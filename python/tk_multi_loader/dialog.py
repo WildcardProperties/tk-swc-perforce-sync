@@ -1192,7 +1192,6 @@ class AppDialog(QtGui.QWidget):
             self.ui.progress.setVisible(True)
         else:
             self.ui.progress.setVisible(False)
-        #self.app.processEvents()
         QtCore.QCoreApplication.processEvents()
 
     def _add_log(self, msg, flag):
