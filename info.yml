@@ -16,12 +16,12 @@ configuration:
     # UI customization
     menu_name:
         type: str
-        default_value: "SWC Perforce Sync"
+        default_value: "P4SG"
         description: Name to appear on the ShotGrid menu.
 
     title_name:
         type: str
-        default_value: "SWC Perforce Sync"
+        default_value: "P4SG"
         description: Name to appear on the title of the UI Dialog.
 
 
