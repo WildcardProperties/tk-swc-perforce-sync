@@ -1123,7 +1123,7 @@ class AppDialog(QtGui.QWidget):
         if self._files_to_sync and len(self._files_to_sync) > 0:
             msg = "\n <span style='color:#2C93E2'>Syncing {} files ... </span> \n".format(len(self._files_to_sync))
             self._add_log(msg, 2)
-            self._get_latest_revision(self._files_to_sync)
+            self._get_latest_revision()
             msg = "\n <span style='color:#2C93E2'>Syncing files is complete</span> \n"
             self._add_log(msg, 2)
             msg = "\n <span style='color:#2C93E2'>Reloading data ...</span> \n"
@@ -1139,8 +1139,8 @@ class AppDialog(QtGui.QWidget):
 
             msg = "\n <span style='color:#2C93E2'>Reloading data is complete</span> \n"
             self._add_log(msg, 2)
-            # Reset the sync queue
-            self._files_to_sync = []
+        # Reset the sync queue
+        self._files_to_sync = []
 
 
     def _get_perforce_summary(self):
@@ -1192,20 +1192,22 @@ class AppDialog(QtGui.QWidget):
 
         return files_to_sync, total_file_count
 
-    def _get_latest_revision(self, files_to_sync):
+    def _get_latest_revision(self):
         """
         Get latest revision
         """
         progress_sum = 0
-        total = len(files_to_sync)
+        total = len(self._files_to_sync)
         if total > 0:
-            for i, file_path in enumerate(files_to_sync):
+            for i, file_path in enumerate(self._files_to_sync):
                 progress_sum = ((i + 1) / total) * 100
                 p4_result = self._p4.run("sync", "-f", file_path + "#head")
                 logger.debug("Syncing file: {}".format(file_path))
                 msg = "({}/{})  Syncing file: {}".format(i+1, total, file_path)
                 self._add_log(msg, 3)
                 self._update_progress(progress_sum)
+        # Reset
+        self._files_to_sync = []
 
     def _update_progress(self, value):
         if 100 > value > 0:
