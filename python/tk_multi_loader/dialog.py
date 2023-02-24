@@ -1219,7 +1219,7 @@ class AppDialog(QtGui.QWidget):
 
         return files_to_sync, total_file_count
 
-    def _get_latest_revision(self):
+    def _get_latest_revision(self, files_to_sync):
         """
         Get latest revision
         """

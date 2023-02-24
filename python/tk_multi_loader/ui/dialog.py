@@ -282,7 +282,7 @@ class Ui_Dialog(object):
         # sp_retain.setRetainSizeWhenHidden(True)
         # self.progress.setSizePolicy(sp_retain)
 
-        self.horizontalLayout_4.addWidget(self.add_to_queue)
+        #self.horizontalLayout_4.addWidget(self.add_to_queue)
         self.horizontalLayout_4.addWidget(self.get_latest_revision)
         self.horizontalLayout_4.addWidget(self.progress)
         spacerItem1 = QtGui.QSpacerItem(128, 20, QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
@@ -409,8 +409,9 @@ class Ui_Dialog(object):
         Dialog.setTabOrder(self.navigation_prev, self.navigation_next)
         Dialog.setTabOrder(self.navigation_next, self.publish_type_list)
         Dialog.setTabOrder(self.publish_type_list, self.show_sub_items)
-        Dialog.setTabOrder(self.show_sub_items, self.add_to_queue)
-        Dialog.setTabOrder(self.add_to_queue, self.get_latest_revision)
+        Dialog.setTabOrder(self.show_sub_items, self.get_latest_revision)
+        #Dialog.setTabOrder(self.show_sub_items, self.add_to_queue)
+        #Dialog.setTabOrder(self.add_to_queue, self.get_latest_revision)
         Dialog.setTabOrder(self.get_latest_revision, self.thumb_scale)
         Dialog.setTabOrder(self.thumb_scale, self.history_view)
 
