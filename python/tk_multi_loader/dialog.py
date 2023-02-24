@@ -295,6 +295,7 @@ class AppDialog(QtGui.QWidget):
 
         #################################################
         # checkboxes, buttons etc
+        self.ui.add_to_queue.clicked.connect(self._on_add_to_queue)
         self.ui.get_latest_revision.clicked.connect(self._on_get_latest_revision)
         # self.ui.show_sub_items.toggled.connect(self._on_show_subitems_toggled)
 
@@ -350,6 +351,9 @@ class AppDialog(QtGui.QWidget):
 
         # trigger an initial evaluation of filter proxy model
         self._apply_type_filters_on_publishes()
+        #################################################
+        # Sync
+        self._files_to_sync = []
 
     def _show_publish_actions(self, pos):
         """
@@ -1088,21 +1092,38 @@ class AppDialog(QtGui.QWidget):
             if default_action:
                 default_action.trigger()
 
+    def _on_add_to_queue(self):
+        """
+        When someone clicks on the "Add to Queue" button
+        """
+        self._connect()
+        files_to_sync, total_file_count = self._get_peforce_data()
+        if total_file_count == 0:
+            # msg = "\n <span style='color:#2C93E2'>No Need to sync these files</span> \n"
+            msg = "\n <span style='color:#2C93E2'>No files are added to the Sync Queue</span> \n"
+            self._add_log(msg, 2)
+
+        if files_to_sync and total_file_count > 0:
+            self._files_to_sync += files_to_sync
+            if total_file_count == 1:
+                msg = "<span style='color:#2C93E2'>Adding one file to the Sync Queue: </span> \n"
+            else:
+                msg = "<span style='color:#2C93E2'>Adding {} files to the Sync Queue: </span> \n".format(total_file_count)
+
+            self._add_log(msg, 2)
+            for file_path in files_to_sync:
+                msg = "{}".format(file_path)
+                self._add_log(msg, 4)
+
     def _on_get_latest_revision(self):
         """
         When someone clicks on the "Get Latest Revision" button
         """
         self._connect()
-        files_to_sync, total_file_count = self._get_peforce_data()
-        files_to_sync_count = len(files_to_sync)
-        if files_to_sync_count == 0:
-            msg = "\n <span style='color:#2C93E2'>No Need to sync</span> \n"
+        if self._files_to_sync and len(self._files_to_sync) > 0:
+            msg = "\n <span style='color:#2C93E2'>Syncing {} files ... </span> \n".format(len(self._files_to_sync))
             self._add_log(msg, 2)
-
-        elif files_to_sync_count > 0:
-            msg = "\n <span style='color:#2C93E2'>Syncing {} files ... </span> \n".format(files_to_sync_count)
-            self._add_log(msg, 2)
-            self._get_latest_revision(files_to_sync)
+            self._get_latest_revision(self._files_to_sync)
             msg = "\n <span style='color:#2C93E2'>Syncing files is complete</span> \n"
             self._add_log(msg, 2)
             msg = "\n <span style='color:#2C93E2'>Reloading data ...</span> \n"
@@ -1114,10 +1135,12 @@ class AppDialog(QtGui.QWidget):
             for p in self._entity_presets:
                 self._entity_presets[p].model.hard_refresh()
             self._setup_details_panel([])
-            self._get_perforce_summary()
+            # self._get_perforce_summary()
 
             msg = "\n <span style='color:#2C93E2'>Reloading data is complete</span> \n"
             self._add_log(msg, 2)
+            # Reset the sync queue
+            self._files_to_sync = []
 
 
     def _get_perforce_summary(self):
@@ -1131,9 +1154,7 @@ class AppDialog(QtGui.QWidget):
             msg = "\n <span style='color:#2C93E2'>No Need to sync</span> \n"
             self._add_log(msg, 2)
 
-        elif files_to_sync_count > 0:
-            msg = "\n <span style='color:#2C93E2'>Need to sync {} files</span> \n".format(files_to_sync_count)
-            self._add_log(msg, 2)
+
 
     ########################################################################################
 
@@ -1196,7 +1217,9 @@ class AppDialog(QtGui.QWidget):
 
     def _add_log(self, msg, flag):
         if flag <= 2:
-            msg = "\n {} \n".format(msg)
+            msg = "\n{}\n".format(msg)
+        else:
+            msg = "{}".format(msg)
         self.ui.log_window.append(msg)
         if flag < 4:
             logger.debug(msg)
