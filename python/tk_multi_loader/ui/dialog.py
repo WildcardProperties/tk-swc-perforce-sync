@@ -251,7 +251,7 @@ class Ui_Dialog(object):
         self.show_sub_items.setObjectName("show_sub_items")
         self.horizontalLayout_4.addWidget(self.show_sub_items)
         # self.show_sub_items.hide()
-
+        """
         self.add_to_queue = QtGui.QToolButton(Dialog)
         sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(0)
@@ -260,7 +260,7 @@ class Ui_Dialog(object):
         self.add_to_queue.setSizePolicy(sizePolicy)
         self.add_to_queue.setMinimumSize(QtCore.QSize(120, 26))
         self.add_to_queue.setObjectName("check_none")
-
+        """
         self.get_latest_revision = QtGui.QToolButton(Dialog)
         sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(0)
@@ -429,9 +429,9 @@ class Ui_Dialog(object):
         self.publish_type_list.setAccessibleName(QtGui.QApplication.translate("Dialog", "publish_type_list", None, QtGui.QApplication.UnicodeUTF8))
         self.check_all.setText(QtGui.QApplication.translate("Dialog", "Select All", None, QtGui.QApplication.UnicodeUTF8))
         self.check_none.setText(QtGui.QApplication.translate("Dialog", "Select None", None, QtGui.QApplication.UnicodeUTF8))
-        self.add_to_queue.setToolTip(QtGui.QApplication.translate("Dialog", "Add current list of files to the <i>Sync Queue</i>.", None, QtGui.QApplication.UnicodeUTF8))
-        self.add_to_queue.setText(QtGui.QApplication.translate("Dialog", "Add to Queue", None, QtGui.QApplication.UnicodeUTF8))
-        self.get_latest_revision.setToolTip(QtGui.QApplication.translate("Dialog", "Sync files in the <i>Sync Queue</i>. Please note that you must click on <i>Add to Queue</i> first before syncing.", None, QtGui.QApplication.UnicodeUTF8))
+        # self.add_to_queue.setToolTip(QtGui.QApplication.translate("Dialog", "Add current list of files to the <i>Sync Queue</i>.", None, QtGui.QApplication.UnicodeUTF8))
+        # self.add_to_queue.setText(QtGui.QApplication.translate("Dialog", "Add to Queue", None, QtGui.QApplication.UnicodeUTF8))
+        # self.get_latest_revision.setToolTip(QtGui.QApplication.translate("Dialog", "Sync files in the <i>Sync Queue</i>. Please note that you must click on <i>Add to Queue</i> first before syncing.", None, QtGui.QApplication.UnicodeUTF8))
         self.get_latest_revision.setText(QtGui.QApplication.translate("Dialog", "Get Latest Revision", None, QtGui.QApplication.UnicodeUTF8))
         self.cog_button.setToolTip(QtGui.QApplication.translate("Dialog", "Tools and Settings", None, QtGui.QApplication.UnicodeUTF8))
         self.cog_button.setAccessibleName(QtGui.QApplication.translate("Dialog", "cog_button", None, QtGui.QApplication.UnicodeUTF8))

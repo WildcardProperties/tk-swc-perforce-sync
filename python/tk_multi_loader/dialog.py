@@ -295,7 +295,7 @@ class AppDialog(QtGui.QWidget):
 
         #################################################
         # checkboxes, buttons etc
-        self.ui.add_to_queue.clicked.connect(self._on_add_to_queue)
+        # self.ui.add_to_queue.clicked.connect(self._on_add_to_queue)
         self.ui.get_latest_revision.clicked.connect(self._on_get_latest_revision)
         # self.ui.show_sub_items.toggled.connect(self._on_show_subitems_toggled)
 
@@ -1091,11 +1091,9 @@ class AppDialog(QtGui.QWidget):
             )
             if default_action:
                 default_action.trigger()
-
+    """
     def _on_add_to_queue(self):
-        """
-        When someone clicks on the "Add to Queue" button
-        """
+        # When someone clicks on the "Add to Queue" button
         self._connect()
         files_to_sync, total_file_count = self._get_peforce_data()
         if total_file_count == 0:
@@ -1116,9 +1114,7 @@ class AppDialog(QtGui.QWidget):
                 self._add_log(msg, 4)
 
     def _on_get_latest_revision(self):
-        """
-        When someone clicks on the "Get Latest Revision" button
-        """
+        # When someone clicks on the "Get Latest Revision" button
         self._connect()
         if self._files_to_sync and len(self._files_to_sync) > 0:
             msg = "\n <span style='color:#2C93E2'>Syncing {} files ... </span> \n".format(len(self._files_to_sync))
@@ -1142,7 +1138,38 @@ class AppDialog(QtGui.QWidget):
         # Reset the sync queue
         self._files_to_sync = []
 
+    """
 
+    def _on_get_latest_revision(self):
+        """
+        When someone clicks on the "Get Latest Revision" button
+        """
+        self._connect()
+        files_to_sync, total_file_count = self._get_peforce_data()
+        files_to_sync_count = len(files_to_sync)
+        if files_to_sync_count == 0:
+            msg = "\n <span style='color:#2C93E2'>No Need to sync</span> \n"
+            self._add_log(msg, 2)
+
+        elif files_to_sync_count > 0:
+            msg = "\n <span style='color:#2C93E2'>Syncing {} files ... </span> \n".format(files_to_sync_count)
+            self._add_log(msg, 2)
+            self._get_latest_revision(files_to_sync)
+            msg = "\n <span style='color:#2C93E2'>Syncing files is complete</span> \n"
+            self._add_log(msg, 2)
+            msg = "\n <span style='color:#2C93E2'>Reloading data ...</span> \n"
+            self._add_log(msg, 2)
+            self._status_model.hard_refresh()
+            self._publish_history_model.hard_refresh()
+            # self._publish_type_model.hard_refresh()
+            self._publish_model.hard_refresh()
+            for p in self._entity_presets:
+                self._entity_presets[p].model.hard_refresh()
+            self._setup_details_panel([])
+            self._get_perforce_summary()
+
+            msg = "\n <span style='color:#2C93E2'>Reloading data is complete</span> \n"
+            self._add_log(msg, 2)
     def _get_perforce_summary(self):
         """
         When someone clicks on the "Get Latest Revision" button
@@ -1197,17 +1224,15 @@ class AppDialog(QtGui.QWidget):
         Get latest revision
         """
         progress_sum = 0
-        total = len(self._files_to_sync)
+        total = len(files_to_sync)
         if total > 0:
-            for i, file_path in enumerate(self._files_to_sync):
+            for i, file_path in enumerate(files_to_sync):
                 progress_sum = ((i + 1) / total) * 100
                 p4_result = self._p4.run("sync", "-f", file_path + "#head")
                 logger.debug("Syncing file: {}".format(file_path))
                 msg = "({}/{})  Syncing file: {}".format(i+1, total, file_path)
                 self._add_log(msg, 3)
                 self._update_progress(progress_sum)
-        # Reset
-        self._files_to_sync = []
 
     def _update_progress(self, value):
         if 100 > value > 0:
