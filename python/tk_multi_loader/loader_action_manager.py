@@ -19,6 +19,7 @@ from sgtk.util import login
 from .action_manager import ActionManager
 from .api import LoaderManager
 
+logger = sgtk.platform.get_logger(__name__)
 
 class LoaderActionManager(ActionManager):
     """
@@ -358,4 +359,5 @@ class LoaderActionManager(ActionManager):
 
             exit_code = os.system(cmd)
             if exit_code != 0:
-                self._engine.log_error("Failed to launch '%s'!" % cmd)
+                # self._engine.log_error("Failed to launch '%s'!" % cmd)
+                logger.debug("Failed to launch: {}".format(cmd))

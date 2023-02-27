@@ -235,9 +235,13 @@ class SgPublishListDelegate(PublishDelegate):
             model_index, SgLatestPublishModel.PUBLISH_TYPE_NAME_ROLE
         )
         created_unixtime = sg_data.get("created_at") or 0
-        date_str = datetime.datetime.fromtimestamp(created_unixtime).strftime(
-            "%Y-%m-%d %H:%M"
-        )
+        if created_unixtime > 0:
+            date_str = datetime.datetime.fromtimestamp(created_unixtime).strftime(
+                "%Y-%m-%d %H:%M"
+            )
+        else:
+            date_str = "Unspecified Date"
+
         # created_by is set to None if the user has been deleted.
         if sg_data.get("created_by") and sg_data["created_by"].get("name"):
             author_str = sg_data["created_by"].get("name")

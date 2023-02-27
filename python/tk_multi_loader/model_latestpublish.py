@@ -16,6 +16,8 @@ import datetime
 from . import utils, constants
 from . import model_item_data
 
+logger = sgtk.platform.get_logger(__name__)
+
 # import the shotgun_model module from the shotgun utils framework
 shotgun_model = sgtk.platform.import_framework(
     "tk-swc-framework-shotgunutils", "shotgun_model"
@@ -226,28 +228,34 @@ class SgLatestPublishModel(ShotgunModel):
         tooltip = "<b>Name:</b> %s" % (sg_item.get("code") or "No name given.")
 
         # Version 012 by John Smith at 2014-02-23 10:34
-        if not isinstance(sg_item.get("created_at"), datetime.datetime):
-            created_unixtime = sg_item.get("created_at") or 0
-            date_str = datetime.datetime.fromtimestamp(created_unixtime).strftime(
-                "%Y-%m-%d %H:%M"
+
+        published_file_type = sg_item.get('type', None)
+        if published_file_type is 'PublishedFile':
+            if created_unixtime <= 0:
+                date_str = "Unspecified Date"
+            else:
+                if not isinstance(sg_item.get("created_at"), datetime.datetime):
+                    created_unixtime = sg_item.get("created_at") or 0
+                    date_str = datetime.datetime.fromtimestamp(created_unixtime).strftime(
+                        "%Y-%m-%d %H:%M"
+                    )
+                else:
+                    date_str = sg_item.get("created_at").strftime("%Y-%m-%d %H:%M")
+
+            # created_by is set to None if the user has been deleted.
+            if sg_item.get("created_by") and sg_item["created_by"].get("name"):
+                author_str = sg_item["created_by"].get("name")
+            else:
+                author_str = "Unspecified User"
+
+            version = sg_item.get("version_number")
+            vers_str = "%03d" % version if version is not None else "N/A"
+
+            tooltip += "<br><br><b>Version:</b> %s by %s at %s" % (
+                vers_str,
+                author_str,
+                date_str,
             )
-        else:
-            date_str = sg_item.get("created_at").strftime("%Y-%m-%d %H:%M")
-
-        # created_by is set to None if the user has been deleted.
-        if sg_item.get("created_by") and sg_item["created_by"].get("name"):
-            author_str = sg_item["created_by"].get("name")
-        else:
-            author_str = "Unspecified User"
-
-        version = sg_item.get("version_number")
-        vers_str = "%03d" % version if version is not None else "N/A"
-
-        tooltip += "<br><br><b>Version:</b> %s by %s at %s" % (
-            vers_str,
-            author_str,
-            date_str,
-        )
         tooltip += "<br><br><b>Path:</b> %s" % (
             (sg_item.get("path") or {}).get("local_path")
         )

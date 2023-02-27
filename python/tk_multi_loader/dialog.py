@@ -30,11 +30,16 @@ from .search_widget import SearchWidget
 from .banner import Banner
 from .loader_action_manager import LoaderActionManager
 from .utils import resolve_filters
+from .publish_app import MultiPublish2
 
 from . import constants
 from . import model_item_data
 
 from .ui.dialog import Ui_Dialog
+
+import os
+from os.path import expanduser
+
 
 logger = sgtk.platform.get_logger(__name__)
 
@@ -295,7 +300,7 @@ class AppDialog(QtGui.QWidget):
 
         #################################################
         # checkboxes, buttons etc
-        # self.ui.add_to_queue.clicked.connect(self._on_add_to_queue)
+        self.ui.fix_files.clicked.connect(self._on_fix_files)
         self.ui.get_latest_revision.clicked.connect(self._on_get_latest_revision)
         # self.ui.show_sub_items.toggled.connect(self._on_show_subitems_toggled)
 
@@ -354,6 +359,10 @@ class AppDialog(QtGui.QWidget):
         #################################################
         # Sync
         self._files_to_sync = []
+        #################################################
+        # Publishing
+        self._home_dir = None
+        self._create_publisher_dir()
 
     def _show_publish_actions(self, pos):
         """
@@ -691,11 +700,19 @@ class AppDialog(QtGui.QWidget):
             # so let's retrieve the standarditem object associated with the index
             item = source_index.model().itemFromIndex(source_index)
 
+            sg_data = item.get_sg_data()
+            if sg_data:
+                # published_file_type = sg_data.get('published_file_type', None)
+                published_file_type = sg_data.get('type', None)
+                logger.debug(">>>>> Type is {}".format(sg_data.get('type', None)))
+                if published_file_type not in ['PublishedFile']:
+                # if not published_file_type:
+                    __clear_publish_history(self._no_selection_pixmap)
+                    return
+
             # render out details
             thumb_pixmap = item.icon().pixmap(512)
             self.ui.details_image.setPixmap(thumb_pixmap)
-
-            sg_data = item.get_sg_data()
 
             if sg_data is None:
                 # an item which doesn't have any sg data directly associated
@@ -1091,6 +1108,61 @@ class AppDialog(QtGui.QWidget):
             )
             if default_action:
                 default_action.trigger()
+
+    def _on_fix_files(self):
+        """
+        When someone clicks on the "Fix Files" button
+        Send unpublished depot files to the Shotgrid Publisher.
+        """
+        msg = "\n <span style='color:#2C93E2'>Sending unpublished depot files to the Shotgrid Publisher...</span> \n"
+        self._add_log(msg, 2)
+
+        # Get list of unpublished depot files
+        depot_file_list, total_file_count = self._get_depot_data()
+
+        msg = "List of files to publish"
+        if total_file_count <= 0:
+            msg = "\n <span style='color:#2C93E2'>There are no unpublished files</span> \n"
+            self._add_log(msg, 2)
+
+        publish_files_path = "{}/publish_files.txt".format(self._home_dir)
+
+        if total_file_count > 0:
+            for file_path in depot_file_list:
+                msg = "Sending file: {}".format(file_path)
+                self._add_log(msg, 4)
+
+            """
+            f = open(publish_files_path, "w")
+            f.write("DEPOT FILES\n")
+            for file_path in depot_file_list:
+                f.write("{}\n".format(file_path))
+                msg = "Sending file: {}".format(file_path)
+                self._add_log(msg, 4)
+            f.close()
+            """
+            """
+            publisher = MultiPublish2()
+            publisher.init_app()
+            """
+
+            engine = sgtk.platform.current_engine()
+            publish_call_back = engine.commands["Publish..."]["callback"]
+            #publish_call_back = engine.commands["Publish..."]depot_file_list
+            publish_call_back()
+            #publish_call_back(file_list=depot_file_list)
+        """
+        for command in engine.commands:
+            msg = command
+            self._add_log(msg, 2)
+        """
+
+    def _create_publisher_dir(self):
+        home_dir = expanduser("~")
+        self._home_dir = "{}/.publisher".format(home_dir)
+        if not os.path.exists(self._home_dir):
+            os.makedirs(self._home_dir)
+
     """
     def _on_add_to_queue(self):
         # When someone clicks on the "Add to Queue" button
@@ -1163,8 +1235,8 @@ class AppDialog(QtGui.QWidget):
             self._publish_history_model.hard_refresh()
             # self._publish_type_model.hard_refresh()
             self._publish_model.hard_refresh()
-            for p in self._entity_presets:
-                self._entity_presets[p].model.hard_refresh()
+            #for p in self._entity_presets:
+            #    self._entity_presets[p].model.hard_refresh()
             self._setup_details_panel([])
             self._get_perforce_summary()
 
@@ -1186,6 +1258,39 @@ class AppDialog(QtGui.QWidget):
     ########################################################################################
 
     # Perforce connection, Sync, and related GUI items
+    def _get_depot_data(self):
+        """
+        Get list of unpublished depot files
+        """
+        total_file_count = 0
+        files_list = []
+
+        model = self.ui.publish_view.model()
+        for row in range(model.rowCount()):
+            model_index = model.index(row, 0)
+            proxy_model = model_index.model()
+            source_index = proxy_model.mapToSource(model_index)
+            # now we have arrived at our model derived from StandardItemModel
+            # so let's retrieve the standarditem object associated with the index
+            item = source_index.model().itemFromIndex(source_index)
+
+            is_folder = item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
+            if not is_folder:
+                # Run default action.
+                total_file_count += 1
+                sg_item = shotgun_model.get_sg_data(model_index)
+                # logger.info("--------->>>>>>  sg_item is: {}".format(sg_item))
+
+                published_file_type = sg_item.get('type', None)
+                # logger.info("--------->>>>>>  published_file_type is: {}".format(published_file_type))
+                if published_file_type == 'depotFile':
+                    if 'path' in sg_item:
+                        local_path = sg_item['path'].get('local_path', None)
+                        if local_path:
+                            files_list.append(local_path)
+
+        return files_list, total_file_count
+
     def _get_peforce_data(self):
         """
         Get lastest revision
@@ -2084,6 +2189,7 @@ class AppDialog(QtGui.QWidget):
         self._publish_model.load_data(
             item, child_folders, show_sub_items, publish_filters
         )
+        logger.info(">>>> item is {}".format(item))
 
     def _populate_entity_breadcrumbs(self, selected_item):
         """
