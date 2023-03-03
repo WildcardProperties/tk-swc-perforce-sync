@@ -30,12 +30,13 @@ from .search_widget import SearchWidget
 from .banner import Banner
 from .loader_action_manager import LoaderActionManager
 from .utils import resolve_filters
-from .publish_app import MultiPublish2
+from .handle_perforce_data import PerforceData
 
 from . import constants
 from . import model_item_data
 
 from .ui.dialog import Ui_Dialog
+from .publish_item import PublishItem
 
 import os
 from os.path import expanduser
@@ -363,6 +364,7 @@ class AppDialog(QtGui.QWidget):
         # Publishing
         self._home_dir = None
         self._create_publisher_dir()
+        self.sg_data_to_publish = []
 
     def _show_publish_actions(self, pos):
         """
@@ -701,6 +703,7 @@ class AppDialog(QtGui.QWidget):
             item = source_index.model().itemFromIndex(source_index)
 
             sg_data = item.get_sg_data()
+
             if sg_data:
                 # published_file_type = sg_data.get('published_file_type', None)
                 published_file_type = sg_data.get('type', None)
@@ -802,10 +805,10 @@ class AppDialog(QtGui.QWidget):
                 msg += __make_table_row("Name", name_str)
                 msg += __make_table_row("Type", type_str)
 
-                version = sg_item.get("version_number")
-                vers_str = "%03d" % version if version is not None else "N/A"
+                #version = sg_item.get("version_number")
+                #vers_str = "%03d" % version if version is not None else "N/A"
 
-                msg += __make_table_row("Version", "%s" % vers_str)
+                #msg += __make_table_row("Version", "%s" % vers_str)
 
                 if sg_item.get("entity"):
                     display_name = shotgun_globals.get_type_display_name(
@@ -845,7 +848,8 @@ class AppDialog(QtGui.QWidget):
 
                 if sg_item.get("revision"):
                     revision = sg_item.get("revision")
-                    msg += __make_table_row("Revision ", revision)
+                    # revision = "#".format(revision)
+                    msg += __make_table_row("Revision#", revision)
 
                 self.ui.details_header.setText("<table>%s</table>" % msg)
 
@@ -1114,103 +1118,21 @@ class AppDialog(QtGui.QWidget):
         When someone clicks on the "Fix Files" button
         Send unpublished depot files to the Shotgrid Publisher.
         """
-        msg = "\n <span style='color:#2C93E2'>Sending unpublished depot files to the Shotgrid Publisher...</span> \n"
-        self._add_log(msg, 2)
-
         # Get list of unpublished depot files
-        depot_file_list, total_file_count = self._get_depot_data()
+        self._publish_depot_data()
 
-        msg = "List of files to publish"
-        if total_file_count <= 0:
-            msg = "\n <span style='color:#2C93E2'>There are no unpublished files</span> \n"
-            self._add_log(msg, 2)
+        msg = "\n <span style='color:#2C93E2'>Reloading data...</span> \n"
+        self._add_log(msg, 2)
+        self._publish_model.hard_refresh()
+        self._setup_details_panel([])
+        #self._on_reload_action_simplified()
 
-        publish_files_path = "{}/publish_files.txt".format(self._home_dir)
-
-        if total_file_count > 0:
-            for file_path in depot_file_list:
-                msg = "Sending file: {}".format(file_path)
-                self._add_log(msg, 4)
-
-            """
-            f = open(publish_files_path, "w")
-            f.write("DEPOT FILES\n")
-            for file_path in depot_file_list:
-                f.write("{}\n".format(file_path))
-                msg = "Sending file: {}".format(file_path)
-                self._add_log(msg, 4)
-            f.close()
-            """
-            """
-            publisher = MultiPublish2()
-            publisher.init_app()
-            """
-
-            engine = sgtk.platform.current_engine()
-            publish_call_back = engine.commands["Publish..."]["callback"]
-            #publish_call_back = engine.commands["Publish..."]depot_file_list
-            publish_call_back()
-            #publish_call_back(file_list=depot_file_list)
-        """
-        for command in engine.commands:
-            msg = command
-            self._add_log(msg, 2)
-        """
 
     def _create_publisher_dir(self):
         home_dir = expanduser("~")
         self._home_dir = "{}/.publisher".format(home_dir)
         if not os.path.exists(self._home_dir):
             os.makedirs(self._home_dir)
-
-    """
-    def _on_add_to_queue(self):
-        # When someone clicks on the "Add to Queue" button
-        self._connect()
-        files_to_sync, total_file_count = self._get_peforce_data()
-        if total_file_count == 0:
-            # msg = "\n <span style='color:#2C93E2'>No Need to sync these files</span> \n"
-            msg = "\n <span style='color:#2C93E2'>No files are added to the Sync Queue</span> \n"
-            self._add_log(msg, 2)
-
-        if files_to_sync and total_file_count > 0:
-            self._files_to_sync += files_to_sync
-            if total_file_count == 1:
-                msg = "<span style='color:#2C93E2'>Adding one file to the Sync Queue: </span> \n"
-            else:
-                msg = "<span style='color:#2C93E2'>Adding {} files to the Sync Queue: </span> \n".format(total_file_count)
-
-            self._add_log(msg, 2)
-            for file_path in files_to_sync:
-                msg = "{}".format(file_path)
-                self._add_log(msg, 4)
-
-    def _on_get_latest_revision(self):
-        # When someone clicks on the "Get Latest Revision" button
-        self._connect()
-        if self._files_to_sync and len(self._files_to_sync) > 0:
-            msg = "\n <span style='color:#2C93E2'>Syncing {} files ... </span> \n".format(len(self._files_to_sync))
-            self._add_log(msg, 2)
-            self._get_latest_revision()
-            msg = "\n <span style='color:#2C93E2'>Syncing files is complete</span> \n"
-            self._add_log(msg, 2)
-            msg = "\n <span style='color:#2C93E2'>Reloading data ...</span> \n"
-            self._add_log(msg, 2)
-            self._status_model.hard_refresh()
-            self._publish_history_model.hard_refresh()
-            # self._publish_type_model.hard_refresh()
-            self._publish_model.hard_refresh()
-            for p in self._entity_presets:
-                self._entity_presets[p].model.hard_refresh()
-            self._setup_details_panel([])
-            # self._get_perforce_summary()
-
-            msg = "\n <span style='color:#2C93E2'>Reloading data is complete</span> \n"
-            self._add_log(msg, 2)
-        # Reset the sync queue
-        self._files_to_sync = []
-
-    """
 
     def _on_get_latest_revision(self):
         """
@@ -1258,12 +1180,13 @@ class AppDialog(QtGui.QWidget):
     ########################################################################################
 
     # Perforce connection, Sync, and related GUI items
-    def _get_depot_data(self):
+    def _publish_depot_data(self):
         """
         Get list of unpublished depot files
         """
+
         total_file_count = 0
-        files_list = []
+        sg_data = []
 
         model = self.ui.publish_view.model()
         for row in range(model.rowCount()):
@@ -1279,17 +1202,54 @@ class AppDialog(QtGui.QWidget):
                 # Run default action.
                 total_file_count += 1
                 sg_item = shotgun_model.get_sg_data(model_index)
-                # logger.info("--------->>>>>>  sg_item is: {}".format(sg_item))
+                #logger.info("--------->>>>>>  current data is: {}".format(sg_item))
+                sg_data.append(sg_item)
+        # logger.debug(">>>>>>>>>>  Checking data {}".format(sg_data))
+        perforce_data_handler = PerforceData(sg_data)
+        self.sg_data_to_publish = perforce_data_handler._get_peforce_data()
 
-                published_file_type = sg_item.get('type', None)
-                # logger.info("--------->>>>>>  published_file_type is: {}".format(published_file_type))
-                if published_file_type == 'depotFile':
-                    if 'path' in sg_item:
-                        local_path = sg_item['path'].get('local_path', None)
-                        if local_path:
-                            files_list.append(local_path)
+        selected_item = self._get_selected_entity()
+        sg_entity = shotgun_model.get_sg_data(selected_item)
+        logger.debug(">>>>>>>>>>  sg_entity {}".format(sg_entity))
 
-        return files_list, total_file_count
+
+        #self._populate_entity_breadcrumbs(selected_item)
+        """
+        model = self._entity_presets[self._current_entity_preset].model
+        logger.debug(">>>>>>>>>>  model {}".format(model))
+        if selected_item and model.canFetchMore(selected_item.index()):
+            model.fetchMore(selected_item.index())
+            logger.debug(">>>>>>>>>>  model.fetchMore(selected_item.index()) {}".format(model.fetchMore(selected_item.index())))
+        """
+        if self.sg_data_to_publish:
+            msg = "\n <span style='color:#2C93E2'>Sending unpublished depot files to the Shotgrid Publisher...</span> \n"
+            self._add_log(msg, 2)
+            for sg_item in self.sg_data_to_publish:
+                sg_item["entity"] = sg_entity
+                if 'path' in sg_item:
+                    file_to_publish = sg_item['path'].get('local_path', None)
+                    msg = "Publishing file: {}...".format(file_to_publish)
+                    self._add_log(msg, 4)
+                    publisher = PublishItem(sg_item)
+                    publish_result = publisher.publish_file()
+                    #if publish_result:
+                    #    logger.debug("New data is: {}".format(publish_result))
+
+            self._reload_treeview()
+            msg = "\n <span style='color:#2C93E2'>Publishing files is complete</span> \n"
+            self._add_log(msg, 2)
+
+        else:
+            msg = "\n <span style='color:#2C93E2'>No need to publish any file</span> \n"
+            self._add_log(msg, 2)
+
+    def _create_key(self, file_path):
+        key = None
+        if file_path:
+            file_path = file_path.replace("\\", "")
+            file_path = file_path.replace("/", "")
+            key = file_path.lower()
+        return key
 
     def _get_peforce_data(self):
         """
@@ -1448,7 +1408,16 @@ class AppDialog(QtGui.QWidget):
         self._publish_model.hard_refresh()
         for p in self._entity_presets:
             self._entity_presets[p].model.hard_refresh()
-        self._get_perforce_summary()
+        # self._get_perforce_summary()
+
+    def _on_reload_action_simplified(self):
+        """
+        Hard reload all caches
+        """
+        self._status_model.hard_refresh()
+        self._publish_history_model.hard_refresh()
+        self._publish_type_model.hard_refresh()
+        self._publish_model.hard_refresh()
 
     ########################################################################################
     # entity listing tree view and presets toolbar
@@ -2098,6 +2067,62 @@ class AppDialog(QtGui.QWidget):
 
         # tell publish UI to update itself
         self._load_publishes_for_entity_item(selected_item)
+        total_file_count = 0
+        sg_data = []
+
+        model = self.ui.publish_view.model()
+        for row in range(model.rowCount()):
+            model_index = model.index(row, 0)
+            proxy_model = model_index.model()
+            source_index = proxy_model.mapToSource(model_index)
+            item = source_index.model().itemFromIndex(source_index)
+
+            is_folder = item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
+            if not is_folder:
+                # Run default action.
+                total_file_count += 1
+                sg_item = shotgun_model.get_sg_data(model_index)
+                sg_data.append(sg_item)
+
+        perforce_data_handler = PerforceData(sg_data)
+        self.sg_data_to_publish = perforce_data_handler._get_peforce_data()
+
+        if self.sg_data_to_publish:
+            msg = "\n <span style='color:#2C93E2'>List of unpublished depot files:</span> \n"
+            self._add_log(msg, 2)
+            for sg_item in self.sg_data_to_publish:
+                if 'path' in sg_item:
+                    file_to_publish = sg_item['path'].get('local_path', None)
+                    msg = "{}".format(file_to_publish)
+                    self._add_log(msg, 4)
+            msg = "\n <span style='color:#2C93E2'>Click on 'Fix Files' to publish above files</span> \n"
+            self._add_log(msg, 2)
+
+    def _reload_treeview(self):
+        """
+        Slot triggered when someone changes the selection in a treeview.
+        """
+
+        selected_item = self._get_selected_entity()
+
+        # update breadcrumbs
+        self._populate_entity_breadcrumbs(selected_item)
+
+        # when an item in the treeview is selected, the child
+        # nodes are displayed in the main view, so make sure
+        # they are loaded.
+        model = self._entity_presets[self._current_entity_preset].model
+        if selected_item and model.canFetchMore(selected_item.index()):
+            model.fetchMore(selected_item.index())
+
+        # notify history
+        self._add_history_record(self._current_entity_preset, selected_item)
+
+        # tell details panel to clear itself
+        self._setup_details_panel([])
+
+        # tell publish UI to update itself
+        self._load_publishes_for_entity_item(selected_item)
 
     def _load_publishes_for_entity_item(self, item):
         """
@@ -2189,7 +2214,7 @@ class AppDialog(QtGui.QWidget):
         self._publish_model.load_data(
             item, child_folders, show_sub_items, publish_filters
         )
-        logger.info(">>>> item is {}".format(item))
+        # logger.info(">>>> item is {}".format(item))
 
     def _populate_entity_breadcrumbs(self, selected_item):
         """

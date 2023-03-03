@@ -230,17 +230,14 @@ class SgLatestPublishModel(ShotgunModel):
         # Version 012 by John Smith at 2014-02-23 10:34
 
         published_file_type = sg_item.get('type', None)
-        if published_file_type is 'PublishedFile':
-            if created_unixtime <= 0:
-                date_str = "Unspecified Date"
+        if published_file_type in ['PublishedFile']:
+            if not isinstance(sg_item.get("created_at"), datetime.datetime):
+                created_unixtime = sg_item.get("created_at") or 0
+                date_str = datetime.datetime.fromtimestamp(created_unixtime).strftime(
+                    "%Y-%m-%d %H:%M"
+                )
             else:
-                if not isinstance(sg_item.get("created_at"), datetime.datetime):
-                    created_unixtime = sg_item.get("created_at") or 0
-                    date_str = datetime.datetime.fromtimestamp(created_unixtime).strftime(
-                        "%Y-%m-%d %H:%M"
-                    )
-                else:
-                    date_str = sg_item.get("created_at").strftime("%Y-%m-%d %H:%M")
+                date_str = sg_item.get("created_at").strftime("%Y-%m-%d %H:%M")
 
             # created_by is set to None if the user has been deleted.
             if sg_item.get("created_by") and sg_item["created_by"].get("name"):
@@ -262,7 +259,7 @@ class SgLatestPublishModel(ShotgunModel):
         tooltip += "<br><br><b>Description:</b> %s" % (
             sg_item.get("description") or "No description given."
         )
-        tooltip += "<br><br><b>Revision:</b> %s" % (
+        tooltip += "<br><br><b>Revision:</b> #%s" % (
                 sg_item.get("revision") or "N/A"
         )
 

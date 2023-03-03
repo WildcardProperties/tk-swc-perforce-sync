@@ -187,8 +187,14 @@ class SgPublishThumbDelegate(PublishDelegate):
         if sg_data.get("name"):
             name_str = sg_data.get("name")
 
-        if sg_data.get("version_number"):
-            name_str += " v%s" % sg_data.get("version_number")
+        #if sg_data.get("version_number"):
+        #    name_str += " v%s" % sg_data.get("version_number")
+
+        if sg_data.get("revision") is not None:
+            revision = sg_data.get("revision", None)
+            name_str += "<span style='color:#2C93E2'>  #%s</span>" % (
+                revision
+            )
 
         # now we are tracking whether this item has a unique task/name/type combo
         # or not via the specially injected task_uniqueness boolean.

@@ -61,10 +61,10 @@ class MaxActions(HookBaseClass):
         :returns List of dictionaries, each with keys name, params, caption and description
         """
         app = self.parent
-        app.log_debug(
-            "Generate actions called for UI element %s. "
-            "Actions: %s. Publish Data: %s" % (ui_area, actions, sg_publish_data)
-        )
+        #app.log_debug(
+        #    "Generate actions called for UI element %s. "
+        #    "Actions: %s. Publish Data: %s" % (ui_area, actions, sg_publish_data)
+        #)
 
         action_instances = []
 
@@ -142,10 +142,10 @@ class MaxActions(HookBaseClass):
         :returns: No return value expected.
         """
         app = self.parent
-        app.log_debug(
-            "Execute action called for action %s. "
-            "Parameters: %s. Publish Data: %s" % (name, params, sg_publish_data)
-        )
+        #app.log_debug(
+        #    "Execute action called for action %s. "
+        #    "Parameters: %s. Publish Data: %s" % (name, params, sg_publish_data)
+        #)
 
         # resolve path
         # toolkit uses utf-8 encoded strings internally and the 3dsmax API expects unicode

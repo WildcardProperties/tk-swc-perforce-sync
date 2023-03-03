@@ -63,10 +63,10 @@ class MariActions(HookBaseClass):
         """
         app = self.parent
         mari_engine = app.engine
-        app.log_debug(
-            "Generate actions called for UI element %s. "
-            "Actions: %s. Publish Data: %s" % (ui_area, actions, sg_publish_data)
-        )
+        #app.log_debug(
+        #    "Generate actions called for UI element %s. "
+        #    "Actions: %s. Publish Data: %s" % (ui_area, actions, sg_publish_data)
+        #)
 
         # if there isn't an open project then we can't do anything:
         if not mari.projects.current():
@@ -149,10 +149,10 @@ class MariActions(HookBaseClass):
         :returns: No return value expected.
         """
         app = self.parent
-        app.log_debug(
-            "Execute action called for action %s. "
-            "Parameters: %s. Publish Data: %s" % (name, params, sg_publish_data)
-        )
+        #app.log_debug(
+        #    "Execute action called for action %s. "
+        #    "Parameters: %s. Publish Data: %s" % (name, params, sg_publish_data)
+        #)
 
         if name == "geometry_import":
             self._import_geometry(sg_publish_data)

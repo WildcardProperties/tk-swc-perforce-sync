@@ -65,10 +65,10 @@ class NukeActions(HookBaseClass):
         :returns List of dictionaries, each with keys name, params, caption and description
         """
         app = self.parent
-        app.log_debug(
-            "Generate actions called for UI element %s. "
-            "Actions: %s. Publish Data: %s" % (ui_area, actions, sg_publish_data)
-        )
+        #app.log_debug(
+        #    "Generate actions called for UI element %s. "
+        #    "Actions: %s. Publish Data: %s" % (ui_area, actions, sg_publish_data)
+        #)
 
         action_instances = []
 
@@ -157,10 +157,10 @@ class NukeActions(HookBaseClass):
         """
         app = self.parent
 
-        app.log_debug(
-            "Execute action called for action %s. "
-            "Parameters: %s. Publish Data: %s" % (name, params, sg_publish_data)
-        )
+        #app.log_debug(
+        #    "Execute action called for action %s. "
+        #    "Parameters: %s. Publish Data: %s" % (name, params, sg_publish_data)
+        #)
 
         # resolve path - forward slashes on all platforms in Nuke
         path = self.get_publish_path(sg_publish_data).replace(os.path.sep, "/")

@@ -188,13 +188,17 @@ class SgPublishListDelegate(PublishDelegate):
         # Publish Name Version 002
 
         sg_data = shotgun_model.get_sg_data(model_index)
+        published_file_type = sg_data.get('type', None)
         # logger.debug(">>>>>>>>>>>> _format_publish: sg_data: {}".format(sg_data))
         main_text = "<b>%s</b>" % (sg_data.get("name") or "Unnamed")
 
-        version = sg_data.get("version_number")
-        vers_str = "%03d" % version if version is not None else "N/A"
+        """
+        if published_file_type in ['PublishedFile']:
+            version = sg_data.get("version_number", None)
+            vers_str = "%03d" % version if version is not None else "N/A"
 
-        main_text += " Version %s" % vers_str
+            main_text += " Version %s" % vers_str
+        """
 
         # If we are in "show subfolders mode, this line will contain
         # the entity information (because we are displaying info from several entities
@@ -226,32 +230,57 @@ class SgPublishListDelegate(PublishDelegate):
 
         if sg_data.get("revision") is not None:
             revision = sg_data["revision"]
-            main_text += "<span style='color:#2C93E2'>  Revision: %s</span>" % (
+            main_text += "<span style='color:#2C93E2'>  #%s</span>" % (
                 revision
             )
 
-        # Quicktime by John Smith at 2014-02-23 10:34
-        pub_type_str = shotgun_model.get_sanitized_data(
-            model_index, SgLatestPublishModel.PUBLISH_TYPE_NAME_ROLE
-        )
-        created_unixtime = sg_data.get("created_at") or 0
-        if created_unixtime > 0:
-            date_str = datetime.datetime.fromtimestamp(created_unixtime).strftime(
-                "%Y-%m-%d %H:%M"
-            )
-        else:
-            date_str = "Unspecified Date"
+        small_text = ""
 
-        # created_by is set to None if the user has been deleted.
-        if sg_data.get("created_by") and sg_data["created_by"].get("name"):
-            author_str = sg_data["created_by"].get("name")
-        else:
-            author_str = "Unspecified User"
-        small_text = "<span style='color:#2C93E2'>%s</span> by %s at %s" % (
-            pub_type_str,
-            author_str,
-            date_str,
-        )
+        if published_file_type in ['PublishedFile']:
+            # Quicktime by John Smith at 2014-02-23 10:34
+            pub_type_str = shotgun_model.get_sanitized_data(
+                model_index, SgLatestPublishModel.PUBLISH_TYPE_NAME_ROLE
+            )
+            created_unixtime = sg_data.get("created_at") or 0
+            if created_unixtime > 0:
+                date_str = datetime.datetime.fromtimestamp(created_unixtime).strftime(
+                    "%Y-%m-%d %H:%M"
+                )
+            else:
+                date_str = "Unspecified Date"
+
+            # created_by is set to None if the user has been deleted.
+            if sg_data.get("created_by") and sg_data["created_by"].get("name"):
+                author_str = sg_data["created_by"].get("name")
+            else:
+                author_str = "Unspecified User"
+            small_text = "<span style='color:#2C93E2'>%s</span> by %s at %s" % (
+                pub_type_str,
+                author_str,
+                date_str,
+            )
+        elif published_file_type in ['depotFile']:
+            pub_type_str = sg_data.get("depot_file_type", "No Type")
+            created_unixtime = int(sg_data.get("headModTime")) or 0
+
+            if created_unixtime > 0:
+                date_str = datetime.datetime.fromtimestamp(created_unixtime).strftime(
+                    "%Y-%m-%d %H:%M"
+                )
+            else:
+                date_str = "Unspecified Date"
+
+            # created_by is set to None if the user has been deleted.
+            if sg_data.get("created_by") and sg_data["created_by"].get("name"):
+                author_str = sg_data["created_by"].get("name")
+            else:
+                author_str = "Unspecified User"
+            small_text = "<span style='color:#2C93E2'>%s</span> by %s at %s" % (
+                pub_type_str,
+                author_str,
+                date_str,
+            )
+
         widget.set_text(main_text, small_text)
 
     def sizeHint(self, style_options, model_index):
