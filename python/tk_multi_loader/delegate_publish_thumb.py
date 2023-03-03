@@ -190,11 +190,7 @@ class SgPublishThumbDelegate(PublishDelegate):
         #if sg_data.get("version_number"):
         #    name_str += " v%s" % sg_data.get("version_number")
 
-        if sg_data.get("revision") is not None:
-            revision = sg_data.get("revision", None)
-            name_str += "<span style='color:#2C93E2'>  #%s</span>" % (
-                revision
-            )
+
 
         # now we are tracking whether this item has a unique task/name/type combo
         # or not via the specially injected task_uniqueness boolean.
@@ -218,6 +214,12 @@ class SgPublishThumbDelegate(PublishDelegate):
 
         # check if we are in "deep mode". In that case, display the entity link info
         # on the thumb card. Otherwise, display the type.
+        if sg_data.get("revision") is not None:
+            revision = sg_data.get("revision", None)
+            details_text = "<span style='color:#2C93E2'>  #%s</span>" % (
+                revision
+            )
+
         if self._sub_items_mode:
 
             # display this publish in sub items node
@@ -228,18 +230,18 @@ class SgPublishThumbDelegate(PublishDelegate):
             # get the name of the associated entity
             entity_link = sg_data.get("entity")
             if entity_link is None:
-                details_text = "Unlinked"
+                details_text += "Unlinked"
             else:
                 entity_link_type = shotgun_globals.get_type_display_name(
                     entity_link["type"]
                 )
-                details_text = "%s %s" % (entity_link_type, entity_link["name"])
+                details_text += "%s %s" % (entity_link_type, entity_link["name"])
 
         else:
             # std publish - render with a name and a publish type
             # main_body v3
             # Render
-            details_text = shotgun_model.get_sanitized_data(
+            details_text += shotgun_model.get_sanitized_data(
                 model_index, SgLatestPublishModel.PUBLISH_TYPE_NAME_ROLE
             )
 
