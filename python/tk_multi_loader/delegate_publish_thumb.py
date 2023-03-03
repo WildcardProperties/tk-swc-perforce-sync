@@ -230,12 +230,12 @@ class SgPublishThumbDelegate(PublishDelegate):
             # get the name of the associated entity
             entity_link = sg_data.get("entity")
             if entity_link is None:
-                details_text += "Unlinked"
+                details_text += " Unlinked"
             else:
                 entity_link_type = shotgun_globals.get_type_display_name(
                     entity_link["type"]
                 )
-                details_text += "%s %s" % (entity_link_type, entity_link["name"])
+                details_text += " %s %s" % (entity_link_type, entity_link["name"])
 
         else:
             # std publish - render with a name and a publish type
