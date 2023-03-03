@@ -216,7 +216,7 @@ class SgPublishThumbDelegate(PublishDelegate):
         # on the thumb card. Otherwise, display the type.
         if sg_data.get("revision") is not None:
             revision = sg_data.get("revision", None)
-            details_text = "<span style='color:#2C93E2'>  #%s</span>" % (
+            details_text = "<span style='color:#2C93E2'>  #%s  </span>" % (
                 revision
             )
 
