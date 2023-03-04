@@ -704,7 +704,7 @@ class AppDialog(QtGui.QWidget):
             item = source_index.model().itemFromIndex(source_index)
 
             sg_data = item.get_sg_data()
-
+            """
             if sg_data:
                 # published_file_type = sg_data.get('published_file_type', None)
                 published_file_type = sg_data.get('type', None)
@@ -713,7 +713,7 @@ class AppDialog(QtGui.QWidget):
                 # if not published_file_type:
                     __clear_publish_history(self._no_selection_pixmap)
                     return
-
+            """
             # render out details
             thumb_pixmap = item.icon().pixmap(512)
             self.ui.details_image.setPixmap(thumb_pixmap)
@@ -806,10 +806,10 @@ class AppDialog(QtGui.QWidget):
                 msg += __make_table_row("Name", name_str)
                 msg += __make_table_row("Type", type_str)
 
-                #version = sg_item.get("version_number")
-                #vers_str = "%03d" % version if version is not None else "N/A"
+                version = sg_item.get("version_number")
+                vers_str = "%03d" % version if version is not None else "N/A"
 
-                #msg += __make_table_row("Version", "%s" % vers_str)
+                msg += __make_table_row("Version", "%s" % vers_str)
 
                 if sg_item.get("entity"):
                     display_name = shotgun_globals.get_type_display_name(
@@ -2039,27 +2039,28 @@ class AppDialog(QtGui.QWidget):
 
         # tell publish UI to update itself
         self._load_publishes_for_entity_item(selected_item)
+        """
         total_file_count = 0
         sg_data = []
 
         model = self.ui.publish_view.model()
-        if model.rowCount() > 0:
-            for row in range(model.rowCount()):
-                model_index = model.index(row, 0)
-                proxy_model = model_index.model()
-                source_index = proxy_model.mapToSource(model_index)
-                item = source_index.model().itemFromIndex(source_index)
+        #if model.rowCount() > 0:
+        for row in range(model.rowCount()):
+            model_index = model.index(row, 0)
+            proxy_model = model_index.model()
+            source_index = proxy_model.mapToSource(model_index)
+            item = source_index.model().itemFromIndex(source_index)
 
-                is_folder = item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
-                if not is_folder:
-                    # Run default action.
-                    total_file_count += 1
-                    sg_item = shotgun_model.get_sg_data(model_index)
-                    sg_data.append(sg_item)
-        else:
-            is_folder = selected_item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
+            is_folder = item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
             if not is_folder:
-                self._publish_main_overlay.show_message_pixmap(self._no_pubs_found_icon)
+                # Run default action.
+                total_file_count += 1
+                sg_item = shotgun_model.get_sg_data(model_index)
+                sg_data.append(sg_item)
+        #else:
+        #    is_folder = selected_item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
+        #     if not is_folder:
+        #        self._publish_main_overlay.show_message_pixmap(self._no_pubs_found_icon)
 
         perforce_data_handler = PerforceData(sg_data)
         self._sg_data_to_publish, self._fstat_dict = perforce_data_handler._get_peforce_data()
@@ -2079,7 +2080,7 @@ class AppDialog(QtGui.QWidget):
                     self._add_log(msg, 4)
             msg = "\n <span style='color:#2C93E2'>Click on 'Fix Files' to publish above files</span> \n"
             self._add_log(msg, 2)
-
+        """
     def _update_revision_data(self):
         if self._fstat_dict:
             model = self.ui.publish_view.model()
