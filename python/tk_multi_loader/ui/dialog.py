@@ -245,7 +245,7 @@ class Ui_Dialog(object):
         self.log_window.setMinimumHeight(187)
         self.log_window.setMaximumHeight(187)
         self.log_window.setMinimumWidth(630)
-        self.log_window.setMaximumWidth(630)
+        # self.log_window.setMaximumWidth(630)
 
         # self.log_window.setMinimumSize(QtCore.QSize(100, 100))
         self.horizontalLayout_8.addWidget(self.log_window)
