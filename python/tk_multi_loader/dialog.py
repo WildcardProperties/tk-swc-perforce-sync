@@ -364,7 +364,8 @@ class AppDialog(QtGui.QWidget):
         # Publishing
         self._home_dir = None
         self._create_publisher_dir()
-        self.sg_data_to_publish = []
+        self._sg_data_to_publish = []
+        self._fstat_dict = {}
 
     def _show_publish_actions(self, pos):
         """
@@ -467,7 +468,7 @@ class AppDialog(QtGui.QWidget):
                 self._entity_presets[
                     p
                 ].view.selectionModel().selectionChanged.disconnect(
-                    self._on_treeview_item_selected
+                    self._reload_treeview
                 )
 
             # gracefully close all connections
@@ -1182,49 +1183,17 @@ class AppDialog(QtGui.QWidget):
     # Perforce connection, Sync, and related GUI items
     def _publish_depot_data(self):
         """
-        Get list of unpublished depot files
+        Publish Depot Data
         """
-
-        total_file_count = 0
-        sg_data = []
-
-        model = self.ui.publish_view.model()
-        for row in range(model.rowCount()):
-            model_index = model.index(row, 0)
-            proxy_model = model_index.model()
-            source_index = proxy_model.mapToSource(model_index)
-            # now we have arrived at our model derived from StandardItemModel
-            # so let's retrieve the standarditem object associated with the index
-            item = source_index.model().itemFromIndex(source_index)
-
-            is_folder = item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
-            if not is_folder:
-                # Run default action.
-                total_file_count += 1
-                sg_item = shotgun_model.get_sg_data(model_index)
-                #logger.info("--------->>>>>>  current data is: {}".format(sg_item))
-                sg_data.append(sg_item)
-        # logger.debug(">>>>>>>>>>  Checking data {}".format(sg_data))
-        perforce_data_handler = PerforceData(sg_data)
-        self.sg_data_to_publish = perforce_data_handler._get_peforce_data()
-
         selected_item = self._get_selected_entity()
         sg_entity = shotgun_model.get_sg_data(selected_item)
-        logger.debug(">>>>>>>>>>  sg_entity {}".format(sg_entity))
+        # logger.debug(">>>>>>>>>>  sg_entity {}".format(sg_entity))
 
 
-        #self._populate_entity_breadcrumbs(selected_item)
-        """
-        model = self._entity_presets[self._current_entity_preset].model
-        logger.debug(">>>>>>>>>>  model {}".format(model))
-        if selected_item and model.canFetchMore(selected_item.index()):
-            model.fetchMore(selected_item.index())
-            logger.debug(">>>>>>>>>>  model.fetchMore(selected_item.index()) {}".format(model.fetchMore(selected_item.index())))
-        """
-        if self.sg_data_to_publish:
+        if self._sg_data_to_publish:
             msg = "\n <span style='color:#2C93E2'>Sending unpublished depot files to the Shotgrid Publisher...</span> \n"
             self._add_log(msg, 2)
-            for sg_item in self.sg_data_to_publish:
+            for sg_item in self._sg_data_to_publish:
                 sg_item["entity"] = sg_entity
                 if 'path' in sg_item:
                     file_to_publish = sg_item['path'].get('local_path', None)
@@ -1235,9 +1204,12 @@ class AppDialog(QtGui.QWidget):
                     #if publish_result:
                     #    logger.debug("New data is: {}".format(publish_result))
 
-            self._reload_treeview()
+
             msg = "\n <span style='color:#2C93E2'>Publishing files is complete</span> \n"
             self._add_log(msg, 2)
+            msg = "\n <span style='color:#2C93E2'>Reloading data</span> \n"
+            self._add_log(msg, 2)
+            self._reload_treeview()
 
         else:
             msg = "\n <span style='color:#2C93E2'>No need to publish any file</span> \n"
@@ -2071,32 +2043,69 @@ class AppDialog(QtGui.QWidget):
         sg_data = []
 
         model = self.ui.publish_view.model()
-        for row in range(model.rowCount()):
-            model_index = model.index(row, 0)
-            proxy_model = model_index.model()
-            source_index = proxy_model.mapToSource(model_index)
-            item = source_index.model().itemFromIndex(source_index)
+        if model.rowCount() > 0:
+            for row in range(model.rowCount()):
+                model_index = model.index(row, 0)
+                proxy_model = model_index.model()
+                source_index = proxy_model.mapToSource(model_index)
+                item = source_index.model().itemFromIndex(source_index)
 
-            is_folder = item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
-            if not is_folder:
-                # Run default action.
-                total_file_count += 1
-                sg_item = shotgun_model.get_sg_data(model_index)
-                sg_data.append(sg_item)
+                is_folder = item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
+                if not is_folder:
+                    # Run default action.
+                    total_file_count += 1
+                    sg_item = shotgun_model.get_sg_data(model_index)
+                    sg_data.append(sg_item)
+        else:
+            self._publish_main_overlay.show_message_pixmap(self._no_pubs_found_icon)
 
         perforce_data_handler = PerforceData(sg_data)
-        self.sg_data_to_publish = perforce_data_handler._get_peforce_data()
+        self._sg_data_to_publish, self._fstat_dict = perforce_data_handler._get_peforce_data()
+        #logger.debug(">>>>>>>>>>  self._fstat_dict is: {}".format(self._fstat_dict))
 
-        if self.sg_data_to_publish:
+        #self._update_revision_data()
+        #self._publish_model.hard_refresh()
+
+
+        if self._sg_data_to_publish:
             msg = "\n <span style='color:#2C93E2'>List of unpublished depot files:</span> \n"
             self._add_log(msg, 2)
-            for sg_item in self.sg_data_to_publish:
+            for sg_item in self._sg_data_to_publish:
                 if 'path' in sg_item:
                     file_to_publish = sg_item['path'].get('local_path', None)
                     msg = "{}".format(file_to_publish)
                     self._add_log(msg, 4)
             msg = "\n <span style='color:#2C93E2'>Click on 'Fix Files' to publish above files</span> \n"
             self._add_log(msg, 2)
+
+    def _update_revision_data(self):
+        if self._fstat_dict:
+            model = self.ui.publish_view.model()
+            for row in range(model.rowCount()):
+                model_index = model.index(row, 0)
+                proxy_model = model_index.model()
+                source_index = proxy_model.mapToSource(model_index)
+                item = source_index.model().itemFromIndex(source_index)
+
+                is_folder = item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
+                if not is_folder:
+                    sg_item = shotgun_model.get_sg_data(model_index)
+                    if "path" in sg_item:
+                        if "local_path" in sg_item["path"]:
+                            local_path = sg_item["path"].get("local_path", None)
+                            modified_local_path = self._create_key(local_path)
+
+                            if modified_local_path and modified_local_path in self._fstat_dict:
+                                have_rev = self._fstat_dict[modified_local_path].get('haveRev', "0")
+                                head_rev = self._fstat_dict[modified_local_path].get('headRev', "0")
+
+                                sg_item["haveRev"], sg_item["headRev"] = have_rev, head_rev
+                                sg_item["revision"] = "{}/{}".format(have_rev, head_rev)
+                                logger.debug(">>>>>>>>>>  Updated sg_item is: {}".format(sg_item.get("revision", None)))
+                                item.setData(sg_item, SgLatestPublishModel.SG_DATA_ROLE)
+                                new_sg_item = shotgun_model.get_sg_data(model_index)
+                                logger.debug(">>>>>>>>>>  new_sg_item is: {}".format(new_sg_item.get("revision", None)))
+
 
     def _reload_treeview(self):
         """

@@ -47,6 +47,7 @@ class PerforceData():
 
     def _get_peforce_data(self):
         sg_data_to_publish = None
+        fstat_dict = {}
         # logger.debug(">>>>>>>>>>  self._sg_data is {}".format(self._sg_data))
         if self._sg_data:
             #if len(self._sg_data) <= 1:
@@ -54,8 +55,10 @@ class PerforceData():
             #    self._sg_data = self._get_small_peforce_data(self._sg_data)
             #else:
             logger.debug(">>>>>>>>>>  Processing large data ...")
-            sg_data_to_publish = self._get_large_peforce_data()
-        return sg_data_to_publish
+            sg_data_to_publish, fstat_dict = self._get_large_peforce_data()
+            #logger.debug(">>>>>  sg_data_to_publish is: {}".format(sg_data_to_publish))
+            #logger.debug("<<<<<<<<<  fstat_dict is: {}".format(fstat_dict))
+        return sg_data_to_publish, fstat_dict
 
     def _get_large_peforce_data(self):
         """"
@@ -107,8 +110,8 @@ class PerforceData():
                                 fstat_dict[modified_client_file]['headChange'] = fstat.get('headChange', None)
 
             #logger.debug(">>>>>>>>>>  fstat_dict is: {}".format(fstat_dict))
-            for k, v in fstat_dict.items():
-                logger.debug(">>>>>>>>>>  {}: {}".format(k, v))
+            #for k, v in fstat_dict.items():
+            #   logger.debug(">>>>>>>>>>  {}: {}".format(k, v))
 
             for i, sg_item in enumerate(self._sg_data):
                 if "path" in sg_item:
@@ -175,7 +178,7 @@ class PerforceData():
                         if publish_result:
                             self._sg_data.append(publish_result)
                         """
-            return sg_data_to_publish
+            return sg_data_to_publish, fstat_dict
                     # logger.debug(">>>>>>>>>>>>>>>>> New SG item: {}".format(sg_item))
 
 

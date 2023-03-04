@@ -112,7 +112,7 @@ class Ui_Dialog(object):
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.publish_type_list.sizePolicy().hasHeightForWidth())
         self.publish_type_list.setSizePolicy(sizePolicy)
-        self.publish_type_list.setMinimumSize(QtCore.QSize(100, 100))
+        self.publish_type_list.setMinimumSize(QtCore.QSize(200, 200))
         self.publish_type_list.setStyleSheet("QListView::item {\n"
 "    border-top: 1px dotted #888888;\n"
 "    padding: 5px;\n"
