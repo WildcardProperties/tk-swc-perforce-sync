@@ -12,7 +12,7 @@ from tank.platform.qt5 import QtWidgets
 class Ui_Dialog(object):
     def setupUi(self, Dialog):
         Dialog.setObjectName("Dialog")
-        Dialog.resize(1226, 782)
+        Dialog.resize(1265, 782)
         self.horizontalLayout_3 = QtGui.QHBoxLayout(Dialog)
         self.horizontalLayout_3.setObjectName("horizontalLayout_3")
         self.left_area = QtGui.QVBoxLayout()
@@ -98,7 +98,7 @@ class Ui_Dialog(object):
         self.top_toolbar.addWidget(self.label)
         self.left_area.addLayout(self.top_toolbar)
         self.entity_preset_tabs = QtGui.QTabWidget(Dialog)
-        self.entity_preset_tabs.setMaximumSize(QtCore.QSize(300, 16777202))
+        self.entity_preset_tabs.setMaximumSize(QtCore.QSize(350, 16777202))
         self.entity_preset_tabs.setUsesScrollButtons(True)
         self.entity_preset_tabs.setObjectName("entity_preset_tabs")
         self.left_area.addWidget(self.entity_preset_tabs)
@@ -112,7 +112,7 @@ class Ui_Dialog(object):
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.publish_type_list.sizePolicy().hasHeightForWidth())
         self.publish_type_list.setSizePolicy(sizePolicy)
-        self.publish_type_list.setMinimumSize(QtCore.QSize(200, 200))
+        self.publish_type_list.setMinimumSize(QtCore.QSize(300, 300))
         self.publish_type_list.setStyleSheet("QListView::item {\n"
 "    border-top: 1px dotted #888888;\n"
 "    padding: 5px;\n"
@@ -244,6 +244,9 @@ class Ui_Dialog(object):
         self.log_window.verticalScrollBar().setValue(self.log_window.verticalScrollBar().maximum())
         self.log_window.setMinimumHeight(187)
         self.log_window.setMaximumHeight(187)
+        self.log_window.setMinmumWidth(630)
+        self.log_window.setMaximumWidth(630)
+
         # self.log_window.setMinimumSize(QtCore.QSize(100, 100))
         self.horizontalLayout_8.addWidget(self.log_window)
         self.middle_area.addLayout(self.horizontalLayout_8)
