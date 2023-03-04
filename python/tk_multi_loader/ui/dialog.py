@@ -244,7 +244,7 @@ class Ui_Dialog(object):
         self.log_window.verticalScrollBar().setValue(self.log_window.verticalScrollBar().maximum())
         self.log_window.setMinimumHeight(187)
         self.log_window.setMaximumHeight(187)
-        self.log_window.setMinmumWidth(630)
+        self.log_window.setMinimumWidth(630)
         self.log_window.setMaximumWidth(630)
 
         # self.log_window.setMinimumSize(QtCore.QSize(100, 100))
