@@ -2057,7 +2057,9 @@ class AppDialog(QtGui.QWidget):
                     sg_item = shotgun_model.get_sg_data(model_index)
                     sg_data.append(sg_item)
         else:
-            self._publish_main_overlay.show_message_pixmap(self._no_pubs_found_icon)
+            is_folder = selected_item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
+            if not is_folder:
+                self._publish_main_overlay.show_message_pixmap(self._no_pubs_found_icon)
 
         perforce_data_handler = PerforceData(sg_data)
         self._sg_data_to_publish, self._fstat_dict = perforce_data_handler._get_peforce_data()
