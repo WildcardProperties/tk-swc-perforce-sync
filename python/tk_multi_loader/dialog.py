@@ -2104,10 +2104,10 @@ class AppDialog(QtGui.QWidget):
 
                                 sg_item["haveRev"], sg_item["headRev"] = have_rev, head_rev
                                 sg_item["revision"] = "{}/{}".format(have_rev, head_rev)
-                                logger.debug(">>>>>>>>>>  Updated sg_item is: {}".format(sg_item.get("revision", None)))
+                                # logger.debug(">>>>>>>>>>  Updated sg_item is: {}".format(sg_item.get("revision", None)))
                                 item.setData(sg_item, SgLatestPublishModel.SG_DATA_ROLE)
                                 new_sg_item = shotgun_model.get_sg_data(model_index)
-                                logger.debug(">>>>>>>>>>  new_sg_item is: {}".format(new_sg_item.get("revision", None)))
+                                # logger.debug(">>>>>>>>>>  new_sg_item is: {}".format(new_sg_item.get("revision", None)))
 
 
     def _reload_treeview(self):

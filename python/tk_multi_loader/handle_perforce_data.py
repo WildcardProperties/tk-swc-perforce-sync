@@ -76,7 +76,7 @@ class PerforceData():
                         # item_path = self._get_item_path(local_path)
                         item_path = os.path.dirname(local_path)
                         item_path_dict[item_path] += 1
-            logger.debug(">>>>>>>>>>  item path dict is: {}".format(item_path_dict))
+            # logger.debug(">>>>>>>>>>  item path dict is: {}".format(item_path_dict))
 
             for key in item_path_dict:
                 if key:
@@ -135,7 +135,7 @@ class PerforceData():
                     sg_item = {}
                     # sg_item = fstat_dict[key]
                     file_path = fstat_dict[key].get("clientFile", None)
-                    logger.debug("----->>>>>>>    file_path: {}".format(file_path))
+                    # logger.debug("----->>>>>>>    file_path: {}".format(file_path))
                     if file_path:
                         sg_item["name"] = os.path.basename(file_path)
                         sg_item["path"] = {}
@@ -168,7 +168,7 @@ class PerforceData():
                         #    sg_item["created_by"] = {}
                         #    sg_item["created_by"]["name"] = user
                         sg_data_to_publish.append(sg_item)
-                        logger.debug("----->>>>>>>    Data to publish: {}".format(sg_data_to_publish))
+                        # logger.debug("----->>>>>>>    Data to publish: {}".format(sg_data_to_publish))
                         """
                         publisher = PublishItem(sg_item)
                         publish_result = publisher.publish_file()
