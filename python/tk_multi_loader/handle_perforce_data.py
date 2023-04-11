@@ -54,7 +54,7 @@ class PerforceData():
             #    logger.debug(">>>>>>>>>>  Processing small data")
             #    self._sg_data = self._get_small_peforce_data(self._sg_data)
             #else:
-            logger.debug(">>>>>>>>>>  Processing large data ...")
+            logger.debug(">>>>>>>>>>  Processing large data ..")
             sg_data_to_publish, fstat_dict = self._get_large_peforce_data()
             #logger.debug(">>>>>  sg_data_to_publish is: {}".format(sg_data_to_publish))
             #logger.debug("<<<<<<<<<  fstat_dict is: {}".format(fstat_dict))

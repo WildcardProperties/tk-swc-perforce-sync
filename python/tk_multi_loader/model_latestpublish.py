@@ -88,6 +88,7 @@ class SgLatestPublishModel(ShotgunModel):
         """
 
         app = sgtk.platform.current_bundle()
+        sg_data = {}
 
         if item is None:
             # nothing selected in the treeview
@@ -147,7 +148,18 @@ class SgLatestPublishModel(ShotgunModel):
                 # Extract the Shotgun data and field value from the node item.
                 (sg_data, field_value) = model_item_data.get_item_data(item)
 
+                #logger.debug(">>>>>>>>>>>>>> entity sg_data is: {}".format(sg_data))
                 if sg_data:
+                    """
+                    entity_id = sg_data.get('id', 0)
+
+                    filters = [["id", "is", id]]
+                    fields = ["path"]
+                    entity_type = sg_data.get('type', None)
+                    entity_path = app.sgtk.paths_from_entity(entity_type, entity_id)
+                    """
+
+                    #logger.debug(">>>>>>>>>>>>>> entity_path is: {}".format(entity_path))
                     # leaf node!
                     # show the items associated. Handle tasks
                     # via the task field instead of the entity field
@@ -210,6 +222,8 @@ class SgLatestPublishModel(ShotgunModel):
         # folders to load, set up the actual model
         self._do_load_data(sg_filters, child_folders)
 
+        return sg_data
+
     def async_refresh(self):
         """
         Refresh the current data set
@@ -262,6 +276,14 @@ class SgLatestPublishModel(ShotgunModel):
         tooltip += "<br><br><b>Revision:</b> #%s" % (
                 sg_item.get("revision") or "N/A"
         )
+        if sg_item.get("headAction"):
+            tooltip += "<br><br><b>Head action:</b> %s" % (
+                    sg_item.get("headAction") or "N/A"
+            )
+        if sg_item.get("action"):
+            tooltip += "<br><br><b>Action:</b> %s" % (
+                    sg_item.get("action") or "N/A"
+            )
 
         item.setToolTip(tooltip)
 

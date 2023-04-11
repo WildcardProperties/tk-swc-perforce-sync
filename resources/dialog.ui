@@ -289,7 +289,7 @@ background-image: url(:/res/right_arrow_pressed.png);
           </size>
          </property>
          <property name="text">
-          <string>Get Latest Revision</string>
+          <string>Sync</string>
          </property>
         </widget>
        </item>
@@ -542,7 +542,7 @@ background-image: url(:/res/right_arrow_pressed.png);
        <item>
         <widget class="QToolButton" name="get_latest_revision">
          <property name="toolTip">
-          <string>Get latest revision</string>
+          <string>Sync</string>
          </property>
          <property name="accessibleName">
           <string>get_latest_revision</string>

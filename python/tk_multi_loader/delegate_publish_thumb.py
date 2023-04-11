@@ -220,6 +220,19 @@ class SgPublishThumbDelegate(PublishDelegate):
                 revision
             )
 
+        if sg_data.get("action") is not None:
+            action = sg_data.get("action", None)
+            details_text += "<span style='color:#2C93E2'>  %s  </span>" % (
+                action
+            )
+        else:
+            if sg_data.get("headAction") is not None:
+                head_action = sg_data.get("headAction", None)
+                details_text += "<span style='color:#2C93E2'>  %s  </span>" % (
+                    head_action
+                )
+
+
         if self._sub_items_mode:
 
             # display this publish in sub items node

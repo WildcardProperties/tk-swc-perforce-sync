@@ -13,6 +13,7 @@ class PublishItem():
     def __init__(self, sg_item):
         self.sg_item = sg_item
         self.entity = None
+        self.publish_path = None
         self.settings = {
             "wire": "Alias File",
             "abc": "Alembic Cache",
@@ -41,40 +42,58 @@ class PublishItem():
             "mp4": "Movie",
             "pdf": "PDF"
         }
+        self.status_dict = {
+            "add": "p4add",
+            "delete": "p4del",
+            "edit": "p4edit"
+        }
 
     def publish_file(self):
         """
         Publish the file
         """
 
-        publish_path = self.get_publish_path()
-        if not publish_path:
+        self.publish_path = self.get_publish_path()
+        if not self.publish_path:
             logger.info("Unable to find publish file")
             return
 
-        publish_name = self.get_publish_name(publish_path)
-
+        name = self.get_name(self.publish_path)
+        published_file_name = self.get_published_file_name(self.publish_path)
+        logger.debug("published_file_name is {}".format(published_file_name))
+        #published_file_name = "{}2".format(published_file_name)
+        #logger.debug("Modified published_file_name is {}".format(published_file_name))
+        #sg_publish_file_name = self.get_SG_publish_file_name(self.publish_path)
+        #logger.debug("SG published_file_name is {}".format(sg_publish_file_name))
 
         entity = self.get_publish_entity()
         entity_type = entity.get("type", None)
         entity_id = entity.get("id", 0)
 
-        # tk = sgtk.sgtk_from_path(publish_path)
+        # tk = sgtk.sgtk_from_path(self.publish_path)
         tk = sgtk.sgtk_from_entity(entity_type, entity_id)
 
-        # ctx = tk.context_from_path(publish_path)
+        # ctx = tk.context_from_path(self.publish_path)
         ctx = tk.context_from_entity(entity_type, entity_id)
 
         logger.debug(">>>>>>>>>>>> entity is: {}".format(entity))
+        """
         logger.debug(">>>>>>>>>>>> tk is: {}".format(tk))
         logger.debug(">>>>>>>>>>>> context is: {}".format(ctx))
+        if self.sg_item:
+            logger.debug(">>>>>>>>>>>> sg_item to be published, begin: ")
+            for k, v in self.sg_item.items():
+                logger.debug("{}: {}".format(k, v))
+            logger.debug(">>>>>>>>>>>> End of sg_item to be published")
+        """
 
-
-        publish_type = self.get_publish_type(publish_path)
+        publish_type = self.get_publish_type(self.publish_path)
 
         publish_version = self.get_publish_version()
+        #publish_version += 1
         publish_fields = self.get_publish_fields()
         description = self.get_description()
+        thumbnail = self.get_thumbnail()
 
         #publish_dependencies_paths = self.get_publish_dependencies(settings, item)
         # publish_user = self.get_publish_user(settings, item)
@@ -85,17 +104,22 @@ class PublishItem():
             "context": ctx,
             "entity": entity,
             "comment": description,
-            "path": publish_path,
-            "name": publish_name,
+            "path": self.publish_path,
+            #"path": published_file_name,
+            #"published_file_name": self.publish_path,
+            "name": name,
+            #"name": published_file_name,
+            "code": published_file_name,
             "version_number": publish_version,
             "published_file_type": publish_type,
             "sg_fields": publish_fields,
             # "created_by": publish_user,
-            # "thumbnail_path": item.get_thumbnail_as_path(),
+            "thumbnail_path": thumbnail,
             #"dependency_paths": publish_dependencies_paths,
             #"dependency_ids": publish_dependencies_ids,
 
         }
+
 
         # logger.debug("publish data: {}".format(publish_data))
 
@@ -105,14 +129,20 @@ class PublishItem():
 
         logger.info("Publish registered!")
         # logger.debug(">>>>> Publish result: {}".format(sg_publish_result))
+
+
         if sg_publish_result:
             logger.debug(">>>>>>>>>>>> Publish result begin: ")
             for k, v in sg_publish_result.items():
                 logger.debug("{}: {}".format(k, v))
-            logger.debug(">>>>>>>>>>>> End of Publish result: ")
+            logger.debug(">>>>>>>>>>>> End of Publish result")
 
         return sg_publish_result
 
+
+    def get_thumbnail(self):
+        thumbnail = self.sg_item.get("image", None)
+        return thumbnail
 
     def get_publish_entity(self):
         publish_entity = {}
@@ -133,11 +163,40 @@ class PublishItem():
             file_to_publish = self.sg_item['path'].get('local_path', None)
         return file_to_publish
 
-    def get_publish_name(self, file_to_publish):
+    def get_published_file_name(self, file_to_publish):
         """
         Get publish name
         """
-        return os.path.basename(file_to_publish)
+        published_file_name = self.sg_item.get("code", None)
+        if published_file_name:
+            return published_file_name
+
+        published_file_name = os.path.basename(file_to_publish)
+        version_number = self.sg_item.get("version_number", None)
+        if version_number:
+            published_file_name = "{}#{}".format(published_file_name, version_number)
+            return published_file_name
+
+        head_rev = self.sg_item.get("headRev", None)
+        if head_rev:
+            published_file_name = "{}#{}".format(published_file_name, head_rev)
+            return published_file_name
+
+        return published_file_name
+
+    def get_SG_publish_file_name(self, file_to_publish):
+        publisher = sgtk.platform.current_bundle()
+        return publisher.execute_hook_method(
+            #"path_info", "get_publish_name", path=file_to_publish, sequence=sequence
+            "path_info", "get_publish_name", path=file_to_publish
+        )
+
+    def get_name(self, file_to_publish):
+        """
+        Get publish name
+        """
+        name = os.path.basename(file_to_publish)
+        return name
 
     def get_publish_type(self, publish_path):
         """
@@ -182,14 +241,50 @@ class PublishItem():
 
     def get_publish_fields(self):
         sg_fields = {}
-        sg_fields["sg_p4_depo_path"] = self.sg_item.get("depotFile", None)
-        sg_fields["sg_p4_change_number"] = int(self.sg_item.get("headChange", None))
-        # sg_fields["Status"] = self.sg_item.get("headAction", None)
-        sg_fields["sg_status_list"] = self.sg_item.get("sg_status_list", None)
-        # sg_fields["link"] = self.entity.get("name", None)
-        # logger.debug(">>>>> Publish sg_fields: {}".format(sg_fields))
+        try:
+            sg_fields["sg_p4_depo_path"] = self.sg_item.get("depotFile", None)
+            change_number = self.sg_item.get("headChange", None)
+            if change_number:
+                sg_fields["sg_p4_change_number"] = int(change_number)
+            # sg_fields["Status"] = self.sg_item.get("headAction", None)
+            sg_fields["sg_status_list"] = self.sg_item.get("sg_status_list", None)
+            sg_fields["sg_p4_depo_path"] = self.sg_item.get("depotFile", None)
+            sg_fields["task"] = self.sg_item.get("task", None)
+            #sg_fields["task.Task.sg_status_list"] = self.sg_item.get("task.Task.sg_status_list", None)
+            #sg_fields["task.Task.due_date"] = self.sg_item.get("task.Task.due_date", None)
+            #sg_fields["task.Task.content"] = self.sg_item.get("task.Task.content", None)
+
+            #published_file_name = self.get_published_file_name(self.publish_path)
+            #sg_fields["code"] = published_file_name
+    
+            #sg_fields["task_uniqueness"] = self.sg_item.get("task_uniqueness", None)
+
+            # sg_fields["link"] = self.entity.get("name", None)
+            #logger.debug(">>>>> Publish sg_fields: {}".format(sg_fields))
+        except:
+            pass
 
         return sg_fields
+
+    def get_sg_status_list(self):
+        sg_status = None
+        if "action" in self.sg_item:
+            action = self.sg_item.get("action", None)
+            if action:
+                action = action.lower()
+                sg_status = self.status_dict.get(action, None)
+                return sg_status
+        elif "headAction" in self.sg_item:
+            action = self.sg_item.get("headAction", None)
+            if action:
+                action = action.lower()
+                sg_status = self.status_dict.get(action, None)
+                return sg_status
+        elif "sg_status_list" in self.sg_item:
+            return self.sg_item.get("sg_status_list", None)
+        return sg_status
+
+
 
     def get_description(self):
         return self.sg_item.get("description", None)

@@ -234,6 +234,19 @@ class SgPublishListDelegate(PublishDelegate):
                 revision
             )
 
+        if sg_data.get("action") is not None:
+            action = sg_data["action"]
+            main_text += "<span style='color:#2C93E2'>  %s</span>" % (
+                action
+            )
+        else:
+            if sg_data.get("headAction") is not None:
+                head_action = sg_data["headAction"]
+                main_text += "<span style='color:#2C93E2'>  %s</span>" % (
+                    head_action
+                )
+
+
         small_text = ""
 
         if published_file_type in ['PublishedFile']:

@@ -14,6 +14,7 @@ from tank.util import sgre as re
 logger = sgtk.platform.get_logger(__name__)
 
 
+#class P4SGPUBLISHER(sgtk.platform.Application):
 class MultiPublish2(sgtk.platform.Application):
     """
     This is the :class:`sgtk.platform.Application` subclass that defines the
@@ -21,6 +22,9 @@ class MultiPublish2(sgtk.platform.Application):
     """
 
     CONFIG_PRE_PUBLISH_HOOK_PATH = "pre_publish"
+
+    def __init__(self):
+        self.init_app()
 
     def init_app(self):
         """
@@ -38,7 +42,7 @@ class MultiPublish2(sgtk.platform.Application):
         self._util = tk_multi_publish2.util
 
         # make the base plugins available via the app
-        self._base_hooks = tk_multi_publish2.base_hooks
+        # self._base_hooks = tk_multi_publish2.base_hooks
 
         display_name = self.get_setting("display_name")
         # "Publish Render" ---> publish_render
@@ -48,8 +52,8 @@ class MultiPublish2(sgtk.platform.Application):
 
         self.modal = self.get_setting("modal")
 
-        pre_publish_hook_path = self.get_setting(self.CONFIG_PRE_PUBLISH_HOOK_PATH)
-        self.pre_publish_hook = self.create_hook_instance(pre_publish_hook_path)
+        # pre_publish_hook_path = self.get_setting(self.CONFIG_PRE_PUBLISH_HOOK_PATH)
+        # self.pre_publish_hook = self.create_hook_instance(pre_publish_hook_path)
 
         # register command
         cb = lambda: tk_multi_publish2.show_dialog(self)
