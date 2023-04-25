@@ -2,6 +2,11 @@ import os
 import sgtk
 from tank.util import sgre as re
 
+from .date_time import create_human_readable_timestamp, create_human_readable_date, get_time_now
+import datetime
+
+from sgtk.util import login
+
 logger = sgtk.platform.get_logger(__name__)
 
 
@@ -12,6 +17,7 @@ class PublishItem():
 
     def __init__(self, sg_item):
         self.sg_item = sg_item
+        self.app = sgtk.platform.current_bundle()
         self.entity = None
         self.publish_path = None
         self.settings = {
@@ -44,6 +50,7 @@ class PublishItem():
         }
         self.status_dict = {
             "add": "p4add",
+            "move/add": "p4add",
             "delete": "p4del",
             "edit": "p4edit"
         }
@@ -77,7 +84,7 @@ class PublishItem():
         ctx = tk.context_from_entity(entity_type, entity_id)
 
         logger.debug(">>>>>>>>>>>> entity is: {}".format(entity))
-        """
+
         logger.debug(">>>>>>>>>>>> tk is: {}".format(tk))
         logger.debug(">>>>>>>>>>>> context is: {}".format(ctx))
         if self.sg_item:
@@ -85,8 +92,8 @@ class PublishItem():
             for k, v in self.sg_item.items():
                 logger.debug("{}: {}".format(k, v))
             logger.debug(">>>>>>>>>>>> End of sg_item to be published")
-        """
 
+        publish_time = self.get_publish_time()
         publish_type = self.get_publish_type(self.publish_path)
 
         publish_version = self.get_publish_version()
@@ -96,7 +103,8 @@ class PublishItem():
         thumbnail = self.get_thumbnail()
 
         #publish_dependencies_paths = self.get_publish_dependencies(settings, item)
-        # publish_user = self.get_publish_user(settings, item)
+        publish_user = self.get_publish_user()
+
 
         logger.info("Registering publish...")
         publish_data = {
@@ -109,11 +117,13 @@ class PublishItem():
             #"published_file_name": self.publish_path,
             "name": name,
             #"name": published_file_name,
-            "code": published_file_name,
+            #"code": published_file_name,
+            "code": name,
             "version_number": publish_version,
             "published_file_type": publish_type,
             "sg_fields": publish_fields,
-            # "created_by": publish_user,
+            "created_by": publish_user,
+            "created_at": publish_time,
             "thumbnail_path": thumbnail,
             #"dependency_paths": publish_dependencies_paths,
             #"dependency_ids": publish_dependencies_ids,
@@ -125,6 +135,7 @@ class PublishItem():
 
         # create the publish and stash it in the item properties for other
         # plugins to use.
+
         sg_publish_result = sgtk.util.register_publish(**publish_data)
 
         logger.info("Publish registered!")
@@ -140,8 +151,10 @@ class PublishItem():
         return sg_publish_result
 
 
+
     def get_thumbnail(self):
         thumbnail = self.sg_item.get("image", None)
+        # logger.debug("Publish image is: {}".format(thumbnail))
         return thumbnail
 
     def get_publish_entity(self):
@@ -219,25 +232,56 @@ class PublishItem():
                 publish_type = "Folder"
         return publish_type
 
+    def get_publish_user(self):
+        publish_user = None
+        p4_user = self.sg_item.get("p4_user", None)
+        if p4_user:
+            publish_user = self.app.shotgun.find_one('HumanUser',
+                                              [['sg_p4_user', 'is', p4_user]],
+                                              ["id", "type", "email", "login", "name", "image"])
+        logger.debug(">>> Publish user is: {}".format(publish_user))
+        if not publish_user:
+            action_owner = self.sg_item.get("actionOwner", None)
+            if action_owner:
+                publish_user = self.app.shotgun.find_one('HumanUser',
+                                                     [['sg_p4_user', 'is', action_owner]],
+                                                     ["id", "type", "email", "login", "name", "image"])
+        logger.debug(">>>> Publish user is: {}".format(publish_user))
+        if not publish_user:
+            publish_user = login.get_current_user(self.app.sgtk)
+            #publish_user = engine.get_current_user()
+            #user = engine.get_current_login()
+            #publish_user = connection.find_one(
+            #    "HumanUser", [["id", "is", user["id"]]],
+            #    ["id", "type", "email", "login", "name", "image"])
+            # publish_user = publish_user.get("name", None)
+        logger.debug(">>>>> Publish user is: {}".format(publish_user))
+        return publish_user
 
-    def get_publish_user(self, settings, item):
-        """
-        Get the user that will be associated with this publish.
+    def get_publish_time(self):
+        publish_time = None
+        version_numer = int(self.sg_item.get("version_number", 0))
+        if version_numer == 0:
+            # No prior publish, use Perforce creation time as publish time
+            dt = self.sg_item.get("headTime", None)
+            logger.debug(">>>>> dt is: {}".format(dt))
+            if dt:
+                publish_time = create_human_readable_timestamp(dt)
+        else:
+            publish_time = get_time_now()
+        logger.debug(">>>>> Publish time is: {}".format(publish_time))
+        return publish_time
 
-        If publish_user is not defined as a ``property`` or ``local_property``,
-        this method will return ``None``.
-
-        :param settings: This plugin instance's configured settings
-        :param item: The item to determine the publish template for
-
-        :return: A user entity dictionary or ``None`` if not defined.
-        """
-        pass
 
     def get_publish_version(self):
-
         # use the p4 revision number as the version number
-        return int(self.sg_item.get("headRev", 0))
+        version_numer = int(self.sg_item.get("headRev", 0))
+
+        action = self.sg_item.get("action", None)
+        if action and action in ["add", "move/add", "edit", "delete"]:
+            # Get next version
+            version_numer += 1
+        return version_numer
 
     def get_publish_fields(self):
         sg_fields = {}
@@ -256,7 +300,7 @@ class PublishItem():
 
             #published_file_name = self.get_published_file_name(self.publish_path)
             #sg_fields["code"] = published_file_name
-    
+
             #sg_fields["task_uniqueness"] = self.sg_item.get("task_uniqueness", None)
 
             # sg_fields["link"] = self.entity.get("name", None)

@@ -214,11 +214,16 @@ class SgPublishThumbDelegate(PublishDelegate):
 
         # check if we are in "deep mode". In that case, display the entity link info
         # on the thumb card. Otherwise, display the type.
+        details_text = ""
         if sg_data.get("revision") is not None:
+            action = sg_data.get("action", None)
+            if action and action == "delete":
+                details_text += "<span style='color:rgb(255, 0, 0)'>x</span>"
             revision = sg_data.get("revision", None)
-            details_text = "<span style='color:#2C93E2'>  #%s  </span>" % (
-                revision
-            )
+            if revision:
+                details_text += "<span style='color:#2C93E2'>  #%s  </span>" % (
+                    revision
+                )
 
         if sg_data.get("action") is not None:
             action = sg_data.get("action", None)

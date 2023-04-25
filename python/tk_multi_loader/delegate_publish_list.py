@@ -229,10 +229,15 @@ class SgPublishListDelegate(PublishDelegate):
             main_text += "  (Task %s)" % sg_data["task"]["name"]
 
         if sg_data.get("revision") is not None:
-            revision = sg_data["revision"]
-            main_text += "<span style='color:#2C93E2'>  #%s</span>" % (
-                revision
-            )
+            action = sg_data.get("action", None)
+            if action and action == "delete":
+                main_text += "<span style='color:rgb(255, 0, 0)'>x</span>"
+
+            revision = sg_data.get("revision", None)
+            if revision:
+                main_text += "<span style='color:#2C93E2'>  #%s</span>" % (
+                    revision
+                )
 
         if sg_data.get("action") is not None:
             action = sg_data["action"]
