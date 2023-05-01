@@ -89,6 +89,16 @@ def create_human_readable_timestamp(dt):
     #logger.debug(">>>>>>>>>> date_str 2 is: {}".format(date_str))
     return date_str
 
+def create_publish_timestamp(dt):
+    created_unixtime = int(dt)
+
+    date_str = datetime.datetime.fromtimestamp(created_unixtime).strftime(
+        "%m-%d-%y %H:%M:%S"
+    )
+    #logger.debug(">>>>>>>>>> date_str 1 is: {}".format(date_str))
+
+    return date_str
+
 def get_time_now():
     date_str = datetime.datetime.now()
     return date_str

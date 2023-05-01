@@ -1,6 +1,7 @@
 import os
 import sgtk
 from tank.util import sgre as re
+from urllib import request
 
 from .date_time import create_human_readable_timestamp, create_human_readable_date, get_time_now
 import datetime
@@ -65,6 +66,7 @@ class PublishItem():
             logger.info("Unable to find publish file")
             return
 
+        self.publish_version = self.get_publish_version()
         name = self.get_name(self.publish_path)
         published_file_name = self.get_published_file_name(self.publish_path)
         logger.debug("published_file_name is {}".format(published_file_name))
@@ -96,11 +98,9 @@ class PublishItem():
         publish_time = self.get_publish_time()
         publish_type = self.get_publish_type(self.publish_path)
 
-        publish_version = self.get_publish_version()
-        #publish_version += 1
         publish_fields = self.get_publish_fields()
         description = self.get_description()
-        thumbnail = self.get_thumbnail()
+        thumbnail_url = self.get_thumbnail()
 
         #publish_dependencies_paths = self.get_publish_dependencies(settings, item)
         publish_user = self.get_publish_user()
@@ -113,18 +113,15 @@ class PublishItem():
             "entity": entity,
             "comment": description,
             "path": self.publish_path,
-            #"path": published_file_name,
-            #"published_file_name": self.publish_path,
             "name": name,
-            #"name": published_file_name,
             #"code": published_file_name,
-            "code": name,
-            "version_number": publish_version,
+            "version_number": self.publish_version,
             "published_file_type": publish_type,
             "sg_fields": publish_fields,
             "created_by": publish_user,
             "created_at": publish_time,
-            "thumbnail_path": thumbnail,
+            "thumbnail_path": thumbnail_url,
+            #"image": thumbnail_url,
             #"dependency_paths": publish_dependencies_paths,
             #"dependency_ids": publish_dependencies_ids,
 
@@ -147,6 +144,21 @@ class PublishItem():
             for k, v in sg_publish_result.items():
                 logger.debug("{}: {}".format(k, v))
             logger.debug(">>>>>>>>>>>> End of Publish result")
+            #image_path = thumbnail_url
+            #request.urlretrieve(thumbnail_url, image_path)
+            #sg.download_attachment(thumbnail_url, image_path)
+            updated_data = {
+                'code': published_file_name,
+                #'image': image_path,
+                #'image': thumbnail_url,
+                #'thumbnail_path': thumbnail_url
+            }
+            logger.debug("updated_data: {}".format(updated_data))
+            id = sg_publish_result.get("id", None)
+            if id and updated_data:
+                update_res = self.app.shotgun.update("PublishedFile", id, updated_data)
+                logger.debug("Updated published file: {}".format(update_res))
+
 
         return sg_publish_result
 
@@ -180,6 +192,10 @@ class PublishItem():
         """
         Get publish name
         """
+        name = os.path.basename(file_to_publish)
+        published_file_name = "{}#{}".format(name, self.publish_version)
+
+        """
         published_file_name = self.sg_item.get("code", None)
         if published_file_name:
             return published_file_name
@@ -194,6 +210,7 @@ class PublishItem():
         if head_rev:
             published_file_name = "{}#{}".format(published_file_name, head_rev)
             return published_file_name
+        """
 
         return published_file_name
 
@@ -277,10 +294,10 @@ class PublishItem():
         # use the p4 revision number as the version number
         version_numer = int(self.sg_item.get("headRev", 0))
 
-        action = self.sg_item.get("action", None)
-        if action and action in ["add", "move/add", "edit", "delete"]:
-            # Get next version
-            version_numer += 1
+        #action = self.sg_item.get("action", None)
+        #if action and action in ["add", "move/add", "edit", "delete"]:
+        #    # Get next version
+        #    version_numer += 1
         return version_numer
 
     def get_publish_fields(self):
