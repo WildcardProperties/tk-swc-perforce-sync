@@ -2383,7 +2383,7 @@ class AppDialog(QtGui.QWidget):
                     if "local_path" in sg_item["path"]:
                         target_file = sg_item["path"].get("local_path", None)
                         depot_file = sg_item.get("depotFile", None)
-
+                        """
                         if action in ["add", "move/add", "edit", "delete"]:
                             msg = "{} file {}".format(action, depot_file)
 
@@ -2487,7 +2487,7 @@ class AppDialog(QtGui.QWidget):
                             self._add_log(msg, 3)
                             publisher = PublishItem(sg_item)
                             publish_result = publisher.publish_file()
-                    """
+
 
         self._update_perforce_data()
         # self.print_publish_data()
