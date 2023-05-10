@@ -41,7 +41,7 @@ class PerformActions():
         # Perform the action
         perform_res = self.perform_action()
         #  Submit the changelist to Perforce
-        submit = self.submit_change()
+        # submit = self.submit_change()
         # Update sg_item
         self.update_sg_item()
 
@@ -77,6 +77,7 @@ class PerformActions():
         action = self.action_dict.get(self.action, None)
         if action:
             action_result = self.p4.run(action, "-c", self.change, "-v", self.local_path)
+            # action_result = self.p4.run(action, "-c", self.change, "-v", self.depot_file)
             logger.debug(">>>> action_result: {}".format(action_result))
         return action_result
 

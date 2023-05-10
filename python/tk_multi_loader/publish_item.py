@@ -47,7 +47,7 @@ class PublishItem():
             "jpg":  "Image",
             "mov": "Movie",
             "mp4": "Movie",
-            "pdf": "PDF"
+            "pdf": "PDF",
         }
         self.status_dict = {
             "add": "p4add",
@@ -56,7 +56,98 @@ class PublishItem():
             "edit": "p4edit"
         }
 
-    def publish_file(self):
+    def gui_publishing(self):
+
+        engine = sgtk.platform.current_engine()
+        engine.commands['Publish...']["callback"]()
+        #engine.commands['SWCPublish...']["callback"]()
+
+
+    def gui_publishing_2(self):
+        tk_multi_publish2 = self.import_module("tk_multi_publish2")
+
+        # the manager class provides the interface for publishing. We store a
+        # reference to it to enable the create_publish_manager method exposed on
+        # the application itself
+        self._manager_class = tk_multi_publish2.PublishManager
+
+        # make the util methods available via the app instance
+        self._util = tk_multi_publish2.util
+
+        # make the base plugins available via the app
+        self._base_hooks = tk_multi_publish2.base_hooks
+
+        display_name = self.get_setting("display_name")
+        # "Publish Render" ---> publish_render
+        command_name = display_name.lower()
+        # replace all non alphanumeric characters by '_'
+        command_name = re.sub(r"[^0-9a-zA-Z]+", "_", command_name)
+
+        self.modal = self.get_setting("modal")
+
+        pre_publish_hook_path = self.get_setting(self.CONFIG_PRE_PUBLISH_HOOK_PATH)
+        self.pre_publish_hook = self.create_hook_instance(pre_publish_hook_path)
+
+        # register command
+        cb = lambda: tk_multi_publish2.show_dialog(self)
+        menu_caption = "%s..." % display_name
+        menu_options = {
+            "short_name": command_name,
+            "description": "Publishing of data to ShotGrid",
+            # dark themed icon for engines that recognize this format
+            "icons": {
+                "dark": {"png": os.path.join(self.disk_location, "icon_256_dark.png")}
+            },
+        }
+        self.engine.register_command(menu_caption, cb, menu_options)
+
+    def gui_publishing_1(self):
+        # need to have an engine running in a context where the publisher has been
+        # configured.
+        engine = sgtk.platform.current_engine()
+
+        # get the publish app instance from the engine's list of configured apps
+        publish_app = engine.apps.get("tk-multi-publish2")
+
+
+        # ensure we have the publisher instance.
+        if not publish_app:
+            raise Exception("The publisher is not configured for this context.")
+
+
+        # create a new publish manager instance
+        manager = publish_app.create_publish_manager()
+
+        # now we can run the collector that is configured for this context
+        manager.collect_session()
+
+        # collect some external files to publish
+        # manager.collect_files([path1, path2, path3])
+
+        # validate the items to publish
+        tasks_failed_validation = manager.validate()
+
+        # oops, some tasks are invalid. see if they can be fixed
+        if tasks_failed_validation:
+            fix_invalid_tasks(tasks_failed_validation)
+            # try again here or bail
+
+        logger.debug(">>>> Showing publisher ...")
+        cb = lambda: publish_app.show_dialog(self)
+        #publish_app.show_dialog(self)
+        """
+        # all good. let's publish and finalize
+        try:
+            manager.publish()
+            # If a plugin needed to version up a file name after publish
+            # it would be done in the finalize.
+            manager.finalize()
+        except Exception as error:
+            logger.error("There was trouble trying to publish!")
+            logger.error("Error: %s", error)
+        """
+
+    def commandline_publishing(self):
         """
         Publish the file
         """
