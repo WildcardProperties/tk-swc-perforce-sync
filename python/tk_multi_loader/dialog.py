@@ -13,6 +13,7 @@ import sgtk
 from sgtk.util import login
 from sgtk import TankError
 from sgtk.platform.qt import QtCore, QtGui
+import tank
 from tank.platform.qt5 import QtWidgets
 
 import datetime
@@ -46,6 +47,7 @@ from .publish_files_ui import PublishFilesUI
 #from .publish_app import P4SGPUBLISHER
 from .publish_app import MultiPublish2
 from .perforce_change import create_change, add_to_change, submit_change
+from .treeview_widget import TreeViewWidget
 from collections import defaultdict, OrderedDict
 import os
 from os.path import expanduser
@@ -403,13 +405,44 @@ class AppDialog(QtGui.QWidget):
         self._submitted_publish_list = []
         self._pending_publish_list = []
         self._change_dict = {}
+        self._entity_path = None
         #self.publish_files_ui.add_publish_files_button.clicked.connect(self.post_publish)
         #################################################
         # Perforce Views
         self.main_view_mode = self.MAIN_VIEW_THUMB
+        self.repo_root = os.path.normpath(
+            os.path.join(os.path.dirname(__file__), "..", "..")
+        )
+        submitted_image_path = os.path.join(self.repo_root, "icons/mode_switch_submitted_active.png")
+        self.submitted_icon = QtGui.QIcon(QtGui.QPixmap(submitted_image_path))
+
+        inactive_submitted_image_path = os.path.join(self.repo_root, "submitted_off.png")
+        #self.inactive_submitted_icon = QtGui.QIcon(QtGui.QPixmap(inactive_submitted_image_path))
+        self.submitted_icon_inactive = QtGui.QIcon(QtGui.QPixmap(inactive_submitted_image_path))
+
+
+
+        pending_image_path = os.path.join(self.repo_root, "icons/mode_switch_pending_active.png")
+        self.pending_icon = QtGui.QIcon(QtGui.QPixmap(pending_image_path))
+
+        inactive_pending_image_path = os.path.join(self.repo_root, "icons/pending_off.png")
+        # self.inactive_pending_icon = QtGui.QIcon(QtGui.QPixmap(inactive_pending_image_path))
+        self.pending_icon_inactive = QtGui.QIcon(QtGui.QPixmap(inactive_pending_image_path))
+
+        self._root_path = self._app.sgtk.roots.get('primary', None)
+        # logger.debug("root_path:{}".format(self._root_path))
+        self._drive = "Z:"
+        if self._root_path:
+            self._drive = self._root_path[0:2]
+
         #################################################
         # Perforce data
-
+        self.action_dict = {
+            "add": "add",
+            "move/add": "add",
+            "delete": "delete",
+            "edit": "edit"
+        }
         self.status_dict = {
             "add": "p4add",
             "move/add": "p4add",
@@ -594,13 +627,30 @@ class AppDialog(QtGui.QWidget):
         default_changelist = self._p4.fetch_change()
         key = "default"
         self._change_dict[key] = []
+        sg_item = {}
+        sg_item['changeListInfo'] = True
+        sg_item['headTime'] = default_changelist.get('time', None)
+        sg_item['p4_user'] = default_changelist.get('User', None)
+        description = default_changelist.get('Description', None)
+        if not description or "description" in description:
+            description = "Default Changelist"
+        sg_item['description'] = description
+        self._change_dict[key].append(sg_item)
+
         # logger.debug("<<<<<<<  default_changelist: {}".format(default_changelist))
         if default_changelist:
             depot_files = default_changelist.get('Files', None)
             if depot_files:
                 for depot_file in depot_files:
-
                     if depot_file:
+                        client_file = self._get_client_file(depot_file)
+                        if client_file:
+                            sg_item = {}
+                            sg_item["depotFile"] = depot_file
+                            sg_item["path"] = {}
+                            sg_item["path"]["local_path"] = client_file
+                            self._change_dict[key].append(sg_item)
+                        """
                         fstat_list = self._p4.run("fstat", depot_file)
                         if fstat_list:
                             sg_item = fstat_list[0]
@@ -626,6 +676,7 @@ class AppDialog(QtGui.QWidget):
                             #sg_item["depot_file_type"] = self._get_publish_type(file_path)
 
                             self._change_dict[key].append(sg_item)
+                        """
 
 
 
@@ -637,47 +688,95 @@ class AppDialog(QtGui.QWidget):
         workspace = client.get("Client", None)
 
         change_lists = self._p4.run_changes("-l", "-s", "pending", "-c", workspace)
-        #logger.debug("<<<<<<<  change_lists: {}".format(change_lists))
+        # logger.debug("<<<<<<<  change_lists: {}".format(change_lists))
+
         for change_list in change_lists:
             key = change_list.get("change", None)
             #logger.debug("{}".format(key))
-            if key not in self._change_dict:
-                self._change_dict[key] = []
-
             desc_files = self._p4.run("describe", "-O", key)
             # logger.debug(">>>> desc_files: {}".format(depot_file))
-            for desc in desc_files:
-                depot_files = desc.get('depotFile', None)
-                if depot_files:
-                    for depot_file in depot_files:
-                        if depot_file:
-                            fstat_list = self._p4.run("fstat", depot_file)
-                            if fstat_list:
-                                sg_item = fstat_list[0]
-                                # logger.debug("Key: {}, sg_item: {}".format(key, sg_item))
-                                sg_item['description'] = change_list.get("desc", None)
-                                sg_item['p4_user'] = change_list.get('user', None)
-                                file_path = sg_item.get("clientFile", None)
-                                if file_path:
-                                    #sg_item["name"] = os.path.basename(file_path)
+            if desc_files:
+
+                for desc in desc_files:
+                    # logger.debug(">>>> desc_file: {}".format(desc))
+                    depot_files = desc.get('depotFile', None)
+
+                    if depot_files:
+                        if key not in self._change_dict:
+                            self._change_dict[key] = []
+                        sg_item = {}
+                        sg_item['changeListInfo'] = True
+                        sg_item['headTime'] = change_list.get('time', None)
+                        sg_item['p4_user'] = change_list.get('user', None)
+                        sg_item['description'] = change_list.get('desc', None)
+                        # Add info sg_item
+                        self._change_dict[key].append(sg_item)
+
+                        files_rev = desc.get('rev', None)
+                        files_action = desc.get('action', None)
+                        change_file_info = zip(depot_files, files_rev, files_action)
+
+                        for depot_file, rev, action in change_file_info:
+                            if depot_file:
+                                client_file = self._get_client_file(depot_file)
+                                if client_file:
+                                    sg_item = {}
+                                    sg_item["depotFile"] = depot_file
                                     sg_item["path"] = {}
-                                    sg_item["path"]["local_path"] = file_path
-                                # sg_item['status'] = change_list.get("status", None)
+                                    sg_item["path"]["local_path"] = client_file
+                                    sg_item["headRev"] = rev
+                                    sg_item["action"] = action
+                                    self._change_dict[key].append(sg_item)
+                                """
+                                logger.debug(">>>> Depot file: {}".format(depot_file))
+                                logger.debug(">>>> client_file: {}".format(client_file))
+                                fstat_list = self._p4.run("fstat", depot_file)
+                                if fstat_list:
+                                    sg_item = fstat_list[0]
+                                    # logger.debug("Key: {}, sg_item: {}".format(key, sg_item))
+                                    sg_item['description'] = change_list.get("desc", None)
+                                    sg_item['p4_user'] = change_list.get('user', None)
+                                    file_path = sg_item.get("clientFile", None)
+                                    if client_file:
+                                        #sg_item["name"] = os.path.basename(file_path)
+                                        sg_item["path"] = {}
+                                        sg_item["path"]["local_path"] = client_file
+                                    # sg_item['status'] = change_list.get("status", None)
 
-                                # sg_item['Published'] = False
-                                #have_rev = sg_item.get('haveRev', "0")
-                                #head_rev = sg_item.get('headRev', "0")
-                                #sg_item["revision"] = "#{}/{}".format(have_rev, head_rev)
+                                    # sg_item['Published'] = False
+                                    #have_rev = sg_item.get('haveRev', "0")
+                                    #head_rev = sg_item.get('headRev', "0")
+                                    #sg_item["revision"] = "#{}/{}".format(have_rev, head_rev)
 
-                                #sg_item["code"] = "{}#{}".format(sg_item.get("name", None), head_rev)
-                                #p4_status = self._get_action(sg_item)
-                                #sg_item["sg_status_list"] = self._get_p4_status(p4_status)
+                                    #sg_item["code"] = "{}#{}".format(sg_item.get("name", None), head_rev)
+                                    #p4_status = self._get_action(sg_item)
+                                    #sg_item["sg_status_list"] = self._get_p4_status(p4_status)
 
-                                #sg_item["depot_file_type"] = self._get_publish_type(file_path)
+                                    #sg_item["depot_file_type"] = self._get_publish_type(file_path)
 
-                                self._change_dict[key].append(sg_item)
+                                    self._change_dict[key].append(sg_item)
+                                """
+
 
             #logger.debug("key {}:{}".format(key, self._change_dict[key]))
+
+    def _get_client_file(self, depot_file):
+        """
+        Convert depot path to local path
+        For example, convert:
+        "//Ark2Depot/Content/Base/Characters/Human/Survivor/Armor/Cloth_T3/_ven/MDL/Survivor_M_Armor_Cloth_T3_MDL.fbx"
+        to:
+        'B:\Ark2Depot\Content\Base\Characters\Human\Survivor\Armor\Cloth_T3\_ven\MDL\Survivor_M_Armor_Cloth_T3_MDL.fbx'
+        """
+        client_file = None
+        try:
+            if depot_file:
+                #depot_file.replace("//", "\\")
+                #depot_file.replace("/", "\\")
+                client_file = "{}{}".format(self._drive, depot_file)
+        except:
+            pass
+        return client_file
 
     def _get_pending_publish_data(self):
         if self._pending_publish_list:
@@ -706,6 +805,7 @@ class AppDialog(QtGui.QWidget):
         # publish list
         publish_widget = QtWidgets.QWidget()
         publish_layout = QtWidgets.QVBoxLayout()
+
         publish_list = self._create_publish_layout(data_dict, sorted)
 
         current_publish = ''
@@ -736,7 +836,7 @@ class AppDialog(QtGui.QWidget):
 
                     description_label = QtWidgets.QLabel()
                     description_label.setMinimumWidth(400)
-                    user_name_label.setMaximumWidth(2000)
+                    description_label.setMaximumWidth(2000)
                     description_txt = self._get_description_info(sg_item)
                     description_label.setText(description_txt)
 
@@ -766,6 +866,38 @@ class AppDialog(QtGui.QWidget):
         # Submitted Scroll Area
         # self.ui.submitted_scroll.setWidget(publish_widget)
         #self.ui.submitted_scroll.setVisible(True)
+
+    def _setup_perforce_model(self, root):
+        """
+        Create the model and proxy model required by a Perforce .
+
+        :param root: The path to the root of the Shotgun hierarchy to display.
+        :return: Created `(proxy model)`.
+        """
+
+        # Construct the hierarchy model and load a hierarchy that leads
+        # to entities that are linked via the "PublishedFile.entity" field.
+        model = SgHierarchyModel(
+            self,
+            root_entity=root,
+            bg_task_manager=self._task_manager,
+            include_root=None,
+        )
+
+        # Create a proxy model.
+        proxy_model = QtGui.QSortFilterProxyModel(self)
+        proxy_model.setSourceModel(model)
+
+        # Impose and keep the sorting order on the default display role text.
+        proxy_model.sort(0)
+        proxy_model.setDynamicSortFilter(True)
+
+        # When clicking on a node, we fetch all the nodes under it so we can populate the
+        # right hand-side. Make sure we are notified when the child come back so we can load
+        # publishes for the current item.
+        model.data_refreshed.connect(self._hierarchy_refreshed)
+
+        return (model, proxy_model)
 
     def _create_publish_layout(self, data_dict, sorted):
         publish_list = []
@@ -1063,21 +1195,25 @@ class AppDialog(QtGui.QWidget):
         elif mode == self.MAIN_VIEW_SUBMITTED:
             self._turn_all_modes_off()
             self.ui.submitted_scroll.setVisible(True)
-            self.ui.submitted_mode.setIcon(
-                QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_card_active.png"))
-            )
+
+
+            #self.ui.submitted_mode.setIcon(
+            #    QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_card_active.png"))
+            #)
+            self.ui.submitted_mode.setIcon(self.submitted_icon)
             self.ui.submitted_mode.setChecked(True)
 
             self.main_view_mode = self.MAIN_VIEW_SUBMITTED
-            msg = "\n <span style='color:#2C93E2'>Check files in the Submitted view then click <i>Fix Files</i>to publish them using the <i>Shotgrid Publisher</i>...</span> \n"
+            msg = "\n <span style='color:#2C93E2'>Select files in the Submitted view then click <i>Fix Files</i>to publish them using the <i>Shotgrid Publisher</i>...</span> \n"
             self._add_log(msg, 2)
 
         elif mode == self.MAIN_VIEW_PENDING:
             self._turn_all_modes_off()
             self.ui.pending_scroll.setVisible(True)
-            self.ui.pending_mode.setIcon(
-                QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_card_active.png"))
-            )
+            self.ui.pending_mode.setIcon(self.pending_icon)
+            #self.ui.pending_mode.setIcon(
+            #    QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_card_active.png"))
+            #)
             self.ui.pending_mode.setChecked(True)
 
             self.main_view_mode = self.MAIN_VIEW_PENDING
@@ -1085,15 +1221,17 @@ class AppDialog(QtGui.QWidget):
             self._change_dict = {}
             self._get_default_changelists()
             self._get_pending_changelists()
-            publish_widget, self._pending_publish_list = self._create_perforce_ui(self._change_dict, sorted=True)
+
+            # publish_widget, self._pending_publish_list = self._create_perforce_ui(self._change_dict, sorted=True)
+            self.pending_tree_view = TreeViewWidget(data_dict=self._change_dict, sorted=True, mode="pending")
+            self.pending_tree_view.populate_treeview_widget()
+            publish_widget = self.pending_tree_view.get_treeview_widget()
 
             # Pending Scroll Area
             self.ui.pending_scroll.setWidget(publish_widget)
             # self._change_dict = {}
-            msg = "\n <span style='color:#2C93E2'>Check files in the Pending view then click <i>Submit Files</i>to publish them using the <i>Shotgrid Publisher</i>...</span> \n"
+            msg = "\n <span style='color:#2C93E2'>Select files in the Pending view then click <i>Submit Files</i>to publish them using the <i>Shotgrid Publisher</i>...</span> \n"
             self._add_log(msg, 2)
-
-
         else:
             raise TankError("Undefined view mode!")
 
@@ -1119,12 +1257,27 @@ class AppDialog(QtGui.QWidget):
         self.ui.perforce_mode.setIcon(
             QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_card.png"))
         )
+        """
         self.ui.submitted_mode.setIcon(
-            QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_card.png"))
+            QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_thumb.png"))
         )
         self.ui.pending_mode.setIcon(
             QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_card.png"))
         )
+        """
+
+        repo_root = os.path.normpath(
+            os.path.join(os.path.dirname(__file__), "..", "..")
+        )
+
+        inactive_submitted_image_path = os.path.join(repo_root, "icons/submitted_off.png")
+        submitted_icon_inactive = QtGui.QIcon(QtGui.QPixmap(inactive_submitted_image_path))
+
+        inactive_pending_image_path = os.path.join(repo_root, "icons/pending_off.png")
+        pending_icon_inactive = QtGui.QIcon(QtGui.QPixmap(inactive_pending_image_path))
+
+        self.ui.submitted_mode.setIcon(submitted_icon_inactive)
+        self.ui.pending_mode.setIcon(pending_icon_inactive)
         self._show_thumb_scale(False)
 
     def _show_thumb_scale(self, is_visible):
@@ -1656,7 +1809,9 @@ class AppDialog(QtGui.QWidget):
         Send pending files to the Shotgrid Publisher.
         """
         # Publish depot files
-        self._get_pending_publish_data()
+        #self._get_pending_publish_data()
+
+        self._pending_data_to_publish = self.pending_tree_view.get_publish_items()
         self._publish_pending_data_using_publisher_ui()
 
         # msg = "\n <span style='color:#2C93E2'>Hard refreshing data...</span> \n"
@@ -1674,7 +1829,10 @@ class AppDialog(QtGui.QWidget):
         Send unpublished depot files in the submitted view to the Shotgrid Publisher.
         """
         # Publish depot files
-        self._get_submitted_publish_data()
+        #self._get_submitted_publish_data()
+
+        self._submitted_data_to_publish = self.submitted_tree_view.get_publish_items()
+        logger.debug(">>>>>>>>>>   self._submitted_data_to_publish {}".format( self._submitted_data_to_publish))
         self._publish_submitted_data_using_publisher_ui()
         # self._publish_submitted_data_using_command_line()
 
@@ -1682,10 +1840,11 @@ class AppDialog(QtGui.QWidget):
         # self._add_log(msg, 2)
         # self._publish_model.hard_refresh()
 
-        self._reload_treeview()
+        #self._reload_treeview()
         self._setup_details_panel([])
+        self._on_treeview_item_selected()
 
-        self._update_perforce_data()
+        #self._update_perforce_data()
         # self.print_publish_data()
 
         # msg = "\n <span style='color:#2C93E2'>Hard refreshing data...</span> \n"
@@ -1825,9 +1984,10 @@ class AppDialog(QtGui.QWidget):
         """
         Publish Depot Data
         """
-        selected_item = self._get_selected_entity()
-        sg_entity = shotgun_model.get_sg_data(selected_item)
+        #selected_item = self._get_selected_entity()
+        #sg_entity = shotgun_model.get_sg_data(selected_item)
         # logger.debug(">>>>>>>>>>  sg_entity {}".format(sg_entity))
+        logger.debug(">>>>>>>>>>  self._pending_data_to_publish {}".format(self._pending_data_to_publish))
 
         if self._pending_data_to_publish:
             msg = "\n <span style='color:#2C93E2'>Sending pending files to the Shotgrid Publisher...</span> \n"
@@ -1840,7 +2000,7 @@ class AppDialog(QtGui.QWidget):
             # change = create_change(self._p4, desc)
 
             for sg_item in self._pending_data_to_publish:
-                sg_item["entity"] = sg_entity
+                # sg_item["entity"] = sg_entity
                 if 'path' in sg_item:
                     file_to_publish = sg_item['path'].get('local_path', None)
                     if file_to_publish:
@@ -1876,6 +2036,22 @@ class AppDialog(QtGui.QWidget):
         """
         selected_item = self._get_selected_entity()
         sg_entity = shotgun_model.get_sg_data(selected_item)
+        """
+        entity_type = sg_entity.get("type", None)
+        entity_id = sg_entity.get("id", 0)
+        tk = sgtk.sgtk_from_entity(entity_type, entity_id)
+        ctx = tk.context_from_entity(entity_type, entity_id)
+        ####tank.platform.current_engine().destroy()
+        engine = sgtk.platform.start_engine('tk-swc-perforce-sync', tk, ctx)
+        logger.debug("<<<<>>>>  engine is {}".format(engine))
+        logger.debug("<<<<>>>>  engine commands ")
+        for key, value in engine.commands.items():
+            logger.debug("<<<<>>>>  {}:{}".format(key, value))
+
+        properties = engine.commands['Publish...']['properties']
+        logger.debug("<<<<>>>>  engine commands properties are {}".format(properties))
+        """
+
         # logger.debug(">>>>>>>>>>  sg_entity {}".format(sg_entity))
 
         if self._submitted_data_to_publish:
@@ -1897,20 +2073,103 @@ class AppDialog(QtGui.QWidget):
                         self._add_log(msg, 4)
 
                         out_file.write('%s\n' % file_to_publish)
+                        action = self._get_action(sg_item)
+                        logger.debug(">>>>>>>>>>  file_to_publish: {}".format(file_to_publish))
+                        logger.debug(">>>>>>>>>>  action: {}".format(action))
+                        if action:
+                            action = self.action_dict.get(action, None)
+                            logger.debug("><<<>>>>>>>>>>>>  action: {}".format(action))
+                            logger.debug("><<<>>>>>>>>>>>>  change: {}".format(change))
+                            add_res = add_to_change(self._p4, change, file_to_publish)
+                            logger.debug("><<<>>>>>>>>>>>>  add_res: {}".format(add_res))
+                            action_result = self._p4.run(action, "-c", change, "-v", file_to_publish)
+                            logger.debug("><<<>>>>>>>>>>>>  action_result: {}".format(action_result))
+                        #action_result = self._p4.run("edit", "-c", change, "-v", file_to_publish)
 
-                        add_res = add_to_change(self._p4, change, file_to_publish)
-                        action_result = self._p4.run("edit", "-c", change, "-v", file_to_publish)
+                        #add_res = add_to_change(self._p4, change, file_to_publish)
+                        #action_result = self._p4.run("edit", "-c", change, "-v", file_to_publish)
             out_file.close()
 
             # Run the publisher UI
+
             engine = sgtk.platform.current_engine()
+            #logger.debug(">>>>>>>>>>  engine is {}".format(engine))
+
+            #logger.debug("<<<<>>>>  engine commands ")
+            #for key, value in engine.commands.items():
+            #    logger.debug("<<<<>>>>  {}:{}".format(key, value))
+
+
+            #properties = engine.commands['Publish...']['properties']
+            #logger.debug(">>>>>>>>>>  engine commands properties are {}".format(properties))
+
             engine.commands["Publish..."]["callback"]()
+
+
+
 
             # msg = "\n <span style='color:#2C93E2'>Publishing files is complete</span> \n"
             # self._add_log(msg, 2)
             msg = "\n <span style='color:#2C93E2'>Reloading data ...</span> \n"
             self._add_log(msg, 2)
             self._reload_treeview()
+
+        else:
+            msg = "\n <span style='color:#2C93E2'>Check files in the Pending view to publish using the Shotgrid Publisher</span> \n"
+            self._add_log(msg, 2)
+
+        self._submitted_data_to_publish = []
+
+    def _publish_submitted_data_using_publisher_ui_old(self):
+        """
+        Publish Depot Data
+        """
+        selected_item = self._get_selected_entity()
+        sg_entity = shotgun_model.get_sg_data(selected_item)
+        # logger.debug(">>>>>>>>>>  sg_entity {}".format(sg_entity))
+
+        if self._submitted_data_to_publish:
+            msg = "\n <span style='color:#2C93E2'>Sending the following unpublished files to the Shotgrid Publisher...</span> \n"
+            self._add_log(msg, 2)
+            # Create publish file
+            out_file = open(self._publish_files_path, 'w')
+            out_file.write('Depot Files\n')
+            # Create a new Perforce changelist
+            desc = "Fixing files "
+            change = create_change(self._p4, desc)
+
+            for sg_item in self._submitted_data_to_publish:
+                sg_item["entity"] = sg_entity
+                if 'path' in sg_item:
+                    file_to_publish = sg_item['path'].get('local_path', None)
+                    #file_to_publish = sg_item.get("depotFile", None)
+                    if file_to_publish:
+                        msg = "{}".format(file_to_publish)
+                        self._add_log(msg, 4)
+
+                        out_file.write('%s\n' % file_to_publish)
+                        action = sg_item.get("action", None)
+                        if action:
+                            action = self.action_dict[action]
+                            #add_res = add_to_change(self._p4, change, file_to_publish)
+                            # Remove this
+                            action = "edit"
+                            #action_result = self._p4.run(action, "-c", change, "-v", file_to_publish)
+            out_file.close()
+
+            # Run the publisher UI
+
+            engine = sgtk.platform.current_engine()
+            #logger.debug(">>>>>>>>>>  engine is {}".format(engine))
+
+            engine.commands["Publish..."]["callback"]()
+            #logger.debug(">>>>>>>>>>  engine commands are {}".format(engine.commands))
+
+            # msg = "\n <span style='color:#2C93E2'>Publishing files is complete</span> \n"
+            # self._add_log(msg, 2)
+            msg = "\n <span style='color:#2C93E2'>Reloading data ...</span> \n"
+            self._add_log(msg, 2)
+            #self._reload_treeview()
 
         else:
             msg = "\n <span style='color:#2C93E2'>Check files in the Pending view to publish using the Shotgrid Publisher</span> \n"
@@ -2803,9 +3062,16 @@ class AppDialog(QtGui.QWidget):
 
         self._update_perforce_data()
         self.print_publish_data()
-        publish_widget, self._submitted_publish_list= self._create_perforce_ui(self._fstat_dict, sorted=False)
+
+        # publish_widget, self._submitted_publish_list = self._create_perforce_ui(self._fstat_dict, sorted=False)
+        #logger.debug(">>> self._fstat_dict is: {}".format(self._fstat_dict))
+        self.submitted_tree_view = TreeViewWidget(data_dict=self._fstat_dict, sorted=False, mode="submitted")
+        self.submitted_tree_view.populate_treeview_widget()
+        publish_widget = self.submitted_tree_view.get_treeview_widget()
+        # self._submitted_publish_list =
 
         # Submitted Scroll Area
+        #self.ui.submitted_scroll.setLayout(publish_widget)
         self.ui.submitted_scroll.setWidget(publish_widget)
         # self.ui.submitted_scroll.setVisible(True)
 

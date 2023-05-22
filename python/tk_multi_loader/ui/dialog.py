@@ -12,7 +12,8 @@ from tank.platform.qt5 import QtWidgets
 class Ui_Dialog(object):
     def setupUi(self, Dialog):
         Dialog.setObjectName("Dialog")
-        Dialog.resize(1265, 782)
+        #Dialog.resize(1265, 782)
+        Dialog.resize(1500, 782)
         self.horizontalLayout_3 = QtGui.QHBoxLayout(Dialog)
         self.horizontalLayout_3.setObjectName("horizontalLayout_3")
         self.left_area = QtGui.QVBoxLayout()
@@ -265,7 +266,7 @@ class Ui_Dialog(object):
         self.submitted_scroll = QtWidgets.QScrollArea()
         self.submitted_scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
         self.submitted_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.submitted_scroll.setWidgetResizable(False)
+        #self.submitted_scroll.setWidgetResizable(False)
 
         self.middle_area.addWidget(self.submitted_scroll)
         self.submitted_scroll.setVisible(False)
