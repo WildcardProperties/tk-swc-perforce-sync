@@ -5,6 +5,7 @@ import datetime
 from .date_time import create_publish_timestamp
 import os
 import sgtk
+from sgtk.util import login
 logger = sgtk.platform.get_logger(__name__)
 
 #from tank.platform.qt5.QtWidgets import QTreeWidgetItemIterator
@@ -36,7 +37,8 @@ class TreeViewWidget(QtWidgets.QWidget):
         self.tree_view.setIconSize(QtCore.QSize(20, 20))
         self.tree_view.setStyleSheet("QTreeView::item { padding: 1px; }")
         self.tree_view.setUniformRowHeights(True)
-        self.tree_view.setSelectionMode(self.tree_view.selectionMode().MultiSelection)
+        self.tree_view.setSelectionMode(self.tree_view.selectionMode().ExtendedSelection)
+        #self.tree_view.setSelectionMode(self.tree_view.selectionMode().MultiSelection)
         #self.tree_view.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tree_view.setHeaderHidden(True)
         # self.tree_view.setIndentation(10)
@@ -54,7 +56,7 @@ class TreeViewWidget(QtWidgets.QWidget):
             self.data_dict = data_dict
 
         # Connections
-        # self.tree_view.selectionModel().selectionChanged.connect(self.get_items)
+        #self.tree_view.selectionModel().selectionChanged.connect(self.select_items)
 
         #self.main_layout.addWidget(self.tree_view)
         #self.setLayout(self.main_layout)
@@ -80,6 +82,15 @@ class TreeViewWidget(QtWidgets.QWidget):
         self.p4_file_delete_icon = QtGui.QIcon(QtGui.QPixmap(p4_file_delete_path))
 
         #self.pending_icon = QtGui.QIcon(":/res/pending.png")
+
+    def select_items(self):
+        selected = self.tree_view.selectionModel().selectedIndexes()
+        for index in selected:
+            item = self.model.data(index)
+            if item:
+                for row in item.childCount():
+                    child_item = item.child(row)
+                    child_item.setSelected(True)
 
     def get_publish_items(self):
         data_to_publish = []
@@ -128,7 +139,7 @@ class TreeViewWidget(QtWidgets.QWidget):
                 change_item.setToolTip(msg)
                 change_item.setSizeHint(QtCore.QSize(0, 25))
                 #change_item.setTextAlignment(QtCore.Qt.AlignVCenter)
-                # change_item.setEditable(False)
+                change_item.setEditable(False)
                 self.model.appendRow([change_item])
 
                 self.tree_view.setFirstColumnSpanned(i, self.tree_view.rootIndex(), True)
@@ -188,7 +199,7 @@ class TreeViewWidget(QtWidgets.QWidget):
 
                 if parent_icon is not None:
                     change_item.setIcon(parent_icon)
-                change_item.setSelectable(False)
+                #change_item.setSelectable(False)
                 if self.mode in ["submitted"]:
                     if enable_change_item:
                         change_item.setEnabled(True)

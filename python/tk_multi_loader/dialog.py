@@ -420,8 +420,6 @@ class AppDialog(QtGui.QWidget):
         #self.inactive_submitted_icon = QtGui.QIcon(QtGui.QPixmap(inactive_submitted_image_path))
         self.submitted_icon_inactive = QtGui.QIcon(QtGui.QPixmap(inactive_submitted_image_path))
 
-
-
         pending_image_path = os.path.join(self.repo_root, "icons/mode_switch_pending_active.png")
         self.pending_icon = QtGui.QIcon(QtGui.QPixmap(pending_image_path))
 
@@ -1833,14 +1831,15 @@ class AppDialog(QtGui.QWidget):
 
         self._submitted_data_to_publish = self.submitted_tree_view.get_publish_items()
         logger.debug(">>>>>>>>>>   self._submitted_data_to_publish {}".format( self._submitted_data_to_publish))
-        self._publish_submitted_data_using_publisher_ui()
-        # self._publish_submitted_data_using_command_line()
+        #self._publish_submitted_data_using_publisher_ui()
+        self._publish_submitted_data_using_command_line()
 
         # msg = "\n <span style='color:#2C93E2'>Hard refreshing data...</span> \n"
         # self._add_log(msg, 2)
         # self._publish_model.hard_refresh()
 
         #self._reload_treeview()
+        #self._update_perforce_data()
         self._setup_details_panel([])
         self._on_treeview_item_selected()
 
@@ -1978,7 +1977,6 @@ class AppDialog(QtGui.QWidget):
             self._add_log(msg, 2)
 
 
-
     ########################################################################################
     def _publish_pending_data_using_publisher_ui(self):
         """
@@ -1996,8 +1994,8 @@ class AppDialog(QtGui.QWidget):
             out_file = open(self._publish_files_path, 'w')
             out_file.write('Pending Files\n')
             # Create a new Perforce changelist
-            # desc = "Fixing files "
-            # change = create_change(self._p4, desc)
+            desc = "Fixing files "
+            change = create_change(self._p4, desc)
 
             for sg_item in self._pending_data_to_publish:
                 # sg_item["entity"] = sg_entity
@@ -2009,8 +2007,8 @@ class AppDialog(QtGui.QWidget):
 
                         out_file.write('%s\n' % file_to_publish)
 
-                        # add_res = add_to_change(self._p4, change, file_to_publish)
-                        # action_result = self._p4.run("edit", "-c", change, "-v", file_to_publish)
+                        add_res = add_to_change(self._p4, change, file_to_publish)
+                        action_result = self._p4.run("edit", "-c", change, "-v", file_to_publish)
             out_file.close()
 
             # Run the publisher UI
@@ -2036,21 +2034,6 @@ class AppDialog(QtGui.QWidget):
         """
         selected_item = self._get_selected_entity()
         sg_entity = shotgun_model.get_sg_data(selected_item)
-        """
-        entity_type = sg_entity.get("type", None)
-        entity_id = sg_entity.get("id", 0)
-        tk = sgtk.sgtk_from_entity(entity_type, entity_id)
-        ctx = tk.context_from_entity(entity_type, entity_id)
-        ####tank.platform.current_engine().destroy()
-        engine = sgtk.platform.start_engine('tk-swc-perforce-sync', tk, ctx)
-        logger.debug("<<<<>>>>  engine is {}".format(engine))
-        logger.debug("<<<<>>>>  engine commands ")
-        for key, value in engine.commands.items():
-            logger.debug("<<<<>>>>  {}:{}".format(key, value))
-
-        properties = engine.commands['Publish...']['properties']
-        logger.debug("<<<<>>>>  engine commands properties are {}".format(properties))
-        """
 
         # logger.debug(">>>>>>>>>>  sg_entity {}".format(sg_entity))
 
@@ -2104,9 +2087,6 @@ class AppDialog(QtGui.QWidget):
             #logger.debug(">>>>>>>>>>  engine commands properties are {}".format(properties))
 
             engine.commands["Publish..."]["callback"]()
-
-
-
 
             # msg = "\n <span style='color:#2C93E2'>Publishing files is complete</span> \n"
             # self._add_log(msg, 2)
@@ -2195,20 +2175,16 @@ class AppDialog(QtGui.QWidget):
                     msg = "Publishing file: {}...".format(file_to_publish)
                     self._add_log(msg, 4)
 
-                    p4_result = self._p4.run("add", "-v", file_to_publish)
-                    logger.debug("Adding file to perforce: {}".format(p4_result))
+                    #p4_result = self._p4.run("add", "-v", file_to_publish)
+                    #p4_result = self._p4.run("edit", "-v", file_to_publish)
+                    #logger.debug("Adding file to perforce: {}".format(p4_result))
 
                     publisher = PublishItem(sg_item)
                     publish_result = publisher.commandline_publishing()
                     # publish_result = publisher.gui_publishing()
                     if publish_result:
                         logger.debug("New data is: {}".format(publish_result))
-            #engine = sgtk.platform.current_engine()
-            #engine.commands["Publish..."]["callback"]()
-            #for command in engine.commands:
-            #    msg = "{}".format(command)
-            #    self._add_log(msg, 4)
-            #engine.commands["SWC Publish..."]["callback"]()
+
 
             msg = "\n <span style='color:#2C93E2'>Publishing files is complete</span> \n"
             self._add_log(msg, 2)
@@ -3034,20 +3010,30 @@ class AppDialog(QtGui.QWidget):
         """
         Get entity path
         """
-        entity_path = None
+        entity_path, entity_id, entity_type = None, 0, None
         #logger.debug(">>>>>>>>>>>>>> entity_data is: {}".format(entity_data))
         if entity_data:
             entity_id = entity_data.get('id', 0)
             entity_type = entity_data.get('type', None)
+            if entity_type:
+                if entity_type in ["Task"]:
+                    entity = entity_data.get("entity", None)
+                    if entity:
+                        entity_id = entity.get('id', 0)
+                        entity_type = entity.get('type', None)
             entity_path = self._app.sgtk.paths_from_entity(entity_type, entity_id)
-            if not entity_path:
+            logger.debug(">>>>>>>>>>>>>> entity_id is: {}".format(entity_id))
+            logger.debug(">>>>>>>>>>>>>> entity_type is: {}".format(entity_type))
+            logger.debug(">>>>>>>>>>>>>> entity_path is: {}".format(entity_path))
+            if not entity_path or len(entity_path) == 0:
                 self._app.sgtk.create_filesystem_structure(entity_type, entity_id)
                 entity_path = self._app.sgtk.paths_from_entity(entity_type, entity_id)
+                logger.debug(">>>>>>>>>>>>>> entity_path2 is: {}".format(entity_path))
             if entity_path and len(entity_path) > 0:
                 entity_path = entity_path[0]
                 msg = "\n <span style='color:#2C93E2'>Entity path: {}</span> \n".format(entity_path)
                 self._add_log(msg, 2)
-        return entity_path
+        return entity_path, entity_id, entity_type
 
     def _on_treeview_item_selected(self):
         """
@@ -3056,9 +3042,17 @@ class AppDialog(QtGui.QWidget):
         logger.debug(">>>>>>>>>>  self.main_view_mode is: {}".format(self.main_view_mode))
         self._fstat_dict = {}
         entity_data = self._reload_treeview()
-        self._entity_path = self._get_entity_path(entity_data)
+        self._entity_path, entity_id, entity_type = self._get_entity_path(entity_data)
+        logger.debug(">>>>>>>>>>>>>>>>>> self._entity_path: {}".format(self._entity_path))
+        #entity_data = self._reload_treeview()
+        #model = self.ui.publish_view.model()
+        #logger.debug(">>>>>>>>>>2 In _on_treeview_item_selected model.rowCount() is {}".format(model.rowCount()))
 
-        self.get_current_sg_data()
+        model = self.ui.publish_view.model()
+        if model.rowCount() > 0:
+            self.get_current_sg_data()
+        else:
+            self.get_current_publish_data(entity_id, entity_type)
 
         self._update_perforce_data()
         self.print_publish_data()
@@ -3082,6 +3076,7 @@ class AppDialog(QtGui.QWidget):
         self._submitted_data_to_publish = []
 
         model = self.ui.publish_view.model()
+        logger.debug(">>>>>>>>>> In get_current_sg_data model.rowCount() is {}".format(model.rowCount()))
         if model.rowCount() > 0:
             for row in range(model.rowCount()):
                 model_index = model.index(row, 0)
@@ -3103,22 +3098,55 @@ class AppDialog(QtGui.QWidget):
         # time.sleep(1)
         #logger.debug(">>>>>>>>>>  sg_data is: {}".format(self._sg_data))
 
+    def get_current_publish_data(self, entity_id, entity_type):
+        self._sg_data = []
+        # logger.debug(">>>>>>>>>>  entity_type: {}".format(entity_type))
+        filters = [[]]
+        if entity_type == "Asset":
+            filters = [
+                 ["entity.Asset.id", "is", entity_id],
+            ]
+        elif entity_type == "Shot":
+            filters = [
+                ["entity.Shot.id", "is", entity_id],
+            ]
+        elif entity_type == "Task":
+            filters = [
+                ["task.Task.id", "is", entity_id],
+            ]
+
+        self._sg_data = self._app.shotgun.find(
+            "PublishedFile",
+            filters,
+            ["entity", "path_cache", "path"],
+        )
+        # logger.debug(">>>>>>>>>>  Published files are: {}".format(self._sg_data))
+
     def _update_perforce_data(self):
 
         self._get_peforce_data()
-        # logger.debug(">>>>>>>>>>  self._fstat_dict is: {}".format(self._fstat_dict))
+        # logger.debug(">>>>>>>>>>  self._fstat_dict is: {}")
         # for key, sg_item in self._fstat_dict.items():
-        #    logger.debug("{}:{}".format(key, sg_item))
-
+        #     logger.debug("{}:{}".format(key, sg_item))
+        #self._publish_model.async_refresh()
         msg = "\n <span style='color:#2C93E2'>Updating data ...</span> \n"
         self._add_log(msg, 2)
         self._update_fstat_data()
+        # logger.debug(">>>>>>>>>>  Updating self._fstat_dict is: {}")
+        # for key, sg_item in self._fstat_dict.items():
+        #    logger.debug("{}:{}".format(key, sg_item))
         self._fix_fstat_dict()
+        # logger.debug(">>>>>>>>>>  Fixing self._fstat_dict is: {}")
+        # for key, sg_item in self._fstat_dict.items():
+        #    logger.debug("{}:{}".format(key, sg_item))
+
         # self._get_depot_files_to_publish()
 
         #msg = "\n <span style='color:#2C93E2'>Soft refreshing data ...</span> \n"
         #self._add_log(msg, 2)
+
         self._publish_model.async_refresh()
+
 
     def print_publish_data(self):
         if self._submitted_data_to_publish:
@@ -3132,55 +3160,52 @@ class AppDialog(QtGui.QWidget):
             msg = "\n <span style='color:#2C93E2'>Click on 'Fix Files' to publish above files</span> \n"
             self._add_log(msg, 2)
 
-    def _update_fstat_data(self):
+    def _update_fstat_data_old(self):
         if self._fstat_dict:
             # logger.debug("<<<<<<< In _update_fstat_data ...")
             # for key, sg_item in self._fstat_dict.items():
             #   logger.debug("{}:{}".format(key, sg_item))
             model = self.ui.publish_view.model()
-            # logger.debug(">>>>>>>>>> model.rowCount() is {}".format(model.rowCount()))
-            for row in range(model.rowCount()):
-                model_index = model.index(row, 0)
-                proxy_model = model_index.model()
-                source_index = proxy_model.mapToSource(model_index)
-                item = source_index.model().itemFromIndex(source_index)
+            logger.debug(">>>>>>>>>> In  _update_fstat_data model.rowCount() is {}".format(model.rowCount()))
+            if model.rowCount() > 0:
+                for row in range(model.rowCount()):
+                    model_index = model.index(row, 0)
+                    proxy_model = model_index.model()
+                    source_index = proxy_model.mapToSource(model_index)
+                    item = source_index.model().itemFromIndex(source_index)
 
-                is_folder = item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
-                if not is_folder:
-                    sg_item = shotgun_model.get_sg_data(model_index)
+                    is_folder = item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
+                    if not is_folder:
+                        logger.debug(">>>>>>>>>>Checking for published file ...")
+                        sg_item = shotgun_model.get_sg_data(model_index)
+                        if "path" in sg_item:
+                            if "local_path" in sg_item["path"]:
+                                local_path = sg_item["path"].get("local_path", None)
+                                key = self._create_key(local_path)
+                                logger.debug(">>>>>>>>>> local_path is {}".format(local_path))
+                                logger.debug(">>>>>>>>>> key is {}".format(key))
+                                if key and key in self._fstat_dict:
+                                    #logger.debug(">>>>>>>>>> local publish path {} is in the self._fstat_dict".format(local_path))
+                                    #logger.debug(">>>>>>>>>> self._fstat_dict[KEY] is {}".format(local_path))
+                                    self._fstat_dict[key]["Published"] = True
+                                    logger.debug(">>>>>>>>>>Found a published file {}".format(key))
+
+    def _update_fstat_data(self):
+        if self._fstat_dict:
+            if self._sg_data:
+                for sg_item in self._sg_data:
+                    # logger.debug(">>>>>>>>>>Checking for published file ...")
                     if "path" in sg_item:
                         if "local_path" in sg_item["path"]:
                             local_path = sg_item["path"].get("local_path", None)
                             key = self._create_key(local_path)
-
+                            # logger.debug(">>>>>>>>>> local_path is {}".format(local_path))
+                            # logger.debug(">>>>>>>>>> key is {}".format(key))
                             if key and key in self._fstat_dict:
-                                #logger.debug(">>>>>>>>>> local publish path {} is in the self._fstat_dict".format(local_path))
-                                #logger.debug(">>>>>>>>>> self._fstat_dict[KEY] is {}".format(local_path))
+                                # logger.debug(">>>>>>>>>> local publish path {} is in the self._fstat_dict".format(local_path))
+                                # logger.debug(">>>>>>>>>> self._fstat_dict[KEY] is {}".format(local_path))
                                 self._fstat_dict[key]["Published"] = True
-
-                                # have_rev = self._fstat_dict[key].get('haveRev', "0")
-                                # head_rev = self._fstat_dict[key].get('headRev', "0")
-
-                                # sg_item["haveRev"], sg_item["headRev"] = have_rev, head_rev
-                                # sg_item["revision"] = "{}/{}".format(have_rev, head_rev)
-    
-                                # sg_item["headAction"] = self._fstat_dict[key].get('headAction', None)
-                                # sg_item["action"] = self._fstat_dict[key].get('action', None)
-                                # sg_item["sg_status_list"] = self._fstat_dict[key].get('sg_status_list', None)
-                                # sg_item["headModTime"] = self._fstat_dict[key].get('headModTime', None)
-                                # sg_item["actionOwner"] = self._fstat_dict[key].get('actionOwner', None)
-                                # sg_item["headTime"] = self._fstat_dict[key].get('headTime', None)
-                                # sg_item["headChange"] = self._fstat_dict[key].get('headChange', None)
-
-
-                                ## logger.debug(">>>>>>>>>>  Updated sg_item is: {}".format(sg_item.get("revision", None)))
-                                ## item.setData(sg_item, SgLatestPublishModel.SG_DATA_ROLE)
-                                ## new_sg_item = shotgun_model.get_sg_data(model_index)
-                                ## logger.debug(">>>>>>>>>>  new sg_item revision data is: {}".format(new_sg_item.get("revision", None)))
-                                ## logger.debug(">>>>>>>>>>  new sg_item revision action is: {}".format(new_sg_item.get("action", None)))
-
-                            # If file is not published
-
+                                # logger.debug(">>>>>>>>>>Found a published file {}".format(key))
 
         #logger.debug(">>>>>>>>>> Updated self._fstat_dict is: {} ...".format(self._fstat_dict))
         #for k, v in self._fstat_dict.items():
