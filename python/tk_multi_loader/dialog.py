@@ -1985,31 +1985,42 @@ class AppDialog(QtGui.QWidget):
         #selected_item = self._get_selected_entity()
         #sg_entity = shotgun_model.get_sg_data(selected_item)
         # logger.debug(">>>>>>>>>>  sg_entity {}".format(sg_entity))
-        logger.debug(">>>>>>>>>>  self._pending_data_to_publish {}".format(self._pending_data_to_publish))
+        #logger.debug(">>>>>>>>>>  self._pending_data_to_publish {}".format(self._pending_data_to_publish))
 
         if self._pending_data_to_publish:
-            msg = "\n <span style='color:#2C93E2'>Sending pending files to the Shotgrid Publisher...</span> \n"
+            msg = "\n <span style='color:#2C93E2'>Submitting pending files...</span> \n"
             self._add_log(msg, 2)
             # Create publish file
             out_file = open(self._publish_files_path, 'w')
             out_file.write('Pending Files\n')
             # Create a new Perforce changelist
-            desc = "Fixing files "
-            change = create_change(self._p4, desc)
 
+            del_change = 0
+            del_files, other_files = 0, 0
             for sg_item in self._pending_data_to_publish:
                 # sg_item["entity"] = sg_entity
                 if 'path' in sg_item:
-                    file_to_publish = sg_item['path'].get('local_path', None)
-                    if file_to_publish:
-                        msg = "{}".format(file_to_publish)
+                    file_to_submit = sg_item['path'].get('local_path', None)
+                    if file_to_submit:
+                        msg = "{}".format(file_to_submit)
                         self._add_log(msg, 4)
+                        action = self._get_action(sg_item)
+                        if action not in ["delete"]:
+                            out_file.write('%s\n' % file_to_submit)
+                            #add_res = add_to_change(self._p4, change, file_to_submit)
+                            #action_result = self._p4.run("edit", "-c", change, "-v", file_to_submit)
+                        else:
+                            if del_change == 0:
+                                desc = "Deleting files"
+                                del_change = create_change(self._p4, desc)
 
-                        out_file.write('%s\n' % file_to_publish)
+                            del_res = add_to_change(self._p4, del_change, file_to_submit)
+                            del_files += 1
 
-                        add_res = add_to_change(self._p4, change, file_to_publish)
-                        action_result = self._p4.run("edit", "-c", change, "-v", file_to_publish)
             out_file.close()
+
+            if del_files > 0:
+                submit_del_res = submit_change(self._p4, del_change)
 
             # Run the publisher UI
             engine = sgtk.platform.current_engine()
@@ -2058,15 +2069,15 @@ class AppDialog(QtGui.QWidget):
                         out_file.write('%s\n' % file_to_publish)
                         action = self._get_action(sg_item)
                         logger.debug(">>>>>>>>>>  file_to_publish: {}".format(file_to_publish))
-                        logger.debug(">>>>>>>>>>  action: {}".format(action))
+                        #logger.debug(">>>>>>>>>>  action: {}".format(action))
                         if action:
                             action = self.action_dict.get(action, None)
-                            logger.debug("><<<>>>>>>>>>>>>  action: {}".format(action))
-                            logger.debug("><<<>>>>>>>>>>>>  change: {}".format(change))
+                            #logger.debug("><<<>>>>>>>>>>>>  action: {}".format(action))
+                            #logger.debug("><<<>>>>>>>>>>>>  change: {}".format(change))
                             add_res = add_to_change(self._p4, change, file_to_publish)
-                            logger.debug("><<<>>>>>>>>>>>>  add_res: {}".format(add_res))
+                            #logger.debug("><<<>>>>>>>>>>>>  add_res: {}".format(add_res))
                             action_result = self._p4.run(action, "-c", change, "-v", file_to_publish)
-                            logger.debug("><<<>>>>>>>>>>>>  action_result: {}".format(action_result))
+                            #logger.debug("><<<>>>>>>>>>>>>  action_result: {}".format(action_result))
                         #action_result = self._p4.run("edit", "-c", change, "-v", file_to_publish)
 
                         #add_res = add_to_change(self._p4, change, file_to_publish)
@@ -3028,9 +3039,9 @@ class AppDialog(QtGui.QWidget):
             if not entity_path or len(entity_path) == 0:
                 self._app.sgtk.create_filesystem_structure(entity_type, entity_id)
                 entity_path = self._app.sgtk.paths_from_entity(entity_type, entity_id)
-                logger.debug(">>>>>>>>>>>>>> entity_path2 is: {}".format(entity_path))
+                # logger.debug(">>>>>>>>>>>>>> entity_path2 is: {}".format(entity_path))
             if entity_path and len(entity_path) > 0:
-                entity_path = entity_path[0]
+                entity_path = entity_path[-1]
                 msg = "\n <span style='color:#2C93E2'>Entity path: {}</span> \n".format(entity_path)
                 self._add_log(msg, 2)
         return entity_path, entity_id, entity_type
@@ -3046,9 +3057,10 @@ class AppDialog(QtGui.QWidget):
         logger.debug(">>>>>>>>>>>>>>>>>> self._entity_path: {}".format(self._entity_path))
         #entity_data = self._reload_treeview()
         #model = self.ui.publish_view.model()
-        #logger.debug(">>>>>>>>>>2 In _on_treeview_item_selected model.rowCount() is {}".format(model.rowCount()))
 
         model = self.ui.publish_view.model()
+        logger.debug(">>>>>>>>>>2 In _on_treeview_item_selected model.rowCount() is {}".format(model.rowCount()))
+
         if model.rowCount() > 0:
             self.get_current_sg_data()
         else:
@@ -3100,7 +3112,7 @@ class AppDialog(QtGui.QWidget):
 
     def get_current_publish_data(self, entity_id, entity_type):
         self._sg_data = []
-        # logger.debug(">>>>>>>>>>  entity_type: {}".format(entity_type))
+        logger.debug(">>>>>>>>>>  entity_type: {}".format(entity_type))
         filters = [[]]
         if entity_type == "Asset":
             filters = [
@@ -3120,20 +3132,20 @@ class AppDialog(QtGui.QWidget):
             filters,
             ["entity", "path_cache", "path"],
         )
-        # logger.debug(">>>>>>>>>>  Published files are: {}".format(self._sg_data))
+        #logger.debug(">>>>>>>>>>  Published files are: {}".format(self._sg_data))
 
     def _update_perforce_data(self):
 
         self._get_peforce_data()
-        # logger.debug(">>>>>>>>>>  self._fstat_dict is: {}")
+        #logger.debug(">>>>>>>>>>  self._fstat_dict is: {}")
         # for key, sg_item in self._fstat_dict.items():
         #     logger.debug("{}:{}".format(key, sg_item))
         #self._publish_model.async_refresh()
         msg = "\n <span style='color:#2C93E2'>Updating data ...</span> \n"
         self._add_log(msg, 2)
         self._update_fstat_data()
-        # logger.debug(">>>>>>>>>>  Updating self._fstat_dict is: {}")
-        # for key, sg_item in self._fstat_dict.items():
+        #logger.debug(">>>>>>>>>>  Updating self._fstat_dict is: {}")
+        #for key, sg_item in self._fstat_dict.items():
         #    logger.debug("{}:{}".format(key, sg_item))
         self._fix_fstat_dict()
         # logger.debug(">>>>>>>>>>  Fixing self._fstat_dict is: {}")
@@ -3728,7 +3740,7 @@ class AppDialog(QtGui.QWidget):
         item_path_dict = defaultdict(int)
         self._fstat_dict = {}
         self._submitted_data_to_publish = []
-        # logger.debug("self._entity_path is: {}".format(self._entity_path))
+        logger.debug("self._entity_path is: {}".format(self._entity_path))
         if self._entity_path:
                 #if not os.path.exists(self._entity_path):
                 item_path_dict[self._entity_path] += 1
@@ -3745,19 +3757,19 @@ class AppDialog(QtGui.QWidget):
                             # item_path = self._get_item_path(local_path)
                             item_path = os.path.dirname(local_path)
                             item_path_dict[item_path] += 1
-                #logger.debug(">>>>>>>>>>  item_path_dict is: {}".format(item_path_dict))
+        #logger.debug(">>>>>>>>>>  item_path_dict is: {}".format(item_path_dict))
 
         for key in item_path_dict:
             if key:
                 # logger.debug(">>>>>>>>>>  key is: {}".format(key))
                 key = "{}\\...".format(key)
-                # logger.debug("^^^ key is: {}".format(key))
+                #logger.debug("^^^ key is: {}".format(key))
                 fstat_list = self._p4.run("fstat", key)
                 #fstat_list = self._p4.run("fstat", "-Ol", key)
                 #logger.debug(">>>>>  fstat_list is: {}".format(fstat_list))
                 for i, fstat in enumerate(fstat_list):
                     #if i == 0:
-                    # logger.debug(">>>>>>>>>  fstat is: {}".format(fstat))
+                    #    logger.debug(">>>>>>>>>  fstat is: {}".format(fstat))
                     # logger.debug("{}: >>>>>  fstat is: {}".format(i, fstat))
                     client_file = fstat.get('clientFile', None)
                     # if i == 0:
@@ -3781,8 +3793,8 @@ class AppDialog(QtGui.QWidget):
                                 if sg_status:
                                     self._fstat_dict[modified_client_file]['sg_status_list'] = sg_status
 
-                            # if i == 0:
-                            #     logger.debug(">>>>>>>>>>  self._fstat_dict[client_file] is: {}".format(self._fstat_dict[modified_client_file]))
+                            #if i == 0:
+                            #    logger.debug(">>>>>>>>>>  self._fstat_dict[client_file] is: {}".format(self._fstat_dict[modified_client_file]))
         #logger.debug(">>>>>>>>>>  self._fstat_dict is: ")
 
         #for k, v in self._fstat_dict.items():
