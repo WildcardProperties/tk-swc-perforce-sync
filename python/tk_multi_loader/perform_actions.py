@@ -4,11 +4,11 @@ import sgtk
 logger = sgtk.platform.get_logger(__name__)
 
 class PerformActions():
-    def __init__(self, p4, sg_item, action):
+    def __init__(self, p4, sg_item, action, change):
         self.p4 = p4
         self.sg_item = sg_item
         self.action = action
-        self.change = None
+        self.change = change
         self.depot_file = sg_item.get("depotFile", None)
         self.local_path = self.get_local_path()
         self.description = "{} file".format(action)
@@ -35,7 +35,7 @@ class PerformActions():
         5. Update sg_item and return it
         """
         # Create a new changelist
-        self.change = self.create_change_list()
+        #self.change = self.create_change_list()
         # Add file to the changelist
         add_res = self.add_file_to_change_list()
         # Perform the action

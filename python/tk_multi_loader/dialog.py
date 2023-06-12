@@ -433,6 +433,10 @@ class AppDialog(QtGui.QWidget):
         if self._root_path:
             self._drive = self._root_path[0:2]
 
+        # "delete" change
+        self._del_change = create_change(self._p4, "Deleting files")
+        self._actions_change = create_change(self._p4, "Perform actions")
+
         #################################################
         # Perforce data
         self.action_dict = {
@@ -1221,7 +1225,7 @@ class AppDialog(QtGui.QWidget):
             self._get_pending_changelists()
 
             # publish_widget, self._pending_publish_list = self._create_perforce_ui(self._change_dict, sorted=True)
-            self.pending_tree_view = TreeViewWidget(data_dict=self._change_dict, sorted=True, mode="pending")
+            self.pending_tree_view = TreeViewWidget(data_dict=self._change_dict, sorted=True, mode="pending", p4=self._p4)
             self.pending_tree_view.populate_treeview_widget()
             publish_widget = self.pending_tree_view.get_treeview_widget()
 
@@ -1995,7 +1999,6 @@ class AppDialog(QtGui.QWidget):
             out_file.write('Pending Files\n')
             # Create a new Perforce changelist
 
-            del_change = 0
             del_files, other_files = 0, 0
             for sg_item in self._pending_data_to_publish:
                 # sg_item["entity"] = sg_entity
@@ -2010,11 +2013,7 @@ class AppDialog(QtGui.QWidget):
                             #add_res = add_to_change(self._p4, change, file_to_submit)
                             #action_result = self._p4.run("edit", "-c", change, "-v", file_to_submit)
                         else:
-                            if del_change == 0:
-                                desc = "Deleting files"
-                                del_change = create_change(self._p4, desc)
-
-                            del_res = add_to_change(self._p4, del_change, file_to_submit)
+                            del_res = add_to_change(self._p4, self._del_change, file_to_submit)
                             del_files += 1
 
             out_file.close()
@@ -3071,7 +3070,7 @@ class AppDialog(QtGui.QWidget):
 
         # publish_widget, self._submitted_publish_list = self._create_perforce_ui(self._fstat_dict, sorted=False)
         #logger.debug(">>> self._fstat_dict is: {}".format(self._fstat_dict))
-        self.submitted_tree_view = TreeViewWidget(data_dict=self._fstat_dict, sorted=False, mode="submitted")
+        self.submitted_tree_view = TreeViewWidget(data_dict=self._fstat_dict, sorted=False, mode="submitted", p4=self._p4)
         self.submitted_tree_view.populate_treeview_widget()
         publish_widget = self.submitted_tree_view.get_treeview_widget()
         # self._submitted_publish_list =
@@ -3325,7 +3324,7 @@ class AppDialog(QtGui.QWidget):
                         if action in ["add", "move/add", "edit", "delete"]:
                             msg = "{} file {}".format(action, depot_file)
 
-                            perform_actions = PerformActions(self._p4, sg_item, action)
+                            perform_actions = PerformActions(self._p4, sg_item, action, self._actions_change)
                             new_sg_item = perform_actions.run()
 
                             if new_sg_item:
