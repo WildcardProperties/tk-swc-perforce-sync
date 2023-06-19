@@ -13,8 +13,17 @@ import sgtk
 from sgtk.util import login
 from sgtk import TankError
 from sgtk.platform.qt import QtCore, QtGui
+#from QtCore import QRunnable, QThreadPool, pyqtSignal
 import tank
 from tank.platform.qt5 import QtWidgets
+import threading
+from .threads import SyncThread, FileSyncThread
+import concurrent.futures
+import subprocess
+import queue
+import time
+import concurrent.futures
+#from .threads import SyncThread, SyncRunnable
 
 import datetime
 from .date_time import create_publish_timestamp
@@ -1951,7 +1960,12 @@ class AppDialog(QtGui.QWidget):
         elif files_to_sync_count > 0:
             msg = "\n <span style='color:#2C93E2'>Syncing {} files ... </span> \n".format(files_to_sync_count)
             self._add_log(msg, 2)
-            self._do_sync_files(files_to_sync)
+            #self._do_sync_files_sequential(files_to_sync)
+            #self._do_sync_files_ThreadPool(files_to_sync)
+            #self._do_sync_files_concurrent_futures(files_to_sync)
+            self._do_sync_files_threading_thread_2(files_to_sync)
+            #self._do_sync_files_threading_multi_thread(files_to_sync)
+
             msg = "\n <span style='color:#2C93E2'>Syncing files is complete</span> \n"
             self._add_log(msg, 2)
             msg = "\n <span style='color:#2C93E2'>Reloading data ...</span> \n"
@@ -2258,10 +2272,188 @@ class AppDialog(QtGui.QWidget):
 
         return files_to_sync, total_file_count
 
-    def _do_sync_files(self, files_to_sync):
-        """
-        Get latest revision
-        """
+    def _sync_file(self, file_name, i, total):
+        # Sync file
+        logger.debug("--------->>>>>>  Syncing file: {}".format(file_name))
+        logger.debug("--------->>>>>>  i: {}".format(i))
+        logger.debug("--------->>>>>>  total: {}".format(total))
+
+        p4_result = self._p4.run("sync", "-f", file_name + "#head")
+        logger.debug("--------->>>>>>  p4_result is: {}".format(p4_result))
+
+        if p4_result:
+            # Update log
+            msg = "({}/{})  Syncing of file {} is complete".format(i + 1, total, file_name)
+            self._add_log(msg, 3)
+            # Update progress bar
+            progress_sum = ((i + 1) / total) * 100
+            self.progress_bar(progress_sum)
+            #time.sleep(1)
+        QtCore.QCoreApplication.processEvents()
+
+    def _do_sync_files_threads(self, files_to_sync):
+
+        threads = []
+        total = len(files_to_sync)
+        if total > 0:
+            # Creating and starting threads for each file
+            for i, file_name in enumerate(files_to_sync):
+               
+                    msg = "({}/{})  Syncing file: {}...".format(i + 1, total, file_name)
+                    self._add_log(msg, 3)
+                    thread = threading.Thread(target=self._sync_file, args=(file_name,i, total,))
+                    threads.append(thread)
+                    #thread.start()
+    
+            # Start all threads
+            max_threads = 5
+            count = 1
+            while len(threads) > 0:
+                if threading.activeCount() <= max_threads:
+                    logger.debug("--------->>>>>>  count: {}".format(count))
+                    thread = threads.pop()
+                    thread.start()
+                    count += 1
+    
+            # Waiting for all threads to finish
+            for thread in threads:
+                thread.join()
+            #   #thread.wait()
+
+    def _sync_file_threads(self, file_name):
+        # Sync file
+        logger.debug("--------->>>>>>  Syncing file: {}".format(file_name))
+
+        p4_result = self._p4.run("sync", "-f", file_name + "#head")
+        logger.debug("--------->>>>>>  p4_result is: {}".format(p4_result))
+
+        if p4_result:
+            # Update log
+            msg = "({}/{})  Syncing of file {} is complete".format(i + 1, total, file_name)
+            self._add_log(msg, 3)
+            # Update progress bar
+            progress_sum = ((i + 1) / total) * 100
+            self._add_progress_bar(progress_sum)
+            #time.sleep(1)
+        QtCore.QCoreApplication.processEvents()
+
+    def _do_sync_files_ThreadPoolExecutor(self, files_to_sync):
+
+        threads = []
+        total = len(files_to_sync)
+        # Number of parallel threads to use
+        num_threads = 3
+        if total > 0:
+
+            # Create a ThreadPoolExecutor with the desired number of threads
+            with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as executor:
+                # Submit each file sync task to the executor
+                results = [executor.submit(self._sync_file, file_path) for file_path in files_to_sync]
+
+                # Wait for all tasks to complete
+                concurrent.futures.wait(results)
+
+    def _do_sync_files_FileSyncThread(self, files_to_sync):
+
+        threads = []
+        self.file_queue = queue.Queue()
+        total = len(files_to_sync)
+        if total > 0:
+            # Creating and starting threads for each file
+            for i, file_name in enumerate(files_to_sync):
+                msg = "({}/{})  Syncing file: {}...".format(i + 1, total, file_name)
+                self._add_log(msg, 3)
+                self.file_queue.put(file_name)
+
+            num_threads = min(len(files_to_sync), 4)  # Number of threads to use
+            for _ in range(num_threads):
+                # Creating and starting threads for the file queue
+                thread = FileSyncThread(self._p4, self.file_queue)
+                thread.start()
+                threads.append(thread)
+
+            self.file_queue.join()
+            # Waiting for all threads to finish
+            #for thread in threads:
+            #    thread.join()
+
+
+    def _do_sync_files_ThreadPool(self, files_to_sync):
+        # Sync files
+        total = len(files_to_sync)
+        if total > 0:
+            self.thread_pool = QtCore.QThreadPool()
+            #self.thread_pool = QtCore.QThreadPool.globalInstance()
+            self.thread_pool.setMaxThreadCount(6)  # Set the maximum number of concurrent threads
+            for i, file_name in enumerate(files_to_sync):
+                msg = "({}/{})  Syncing file: {}...".format(i + 1, total, file_name)
+                self._add_log(msg, 3)
+                #runnable = SyncRunnable(p4=self._p4, file_name=file_name)
+                runnable = self._sync_runnable_file(file_name)
+                self.thread_pool.start(runnable)
+                progress_sum = ((i + 1) / total) * 100
+                self._update_progress(progress_sum)
+                QtCore.QCoreApplication.processEvents()
+            self.thread_pool.waitForDone()
+
+
+    def _do_sync_files_concurrent_futures(self, files_to_sync):
+        # Sync files
+        total = len(files_to_sync)
+        if total > 0:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+                futures = []
+                for i, file_name in enumerate(files_to_sync):
+                    msg = "({}/{})  Syncing file: {}...".format(i + 1, total, file_name)
+                    self._add_log(msg, 3)
+                    # runnable = SyncRunnable(p4=self._p4, file_name=file_name)
+                    runnable = self._sync_runnable_file(file_name)
+                    future = executor.submit(runnable)
+                    futures.append(future)
+                    progress_sum = ((i + 1) / total) * 100
+                    self._update_progress(progress_sum)
+
+                # Wait for all tasks to complete
+                concurrent.futures.wait(futures)
+
+    def _sync_runnable_file(self, file_name):
+        # Sync file
+        #logger.debug("--------->>>>>>  Syncing file: {}".format(file_name))
+
+        p4_result = self._p4.run("sync", "-f", file_name + "#head")
+        #logger.debug("--------->>>>>>  p4_result is: {}".format(p4_result))
+
+    def _do_sync_files_SyncThread(self, files_to_sync):
+
+        # Creating and starting threads for each file
+        threads = []
+
+        progress_sum = 0
+        total = len(files_to_sync)
+        if total > 0:
+            for i, file_name in enumerate(files_to_sync):
+                msg = "({}/{})  Syncing file: {}".format(i + 1, total, file_name)
+                self._add_log(msg, 3)
+                progress_sum = ((i + 1) / total) * 100
+                thread = SyncThread(p4=self._p4, file_name=file_name)
+                threads.append(thread)
+                #thread.start()
+                #thread.run()
+                self._update_progress(progress_sum)
+                QtCore.QCoreApplication.processEvents()
+
+            # Start all threads
+            for thread in threads:
+                thread.start()
+
+            # Waiting for all threads to finish
+            for thread in threads:
+                thread.join()
+
+    def _do_sync_files_sequential(self, files_to_sync):
+        
+        #Get latest revision
+        
         progress_sum = 0
         total = len(files_to_sync)
         if total > 0:
@@ -2273,6 +2465,147 @@ class AppDialog(QtGui.QWidget):
                 self._add_log(msg, 3)
                 self._update_progress(progress_sum)
 
+    def _do_sync_files_threading_thread_1(self, files_to_sync):
+        self.sync_command = []
+        self.sync_command.append("sync")
+        self.sync_command.append("-f")
+        #parallel_cmd = "--parallel threads=12,batch=8,batchsize=512,min=1,minsize=1"
+        #self.sync_command.append(parallel_cmd)
+
+        for i, file_path in enumerate(files_to_sync):
+            depot_path = self._get_depot_filepath(file_path)
+            depot_path = "{}#head".format(depot_path)
+            self.sync_command.append(depot_path)
+
+        logger.debug("sync_command: {}".format(self.sync_command))
+
+        sync_threads = threading.Thread(target=self.run_sync, args=())
+        sync_threads.start()
+        sync_threads.join()
+
+    def _do_sync_files_threading_thread_2(self, files_to_sync):
+        self.sync_command = []
+        self.sync_command.append("sync")
+        self.sync_command.append("-f")
+        self.sync_command.append("--parallel")
+        self.sync_command.append("threads=16,batch=4,batchsize=4096,min=1,minsize=1")
+
+        for i, file_path in enumerate(files_to_sync):
+            depot_path = self._get_depot_filepath(file_path)
+            depot_path = "{}#head".format(depot_path)
+            self.sync_command.append(depot_path)
+
+        #logger.debug("sync_command: {}".format(self.sync_command))
+
+        sync_thread = threading.Thread(target=self.run_sync, args=())
+        sync_thread.start()
+
+        total = len(files_to_sync)
+        for i, file_path in enumerate(files_to_sync):
+
+            msg = "({}/{})  Syncing file: {}".format(i + 1, total, file_path)
+            self._add_log(msg, 3)
+            progress_sum = ((i + 1) / total) * 100
+            # Simulate progress
+            self._update_progress(progress_sum)
+            QtCore.QCoreApplication.processEvents()
+            time.sleep(0.15)
+            #time.sleep(0.1)
+
+        msg = "\n <span style='color:#2C93E2'>Finalizing file syncing, please wait...</span> \n"
+        self._add_log(msg, 2)
+
+        # Todo, find out why this is faster than sync_thread.join()
+        # wait for all threads to complete
+        while sync_thread.is_alive():
+            #threading.enumerate()
+            #logger.debug(">>>>>>>>> len(threading.enumerate()): {}".format(len(threading.enumerate())))
+            QtCore.QCoreApplication.processEvents()
+
+        # wait for all threads to complete
+        #sync_thread.join()
+
+    def run_sync(self):
+        # Sync files
+        p4_response = self._p4.run(self.sync_command)
+        #logger.debug("p4_response: {}".format(p4_response))
+
+    def _do_sync_files_threading_thread_3(self, files_to_sync):
+        self.sync_command = []
+        self.sync_command.append("sync")
+        self.sync_command.append("-f")
+        self.sync_command.append("--parallel")
+        self.sync_command.append("threads=12,batch=8,batchsize=512,min=1,minsize=1")
+
+        total_tasks = len(files_to_sync)  # Total number of tasks
+        completed_tasks = 0  # Number of completed tasks
+        remaining_tasks = total_tasks  # Number of remaining tasks
+
+        semaphore = threading.Semaphore()  # Semaphore to track remaining tasks
+
+        for i, file_path in enumerate(files_to_sync):
+            depot_path = self._get_depot_filepath(file_path)
+            depot_path = "{}#head".format(depot_path)
+            self.sync_command.append(depot_path)
+
+        logger.debug("sync_command: {}".format(self.sync_command))
+
+        sync_thread = threading.Thread(target=self.run_sync_semaphore, args=(files_to_sync, semaphore, completed_tasks))
+        sync_thread.start()
+        self.update_progress_thread(sync_thread, total_tasks, completed_tasks, remaining_tasks)
+
+    def update_progress_thread(self, thread, total_tasks, completed_tasks, remaining_tasks):
+        while thread.is_alive():
+            progress = int((completed_tasks / total_tasks) * 100)  # Calculate the progress based on completed tasks
+            self.progress_bar.setValue(progress)
+            QtCore.QCoreApplication.processEvents()
+
+    def run_sync_semaphore(self, files_to_sync, semaphore, completed_tasks):
+        for file in files_to_sync:
+            with semaphore:  # Acquire semaphore to indicate a task in progress
+                # Perform the sync operation for file using self.sync_command
+                # Update the progress of completed tasks
+                completed_tasks += 1
+
+        self.completed_tasks = completed_tasks
+        self.remaining_tasks = 0
+
+    def _do_sync_files_threading_multi_thread(self, files_to_sync):
+        self.sync_command = []
+        self.sync_command.append("sync")
+        self.sync_command.append("-f")
+
+        for i, file_path in enumerate(files_to_sync):
+            depot_path = self._get_depot_filepath(file_path)
+            depot_path = "{}#head".format(depot_path)
+            self.sync_command.append(depot_path)
+
+        logger.debug("sync_command: {}".format(self.sync_command))
+
+        sync_threads = []
+        for _ in range(len(files_to_sync)):
+            thread = threading.Thread(target=self.run_sync, args=())
+            sync_threads.append(thread)
+            thread.start()
+
+        for thread in sync_threads:
+            thread.join()
+
+    def _do_sync_files_subprocess(self, files_to_sync):
+
+        processes = []
+        total = len(files_to_sync)
+        for i, file_path in enumerate(files_to_sync):
+            depot_path = self._get_depot_filepath(file_path)
+            depot_path = "{}#head".format(depot_path)
+            msg = "({}/{})  Syncing file: {}".format(i + 1, total, file_path)
+            self._add_log(msg, 3)
+            p = subprocess.Popen(['p4', 'sync', '-f', depot_path])
+            processes.append(p)
+
+        for p in processes:
+            p.wait()
+
     def _update_progress(self, value):
         if 100 > value > 0:
             self.ui.progress.setValue(value)
@@ -2280,6 +2613,7 @@ class AppDialog(QtGui.QWidget):
         else:
             self.ui.progress.setVisible(False)
         QtCore.QCoreApplication.processEvents()
+
 
     def _add_log(self, msg, flag):
         if flag <= 2:
@@ -3766,31 +4100,32 @@ class AppDialog(QtGui.QWidget):
                 fstat_list = self._p4.run("fstat", key)
                 #fstat_list = self._p4.run("fstat", "-Ol", key)
                 #logger.debug(">>>>>  fstat_list is: {}".format(fstat_list))
-                for i, fstat in enumerate(fstat_list):
-                    #if i == 0:
-                    #    logger.debug(">>>>>>>>>  fstat is: {}".format(fstat))
-                    # logger.debug("{}: >>>>>  fstat is: {}".format(i, fstat))
-                    client_file = fstat.get('clientFile', None)
-                    # if i == 0:
-                    #    logger.debug(">>>>>>>>>>  client_file is: {}".format(client_file))
-                    if client_file:
-
+                if fstat_list:
+                    for i, fstat in enumerate(fstat_list):
+                        #if i == 0:
+                        #    logger.debug(">>>>>>>>>  fstat is: {}".format(fstat))
+                        # logger.debug("{}: >>>>>  fstat is: {}".format(i, fstat))
+                        client_file = fstat.get('clientFile', None)
                         # if i == 0:
-                        #    logger.debug(">>>>>>>>>>  have_rev is: {}".format(have_rev))
-                        #    logger.debug(">>>>>>>>>>  head_rev is: {}".format(head_rev))
-                        modified_client_file = self._create_key(client_file)
-                        if modified_client_file not in self._fstat_dict:
+                        #    logger.debug(">>>>>>>>>>  client_file is: {}".format(client_file))
+                        if client_file:
 
                             # if i == 0:
-                            #    logger.debug(">>>>>>>>>>  client_file is: {}".format(client_file))
+                            #    logger.debug(">>>>>>>>>>  have_rev is: {}".format(have_rev))
+                            #    logger.debug(">>>>>>>>>>  head_rev is: {}".format(head_rev))
+                            modified_client_file = self._create_key(client_file)
+                            if modified_client_file not in self._fstat_dict:
 
-                            self._fstat_dict[modified_client_file] = fstat
-                            self._fstat_dict[modified_client_file]['Published'] = False
-                            action = fstat.get('action', None)
-                            if action:
-                                sg_status = self._get_p4_status(action)
-                                if sg_status:
-                                    self._fstat_dict[modified_client_file]['sg_status_list'] = sg_status
+                                # if i == 0:
+                                #    logger.debug(">>>>>>>>>>  client_file is: {}".format(client_file))
+
+                                self._fstat_dict[modified_client_file] = fstat
+                                self._fstat_dict[modified_client_file]['Published'] = False
+                                action = fstat.get('action', None)
+                                if action:
+                                    sg_status = self._get_p4_status(action)
+                                    if sg_status:
+                                        self._fstat_dict[modified_client_file]['sg_status_list'] = sg_status
 
                             #if i == 0:
                             #    logger.debug(">>>>>>>>>>  self._fstat_dict[client_file] is: {}".format(self._fstat_dict[modified_client_file]))
@@ -3898,8 +4233,8 @@ class AppDialog(QtGui.QWidget):
         for file_path in files_to_sync:
             p4_result = self._p4.run("sync", "-f", file_path + "#head")
             logger.debug("Syncing file: {}".format(file_path))
-    """
-    def _get_depot_path(self, local_path):
+
+    def _get_depot_filepath(self, local_path):
         
         #Convert local path to depot path
         #For example, convert: 'B:\\Ark2Depot\\Content\\Base\\Characters\\Human\\Survivor\\Armor\\Cloth_T3\\_ven\\MDL\\Survivor_M_Armor_Cloth_T3_MDL.fbx'
@@ -3909,7 +4244,7 @@ class AppDialog(QtGui.QWidget):
         depot_path = local_path.replace("\\", "/")
         depot_path = "/{}".format(depot_path)
         return depot_path
-    """
+
 
 ################################################################################################
 # Helper stuff
