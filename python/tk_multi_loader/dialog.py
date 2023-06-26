@@ -2176,7 +2176,7 @@ class AppDialog(QtGui.QWidget):
                     rev = sg_item.get("version_number") or sg_item.get("headRev") or 1
 
                     file_to_publish = sg_item['path'].get('local_path', None)
-                    msg = "({}/{})  Publishing file: {}#{}".format(i + 1, files_count, file_path, rev)
+                    msg = "({}/{})  Publishing file: {}#{}".format(i + 1, files_count, file_to_publish, rev)
                     self._add_log(msg, 4)
 
                     #p4_result = self._p4.run("add", "-v", file_to_publish)
