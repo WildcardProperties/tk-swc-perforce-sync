@@ -339,7 +339,8 @@ class AppDialog(QtGui.QWidget):
 
         #################################################
         # checkboxes, buttons etc
-        self.ui.fix_files.clicked.connect(self._on_fix_files)
+        self.ui.fix_seleted.clicked.connect(self._on_fix_seleted)
+        self.ui.fix_all.clicked.connect(self._on_fix_all)
         self.ui.sync_files.clicked.connect(self._on_sync_files)
         self.ui.submit_files.clicked.connect(self._on_submit_files)
         # self.ui.show_sub_items.toggled.connect(self._on_show_subitems_toggled)
@@ -1215,7 +1216,7 @@ class AppDialog(QtGui.QWidget):
             self.ui.submitted_mode.setChecked(True)
 
             self.main_view_mode = self.MAIN_VIEW_SUBMITTED
-            msg = "\n <span style='color:#2C93E2'>Select files in the Submitted view then click <i>Fix Files</i>to publish them using the <i>Shotgrid Publisher</i>...</span> \n"
+            msg = "\n <span style='color:#2C93E2'>Select files in the Submitted view then click <i>Fix Selected</i> or click to <i>Fix All</i> to publish them using the <i>Shotgrid Publisher</i>...</span> \n"
             self._add_log(msg, 2)
 
         elif mode == self.MAIN_VIEW_PENDING:
@@ -1834,69 +1835,43 @@ class AppDialog(QtGui.QWidget):
 
         self._update_perforce_data()
 
-    def _on_fix_files(self):
+        
+    def _on_fix_seleted(self):
         """
-        When someone clicks on the "Fix Files" button
+        When someone clicks on the "Fix Selected" button
         Send unpublished depot files in the submitted view to the Shotgrid Publisher.
         """
         # Publish depot files
         #self._get_submitted_publish_data()
 
-        self._submitted_data_to_publish = self.submitted_tree_view.get_publish_items()
+        self._submitted_data_to_publish = self.submitted_tree_view.get_selected_publish_items()
         logger.debug(">>>>>>>>>>   self._submitted_data_to_publish {}".format( self._submitted_data_to_publish))
         #self._publish_submitted_data_using_publisher_ui()
         self._publish_submitted_data_using_command_line()
 
-        # msg = "\n <span style='color:#2C93E2'>Hard refreshing data...</span> \n"
-        # self._add_log(msg, 2)
-        # self._publish_model.hard_refresh()
+        self._setup_details_panel([])
+        self._on_treeview_item_selected()
+        
+    def _on_fix_all(self):
+        """
+        When someone clicks on the "Fix All" button
+        Send unpublished depot files in the submitted view to the Shotgrid Publisher.
+        """
+        self._submitted_data_to_publish = []
+        for key in self._fstat_dict:
+            # Find if it is published
+            sg_item = self._fstat_dict[key]
+            is_published = sg_item.get("Published", False)
+            if not is_published:
+                self._submitted_data_to_publish.append(sg_item)
+        #logger.debug(">>>>>>>>>>   self._submitted_data_to_publish {}".format( self._submitted_data_to_publish))
+        #self._publish_submitted_data_using_publisher_ui()
+        self._publish_submitted_data_using_command_line()
 
-        #self._reload_treeview()
-        #self._update_perforce_data()
         self._setup_details_panel([])
         self._on_treeview_item_selected()
 
-        #self._update_perforce_data()
-        # self.print_publish_data()
-
-        # msg = "\n <span style='color:#2C93E2'>Hard refreshing data...</span> \n"
-        # self._add_log(msg, 2)
-        # self._publish_model.hard_refresh()
-
-        # self._reload_treeview()
-        #self._setup_details_panel([])
-
-        #self._update_perforce_data()
-        # self.print_publish_data()
-        """
-        selected_item = self._get_selected_entity()
-        sg_entity = shotgun_model.get_sg_data(selected_item)
-        logger.debug(">>>>>>>>>>  sg_entity {}".format(sg_entity))
-
-        logger.debug("<<<<<<<  In _on_fix_files: {}".format(self._submitted_data_to_publish))
-
-        #self.publish_files_ui = PublishFilesUI(self, self.window(), self._submitted_data_to_publish, sg_entity)
-
-
-
-        #self.publish_files_ui.show()
-        #self.publish_list = self.publish_files.publish_list
-        #logger.debug(">>>>>>>>>>  Publish list {}".format(self.publish_list))
-        """
-        """
-        # Publish depot files
-        self._publish_depot_data()
-
-        #msg = "\n <span style='color:#2C93E2'>Hard refreshing data...</span> \n"
-        #self._add_log(msg, 2)
-        #self._publish_model.hard_refresh()
-
-        self._reload_treeview()
-        self._setup_details_panel([])
-
-        self._update_perforce_data()
-        self.print_publish_data()
-        """
+       
     def post_publish(self):
         msg = "\n <span style='color:#2C93E2'>Publish is complete, reloading data</span> \n"
         self._add_log(msg, 2)
@@ -1926,7 +1901,9 @@ class AppDialog(QtGui.QWidget):
                 if "local_path" in sg_item["path"]:
                     file_path = sg_item["path"].get("local_path", None)
                     if file_path:
-                        msg = "({}/{})  Publishing file: {}".format(i + 1, files_count, file_path)
+                        rev = sg_item.get("version_number") or sg_item.get("headRev") or 1
+
+                        msg = "({}/{})  Publishing file: {}#{}".format(i + 1, files_count, file_path, rev)
                         self._add_log(msg, 3)
                         publisher = PublishItem(sg_item)
                         publish_result = publisher.commandline_publishing()
@@ -2190,13 +2167,16 @@ class AppDialog(QtGui.QWidget):
         # logger.debug(">>>>>>>>>>  sg_entity {}".format(sg_entity))
 
         if self._submitted_data_to_publish:
-            msg = "\n <span style='color:#2C93E2'>Sending unpublished depot files to the Shotgrid Publisher...</span> \n"
+            msg = "\n <span style='color:#2C93E2'>Publishing all unpublished files in the depot associated with this entity to Shotgrid ...</span> \n"
             self._add_log(msg, 2)
-            for sg_item in self._submitted_data_to_publish:
+            files_count = len(self._submitted_data_to_publish)
+            for i, sg_item in enumerate(self._submitted_data_to_publish):
                 sg_item["entity"] = sg_entity
                 if 'path' in sg_item:
+                    rev = sg_item.get("version_number") or sg_item.get("headRev") or 1
+
                     file_to_publish = sg_item['path'].get('local_path', None)
-                    msg = "Publishing file: {}...".format(file_to_publish)
+                    msg = "({}/{})  Publishing file: {}#{}".format(i + 1, files_count, file_path, rev)
                     self._add_log(msg, 4)
 
                     #p4_result = self._p4.run("add", "-v", file_to_publish)
@@ -3460,11 +3440,22 @@ class AppDialog(QtGui.QWidget):
                 ["task.Task.id", "is", entity_id],
             ]
 
-        self._sg_data = self._app.shotgun.find(
+        entity_published_files = self._app.shotgun.find(
             "PublishedFile",
             filters,
-            ["entity", "path_cache", "path"],
+            ["entity", "path_cache", "path", "version_number"],
+            #["entity", "path_cache", "path", "version_number", "name", "description", "created_at", "created_by", "image", "published_file_type", "task","],
         )
+        """
+        # Exclude published files associated with child entities
+        published_files = []
+        for published_file in entity_published_files:
+            if published_file["entity"]["id"] == entity_id:
+                published_files.append(published_file)
+        """
+
+        # self._sg_data = published_files
+        self._sg_data = entity_published_files
         #logger.debug(">>>>>>>>>>  Published files are: {}".format(self._sg_data))
 
     def _update_perforce_data(self):
@@ -3505,56 +3496,48 @@ class AppDialog(QtGui.QWidget):
             msg = "\n <span style='color:#2C93E2'>Click on 'Fix Files' to publish above files</span> \n"
             self._add_log(msg, 2)
 
-    def _update_fstat_data_old(self):
-        if self._fstat_dict:
-            # logger.debug("<<<<<<< In _update_fstat_data ...")
-            # for key, sg_item in self._fstat_dict.items():
-            #   logger.debug("{}:{}".format(key, sg_item))
-            model = self.ui.publish_view.model()
-            logger.debug(">>>>>>>>>> In  _update_fstat_data model.rowCount() is {}".format(model.rowCount()))
-            if model.rowCount() > 0:
-                for row in range(model.rowCount()):
-                    model_index = model.index(row, 0)
-                    proxy_model = model_index.model()
-                    source_index = proxy_model.mapToSource(model_index)
-                    item = source_index.model().itemFromIndex(source_index)
-
-                    is_folder = item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
-                    if not is_folder:
-                        logger.debug(">>>>>>>>>>Checking for published file ...")
-                        sg_item = shotgun_model.get_sg_data(model_index)
-                        if "path" in sg_item:
-                            if "local_path" in sg_item["path"]:
-                                local_path = sg_item["path"].get("local_path", None)
-                                key = self._create_key(local_path)
-                                logger.debug(">>>>>>>>>> local_path is {}".format(local_path))
-                                logger.debug(">>>>>>>>>> key is {}".format(key))
-                                if key and key in self._fstat_dict:
-                                    #logger.debug(">>>>>>>>>> local publish path {} is in the self._fstat_dict".format(local_path))
-                                    #logger.debug(">>>>>>>>>> self._fstat_dict[KEY] is {}".format(local_path))
-                                    self._fstat_dict[key]["Published"] = True
-                                    logger.debug(">>>>>>>>>>Found a published file {}".format(key))
 
     def _update_fstat_data(self):
+        """Update the fstat data for the selected entity"""
+        # Get the selected item
+        selected_item = self._get_selected_entity()
+        # Get the entity data
+        entity_data = self._load_publishes_for_entity_item(selected_item)
+        # Get the entity path, id and type
+        self._entity_path, entity_id, entity_type = self._get_entity_path(entity_data)
+        # Get the current publish data
+        self.get_current_publish_data(entity_id, entity_type)
+
         if self._fstat_dict:
             if self._sg_data:
                 for sg_item in self._sg_data:
                     # logger.debug(">>>>>>>>>>Checking for published file ...")
+                    #logger.debug(">>>>>>>>>>sg_item {}".format(sg_item))
                     if "path" in sg_item:
                         if "local_path" in sg_item["path"]:
                             local_path = sg_item["path"].get("local_path", None)
                             key = self._create_key(local_path)
-                            # logger.debug(">>>>>>>>>> local_path is {}".format(local_path))
-                            # logger.debug(">>>>>>>>>> key is {}".format(key))
-                            if key and key in self._fstat_dict:
-                                # logger.debug(">>>>>>>>>> local publish path {} is in the self._fstat_dict".format(local_path))
-                                # logger.debug(">>>>>>>>>> self._fstat_dict[KEY] is {}".format(local_path))
-                                self._fstat_dict[key]["Published"] = True
-                                # logger.debug(">>>>>>>>>>Found a published file {}".format(key))
+                            version_number = sg_item.get("version_number", None)
+                            # Get the version number from the path if it exists
+                            if version_number:
+                                version_number = int(version_number)
+                                key = "{}#{}".format(key, version_number)
+                            else:
+                                # Get the revision number from the path if it exists
+                                have_rev = sg_item.get("haveRev", None)
+                                if have_rev:
+                                    have_rev = int(have_rev)
+                                    key = "{}#{}".format(key, have_rev)
+                                else:
+                                    key = "{}#{}".format(key, 1)
+                            depot_file = sg_item.get('depotFile', None)
+                            #if depot_file:
+                            #    if 'Original_maleLeather_pants' in depot_file:
+                            #        logger.debug(">>>>>>>>>  sg_item is: {}".format(sg_item))
+                            #        logger.debug(">>>>>>>>>> key is {}".format(key))
 
-        #logger.debug(">>>>>>>>>> Updated self._fstat_dict is: {} ...".format(self._fstat_dict))
-        #for k, v in self._fstat_dict.items():
-        #    logger.debug("{}: {}".format(k, v))
+                            if key and key in self._fstat_dict:
+                                self._fstat_dict[key]["Published"] = True
 
     def _fix_fstat_dict(self):
         for key in self._fstat_dict:
@@ -3596,24 +3579,7 @@ class AppDialog(QtGui.QWidget):
                     sg_item["name"] = os.path.basename(file_path)
                     sg_item["path"] = {}
                     sg_item["path"]["local_path"] = file_path
-                #sg_item["code"] = "{}#{}".format(sg_item["name"], self._fstat_dict[key].get("headRev", 0))
-                # sg_item["type"] = "depotFile"
-                # sg_item["published_file_type"] = None
-                # have_rev = self._fstat_dict[key].get('haveRev', "0")
-                # head_rev = self._fstat_dict[key].get('headRev', "0")
-                # sg_item["haveRev"] = have_rev
-                # sg_item["headRev"] = head_rev
-                # sg_item["revision"] = "#{}/{}".format(have_rev, head_rev)
-                ## sg_item["created_at"] = 0
-                # sg_item["depotFile"] = self._fstat_dict[key].get('depotFile', None)
-                # sg_item["headChange"] = self._fstat_dict[key].get('headChange', "0")
-                # sg_item["headModTime"] = self._fstat_dict[key].get('headModTime', None)
-                # sg_item["actionOwner"] = self._fstat_dict[key].get('actionOwner', None)
-                # sg_item["headTime"] = self._fstat_dict[key].get('headTime', None)
-                # sg_item["sg_p4_user"] = self._fstat_dict[key].get('sg_p4_user', None)
-                # sg_item["action"] = self._fstat_dict[key].get('action', None)
-                # sg_item["sg_status_list"] = self._fstat_dict[key].get('sg_status_list', None)
-                ## sg_item["version_number"] = self._fstat_dict[key]["headRev"]
+
 
                 have_rev = self._fstat_dict[key].get('haveRev', "0")
                 head_rev = self._fstat_dict[key].get('headRev', "0")
@@ -4065,6 +4031,18 @@ class AppDialog(QtGui.QWidget):
         self.ui.entity_breadcrumbs.setText("<big>%s</big>" % breadcrumbs)
 
     ################################################################################################
+    def _convert_local_to_depot(self, local_directory):
+
+        local_directory = os.path.abspath(local_directory)
+        where_output = self._p4.run_where(local_directory)
+
+        depot_directory = None
+        for mapping in where_output:
+            depot_directory = mapping.get('depotFile')
+            if depot_directory:
+                break
+
+        return depot_directory
 
     def _get_peforce_data(self):
         """"
@@ -4094,31 +4072,56 @@ class AppDialog(QtGui.QWidget):
 
         for key in item_path_dict:
             if key:
-                # logger.debug(">>>>>>>>>>  key is: {}".format(key))
-                key = "{}\\...".format(key)
-                #logger.debug("^^^ key is: {}".format(key))
-                fstat_list = self._p4.run("fstat", key)
+                logger.debug(">>>>>>>>>>  key is: {}".format(key))
+                key = self._convert_local_to_depot(key)
+                key = key.rstrip('/')
+                #fstat_list = self._p4.run_fstat('-Ol', key + '/...')
+                fstat_list = self._p4.run_fstat(key + '/...')
                 #fstat_list = self._p4.run("fstat", "-Ol", key)
-                #logger.debug(">>>>>  fstat_list is: {}".format(fstat_list))
+                #logger.debug("<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>  fstat_list is: {}".format(fstat_list))
+
+                #file_list = []
+                for file_info in fstat_list:
+                    #logger.debug("<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>  file_info is: {}".format(file_info))
+                    if file_info:
+                        if isinstance(file_info, list) and len(file_info) == 1:
+                            file_info = file_info[0]
+
+                        depot_file = file_info.get('depotFile', None)
+                        revision = file_info.get('headRev', None)
+                        if depot_file and revision:
+                            for i in range(1, int(revision) ):
+                                depot_file = depot_file.split('#')[0]  # Remove existing revision number
+                                depot_file = "{}#{}".format(depot_file, i)
+                                fstat = self._p4.run_fstat(depot_file)
+                                fstat_list.append(fstat)
+                #logger.debug("<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>  file_list is: {}".format(file_list))
+                #fstat_list = self._p4.run_fstat(file_list)
+                #logger.debug("<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>  fstat_list is: {}".format(fstat_list))
+                # Add head list to fstat list
+                #fstat_list += head_list
+                #logger.debug(">>>>>>>>>>>>>>>>>>>>>>  fstat_list_2 is: {}".format(fstat_list_2))
                 if fstat_list:
                     for i, fstat in enumerate(fstat_list):
+                        if isinstance(fstat, list) and len(fstat) == 1:
+                            fstat = fstat[0]
                         #if i == 0:
                         #    logger.debug(">>>>>>>>>  fstat is: {}".format(fstat))
                         # logger.debug("{}: >>>>>  fstat is: {}".format(i, fstat))
                         client_file = fstat.get('clientFile', None)
-                        # if i == 0:
-                        #    logger.debug(">>>>>>>>>>  client_file is: {}".format(client_file))
+
+                        depot_file = fstat.get('depotFile', None)
+                        #if depot_file:
+                        #    if 'Original_maleLeather_pants' in depot_file:
+                        #        logger.debug(">>>>>>>>>  fstat is: {}".format(fstat))
+
                         if client_file:
-
-                            # if i == 0:
-                            #    logger.debug(">>>>>>>>>>  have_rev is: {}".format(have_rev))
-                            #    logger.debug(">>>>>>>>>>  head_rev is: {}".format(head_rev))
                             modified_client_file = self._create_key(client_file)
+                            head_rev = fstat.get('headRev', None)
+                            # Add revision number to client file
+                            modified_client_file = "{}#{}".format(modified_client_file, head_rev)
+
                             if modified_client_file not in self._fstat_dict:
-
-                                # if i == 0:
-                                #    logger.debug(">>>>>>>>>>  client_file is: {}".format(client_file))
-
                                 self._fstat_dict[modified_client_file] = fstat
                                 self._fstat_dict[modified_client_file]['Published'] = False
                                 action = fstat.get('action', None)
@@ -4127,12 +4130,6 @@ class AppDialog(QtGui.QWidget):
                                     if sg_status:
                                         self._fstat_dict[modified_client_file]['sg_status_list'] = sg_status
 
-                            #if i == 0:
-                            #    logger.debug(">>>>>>>>>>  self._fstat_dict[client_file] is: {}".format(self._fstat_dict[modified_client_file]))
-        #logger.debug(">>>>>>>>>>  self._fstat_dict is: ")
-
-        #for k, v in self._fstat_dict.items():
-        #    logger.debug("{}: {}".format(k, v))
 
     def _get_file_log(self, file_path):
         try:

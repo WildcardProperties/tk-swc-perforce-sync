@@ -171,7 +171,23 @@ class TreeViewWidget(QtWidgets.QWidget):
                     child_item = item.child(row)
                     child_item.setSelected(True)
 
-    def get_publish_items(self):
+    def get_selected_publish_items(self):
+        data_to_publish = []
+        #selected = self.tree_view.getSelectedIndexes()
+        selected = self.tree_view.selectionModel().selectedIndexes()
+        for index in selected:
+            key = self.model.data(index)
+            if key:
+                if key in self.publish_dict:
+                    sg_item = self.publish_dict.get(key, None)
+                    if sg_item:
+                        data_to_publish.append(sg_item)
+
+        #logger.debug("<<<<<<<  self.publish_dict: {}".format(self.publish_dict))
+        #logger.debug("<<<<<<<  data_to_publish: {}".format(data_to_publish))
+        return data_to_publish
+
+    def get_all_publish_items(self):
         data_to_publish = []
         #selected = self.tree_view.getSelectedIndexes()
         selected = self.tree_view.selectionModel().selectedIndexes()
