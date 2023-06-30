@@ -1233,6 +1233,8 @@ class AppDialog(QtGui.QWidget):
         self.pending_tree_view = TreeViewWidget(data_dict=self._change_dict, sorted=True, mode="pending", p4=self._p4)
         self.pending_tree_view.populate_treeview_widget()
         publish_widget = self.pending_tree_view.get_treeview_widget()
+        # Pending Scroll Area
+        self.ui.pending_scroll.setWidget(publish_widget)
 
 
 
@@ -2012,8 +2014,8 @@ class AppDialog(QtGui.QWidget):
             self._add_log(msg, 2)
             # Update the Pending view
             self._update_pending_view()
-            msg = "\n <span style='color:#2C93E2'>Updating the Pending view is complete</span> \n"
-            self._add_log(msg, 2)
+            #msg = "\n <span style='color:#2C93E2'>Updating the Pending view is complete</span> \n"
+            #self._add_log(msg, 2)
 
 
             # msg = "\n <span style='color:#2C93E2'>Publishing files is complete</span> \n"
