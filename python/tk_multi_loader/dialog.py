@@ -739,35 +739,6 @@ class AppDialog(QtGui.QWidget):
                                     sg_item["headRev"] = rev
                                     sg_item["action"] = action
                                     self._change_dict[key].append(sg_item)
-                                """
-                                logger.debug(">>>> Depot file: {}".format(depot_file))
-                                logger.debug(">>>> client_file: {}".format(client_file))
-                                fstat_list = self._p4.run("fstat", depot_file)
-                                if fstat_list:
-                                    sg_item = fstat_list[0]
-                                    # logger.debug("Key: {}, sg_item: {}".format(key, sg_item))
-                                    sg_item['description'] = change_list.get("desc", None)
-                                    sg_item['p4_user'] = change_list.get('user', None)
-                                    file_path = sg_item.get("clientFile", None)
-                                    if client_file:
-                                        #sg_item["name"] = os.path.basename(file_path)
-                                        sg_item["path"] = {}
-                                        sg_item["path"]["local_path"] = client_file
-                                    # sg_item['status'] = change_list.get("status", None)
-
-                                    # sg_item['Published'] = False
-                                    #have_rev = sg_item.get('haveRev', "0")
-                                    #head_rev = sg_item.get('headRev', "0")
-                                    #sg_item["revision"] = "#{}/{}".format(have_rev, head_rev)
-
-                                    #sg_item["code"] = "{}#{}".format(sg_item.get("name", None), head_rev)
-                                    #p4_status = self._get_action(sg_item)
-                                    #sg_item["sg_status_list"] = self._get_p4_status(p4_status)
-
-                                    #sg_item["depot_file_type"] = self._get_publish_type(file_path)
-
-                                    self._change_dict[key].append(sg_item)
-                                """
 
 
             #logger.debug("key {}:{}".format(key, self._change_dict[key]))
@@ -1249,6 +1220,21 @@ class AppDialog(QtGui.QWidget):
 
         self.ui.publish_view.selectionModel().clear()
         self._settings_manager.store("main_view_mode", mode)
+
+    def _update_pending_view(self):
+        """
+        Shows the pending view
+        """
+        self._change_dict = {}
+        self._get_default_changelists()
+        self._get_pending_changelists()
+
+        # publish_widget, self._pending_publish_list = self._create_perforce_ui(self._change_dict, sorted=True)
+        self.pending_tree_view = TreeViewWidget(data_dict=self._change_dict, sorted=True, mode="pending", p4=self._p4)
+        self.pending_tree_view.populate_treeview_widget()
+        publish_widget = self.pending_tree_view.get_treeview_widget()
+
+
 
     def _turn_all_modes_off(self):
         self.ui.publish_view.setVisible(False)
@@ -1822,18 +1808,17 @@ class AppDialog(QtGui.QWidget):
         """
         # Publish depot files
         #self._get_pending_publish_data()
-
-        self._pending_data_to_publish = self.pending_tree_view.get_publish_items()
+        self._pending_data_to_publish = self.pending_tree_view.get_selected_publish_items()
         self._publish_pending_data_using_publisher_ui()
 
         # msg = "\n <span style='color:#2C93E2'>Hard refreshing data...</span> \n"
         # self._add_log(msg, 2)
         # self._publish_model.hard_refresh()
 
-        self._reload_treeview()
-        self._setup_details_panel([])
+        #self._reload_treeview()
+        #self._setup_details_panel([])
 
-        self._update_perforce_data()
+        # self._update_perforce_data()
 
         
     def _on_fix_seleted(self):
@@ -1992,6 +1977,7 @@ class AppDialog(QtGui.QWidget):
 
             del_files, other_files = 0, 0
             for sg_item in self._pending_data_to_publish:
+                logger.debug(">>>>>>>>>>  sg_item: {}".format(sg_item))
                 # sg_item["entity"] = sg_entity
                 if 'path' in sg_item:
                     file_to_submit = sg_item['path'].get('local_path', None)
@@ -2001,26 +1987,36 @@ class AppDialog(QtGui.QWidget):
                         action = self._get_action(sg_item)
                         if action not in ["delete"]:
                             out_file.write('%s\n' % file_to_submit)
+                            other_files += 1
                             #add_res = add_to_change(self._p4, change, file_to_submit)
                             #action_result = self._p4.run("edit", "-c", change, "-v", file_to_submit)
                         else:
                             del_res = add_to_change(self._p4, self._del_change, file_to_submit)
+                            logger.debug(">>>>>>>>>>  File added to changlist for deletion: {}".format(del_res))
                             del_files += 1
 
             out_file.close()
 
             if del_files > 0:
-                submit_del_res = submit_change(self._p4, del_change)
+                submit_del_res = submit_change(self._p4, self._del_change)
+                logger.debug(">>>>>>>>>>  Result of deleting files: {}".format(submit_del_res))
 
             # Run the publisher UI
-            engine = sgtk.platform.current_engine()
-            engine.commands["Publish..."]["callback"]()
+            if other_files > 0:
+                engine = sgtk.platform.current_engine()
+                engine.commands["Publish..."]["callback"]()
+
+            msg = "\n <span style='color:#2C93E2'>Updating the Pending view ...</span> \n"
+            self._add_log(msg, 2)
+            # Update the Pending view
+            self._update_pending_view()
 
             # msg = "\n <span style='color:#2C93E2'>Publishing files is complete</span> \n"
             # self._add_log(msg, 2)
-            msg = "\n <span style='color:#2C93E2'>Reloading data ...</span> \n"
-            self._add_log(msg, 2)
-            self._reload_treeview()
+            #msg = "\n <span style='color:#2C93E2'>Reloading data ...</span> \n"
+            #self._add_log(msg, 2)
+            #self._reload_treeview()
+
 
         else:
             msg = "\n <span style='color:#2C93E2'>Check files in the Pending view to publish using the Shotgrid Publisher</span> \n"
