@@ -1998,6 +1998,8 @@ class AppDialog(QtGui.QWidget):
             out_file.close()
 
             if del_files > 0:
+                msg = "\n <span style='color:#2C93E2'>Submitting files for deletion ...</span> \n"
+                self._add_log(msg, 2)
                 submit_del_res = submit_change(self._p4, self._del_change)
                 logger.debug(">>>>>>>>>>  Result of deleting files: {}".format(submit_del_res))
 
@@ -2010,6 +2012,9 @@ class AppDialog(QtGui.QWidget):
             self._add_log(msg, 2)
             # Update the Pending view
             self._update_pending_view()
+            msg = "\n <span style='color:#2C93E2'>Updating the Pending view is complete</span> \n"
+            self._add_log(msg, 2)
+
 
             # msg = "\n <span style='color:#2C93E2'>Publishing files is complete</span> \n"
             # self._add_log(msg, 2)
