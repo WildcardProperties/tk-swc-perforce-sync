@@ -385,10 +385,11 @@ class PublishItem():
         # use the p4 revision number as the version number
         version_numer = int(self.sg_item.get("headRev", 0))
 
-        #action = self.sg_item.get("action", None)
+        action = self.sg_item.get("action", None)
         #if action and action in ["add", "move/add", "edit", "delete"]:
-        #    # Get next version
-        #    version_numer += 1
+        if action and action in ["delete"]:
+            # Get next version
+            version_numer += 1
         return version_numer
 
     def get_publish_fields(self):
@@ -399,7 +400,8 @@ class PublishItem():
             if change_number:
                 sg_fields["sg_p4_change_number"] = int(change_number)
             # sg_fields["Status"] = self.sg_item.get("headAction", None)
-            sg_fields["sg_status_list"] = self.sg_item.get("sg_status_list", None)
+            # sg_fields["sg_status_list"] = self.sg_item.get("sg_status_list", None)
+            sg_fields["sg_status_list"] = self.get_sg_status_list()
             sg_fields["sg_p4_depo_path"] = self.sg_item.get("depotFile", None)
             sg_fields["task"] = self.sg_item.get("task", None)
             #sg_fields["task.Task.sg_status_list"] = self.sg_item.get("task.Task.sg_status_list", None)

@@ -173,7 +173,6 @@ class TreeViewWidget(QtWidgets.QWidget):
 
     def get_selected_publish_items(self):
         data_to_publish = []
-        #selected = self.tree_view.getSelectedIndexes()
         selected = self.tree_view.selectionModel().selectedIndexes()
         for index in selected:
             key = self.model.data(index)
@@ -186,6 +185,37 @@ class TreeViewWidget(QtWidgets.QWidget):
         #logger.debug("<<<<<<<  self.publish_dict: {}".format(self.publish_dict))
         #logger.debug("<<<<<<<  data_to_publish: {}".format(data_to_publish))
         return data_to_publish
+
+    def get_selected_publish_items_by_action(self):
+        delete_data_to_publish = []
+        other_data_to_publish = []
+        selected = self.tree_view.selectionModel().selectedIndexes()
+        for index in selected:
+            key = self.model.data(index)
+            if key:
+                if key in self.publish_dict:
+                    sg_item = self.publish_dict.get(key, None)
+                    if sg_item:
+                        action = self._get_action(sg_item)
+                        if action not in ["delete"]:
+                            other_data_to_publish.append(sg_item)
+                        else:
+                            delete_data_to_publish.append(sg_item)
+
+
+        #logger.debug("<<<<<<<  self.publish_dict: {}".format(self.publish_dict))
+        #logger.debug("<<<<<<<  data_to_publish: {}".format(data_to_publish))
+        return other_data_to_publish, delete_data_to_publish
+
+    def _get_action(self, sg_item):
+        """
+        Get action
+        """
+        action = sg_item.get("action", None)
+        if not action:
+            action = sg_item.get("headAction", None)
+        return action
+
 
     def get_all_publish_items(self):
         data_to_publish = []

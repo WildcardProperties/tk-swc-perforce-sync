@@ -698,7 +698,7 @@ class AppDialog(QtGui.QWidget):
 
         client = self._p4.fetch_client()
         workspace = client.get("Client", None)
-
+        # Get the pending changelists
         change_lists = self._p4.run_changes("-l", "-s", "pending", "-c", workspace)
         # logger.debug("<<<<<<<  change_lists: {}".format(change_lists))
 
@@ -710,7 +710,7 @@ class AppDialog(QtGui.QWidget):
             if desc_files:
 
                 for desc in desc_files:
-                    # logger.debug(">>>> desc_file: {}".format(desc))
+                    # logger.debug(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> desc_file: {}".format(desc))
                     depot_files = desc.get('depotFile', None)
 
                     if depot_files:
@@ -738,6 +738,7 @@ class AppDialog(QtGui.QWidget):
                                     sg_item["path"]["local_path"] = client_file
                                     sg_item["headRev"] = rev
                                     sg_item["action"] = action
+                                    sg_item["headChange"] = key
                                     self._change_dict[key].append(sg_item)
 
 
@@ -1187,7 +1188,7 @@ class AppDialog(QtGui.QWidget):
             self.ui.submitted_mode.setChecked(True)
 
             self.main_view_mode = self.MAIN_VIEW_SUBMITTED
-            msg = "\n <span style='color:#2C93E2'>Select files in the Submitted view then click <i>Fix Selected</i> or click to <i>Fix All</i> to publish them using the <i>Shotgrid Publisher</i>...</span> \n"
+            msg = "\n <span style='color:#2C93E2'>Select files in the Submitted view then click <i>Fix Selected</i> or click <i>Fix All</i> to publish them using the <i>Shotgrid Publisher</i>...</span> \n"
             self._add_log(msg, 2)
 
         elif mode == self.MAIN_VIEW_PENDING:
@@ -1809,9 +1810,23 @@ class AppDialog(QtGui.QWidget):
         Send pending files to the Shotgrid Publisher.
         """
         # Publish depot files
-        #self._get_pending_publish_data()
-        self._pending_data_to_publish = self.pending_tree_view.get_selected_publish_items()
-        self._publish_pending_data_using_publisher_ui()
+        # Get the selected pending files
+        other_data_to_publish, deleted_data_to_publish = self.pending_tree_view.get_selected_publish_items_by_action()
+        if other_data_to_publish or deleted_data_to_publish:
+            msg = "\n <span style='color:#2C93E2'>Submitting pending files...</span> \n"
+            self._add_log(msg, 2)
+            if deleted_data_to_publish:
+                self._publish_delete_pending_data(deleted_data_to_publish)
+            if other_data_to_publish:
+                self._publish_other_pending_data(other_data_to_publish)
+
+            msg = "\n <span style='color:#2C93E2'>Updating the Pending view ...</span> \n"
+            self._add_log(msg, 2)
+            # Update the Pending view
+            self._update_pending_view()
+        else:
+            msg = "\n <span style='color:#2C93E2'>Please select files in the Pending view...</span> \n"
+            self._add_log(msg, 2)
 
         # msg = "\n <span style='color:#2C93E2'>Hard refreshing data...</span> \n"
         # self._add_log(msg, 2)
@@ -1821,8 +1836,134 @@ class AppDialog(QtGui.QWidget):
         #self._setup_details_panel([])
 
         # self._update_perforce_data()
+    def _publish_other_pending_data(self, other_data_to_publish):
+        """
+        Publish Depot Data in the Pending view that does not need to be deleted.
+        """
 
-        
+        if other_data_to_publish:
+            msg = "\n <span style='color:#2C93E2'>Submitting pending files that are not marked for delete...</span> \n"
+            self._add_log(msg, 2)
+            # Create publish file
+            out_file = open(self._publish_files_path, 'w')
+            out_file.write('Pending Files\n')
+            # Create a new Perforce changelist
+
+            for sg_item in other_data_to_publish:
+                # logger.debug(">>>>>>>>>>  sg_item: {}".format(sg_item))
+                if 'path' in sg_item:
+                    file_to_submit = sg_item['path'].get('local_path', None)
+                    if file_to_submit:
+                        msg = "{}".format(file_to_submit)
+                        self._add_log(msg, 4)
+                        out_file.write('%s\n' % file_to_submit)
+                        #add_res = add_to_change(self._p4, change, file_to_submit)
+                        #action_result = self._p4.run("edit", "-c", change, "-v", file_to_submit)
+
+            out_file.close()
+
+            # Run the publisher UI
+            engine = sgtk.platform.current_engine()
+            engine.commands["Publish..."]["callback"]()
+
+
+    def _publish_delete_pending_data(self, deleted_data_to_publish):
+        """
+        Publish Depot Data in the Pending view that needs to be deleted.
+        """
+        if deleted_data_to_publish:
+            msg = "\n <span style='color:#2C93E2'>Submitting files for deletion...</span> \n"
+            self._add_log(msg, 2)
+
+            self._publish_deleted_data_using_command_line(deleted_data_to_publish)
+
+            for sg_item in deleted_data_to_publish:
+                # logger.debug(">>>>>>>>>>  sg_item: {}".format(sg_item))
+
+                file_to_submit = sg_item.get('path', {}).get('local_path', None) if 'path' in sg_item else None
+
+                if file_to_submit:
+                        msg = "{}".format(file_to_submit)
+                        self._add_log(msg, 4)
+                        del_res = add_to_change(self._p4, self._del_change, file_to_submit)
+                        logger.debug(">>>>>>>>>>  File added to changlist for deletion: {}".format(del_res))
+
+            # Submit the changelist
+            if self._del_change:
+                submit_del_res = submit_change(self._p4, self._del_change)
+                logger.debug(">>>>>>>>>>  Result of deleting files: {}".format(submit_del_res))
+
+
+    def _publish_deleted_data_using_command_line(self, deleted_data_to_publish):
+        """
+        Publish Pending view Depot Data that needs to be deleted using the command line.
+        """
+        if deleted_data_to_publish:
+            for sg_item in deleted_data_to_publish:
+                logger.debug(">>>>>>>>>>  sg_item {}".format(sg_item))
+                file_path = sg_item['path'].get('local_path', None) if 'path' in sg_item else None
+                logger.debug(">>>>>>>>>>  file_path {}".format(file_path))
+                target_context = self._find_task_context(file_path)
+                logger.debug(">>>>>>>>>>  target_context.entity {}".format(target_context.entity))
+                if target_context.entity and file_path:
+                    sg_item["entity"] = target_context.entity
+
+                    # Extract the base name without extension
+                    base_name = os.path.splitext(os.path.basename(file_path))[0]
+
+                    # See how many prior versions there are
+                    filters = [
+                        ['entity', 'is', target_context.entity],
+                        ["code", "contains", base_name],
+                    ]
+
+                    # prior_versions = self._app.shotgun.find("Version", filters, ['code', 'sg_version_number', 'version_number'])
+                    published_files = self._app.shotgun.find("PublishedFile", filters,
+                                                            ['code', 'path_cache', 'path', 'sg_version_number', 'version_number'])
+                    # Hide all prior versions
+                    for published_file in published_files:
+                        logger.debug(">>>>>>>>>>  published_file {}".format(published_file))
+                        publish_id = published_file["id"]
+                        # Todo: find a way to hide the published file
+                        # self._app.shotgun.update("PublishedFile", publish_id, {"sg_status_list": "hid"})
+                        # self._app.shotgun.update("PublishedFile", publish_id, {"is_published": False})
+                        # New custom field "sg_hidden"
+                        # sg.update("PublishedFile", published_file_id, {"sg_hidden": True})
+                        pass
+
+                    # Publish the file to Shotgrid with a new version number and "delete" action
+
+                    publisher = PublishItem(sg_item)
+                    publish_result = publisher.commandline_publishing()
+                    if publish_result:
+                        logger.debug("New data is: {}".format(publish_result))
+
+            msg = "\n <span style='color:#2C93E2'>Publishing files marked for delete is complete</span> \n"
+            self._add_log(msg, 2)
+        else:
+            msg = "\n <span style='color:#2C93E2'>No need to publish any file that is marked for deletion</span> \n"
+            self._add_log(msg, 2)
+
+
+    def _get_published_files(self, sg_item):
+
+        # Define the file path of the published file
+        file_path = sg_item['path'].get('local_path', None) if 'path' in sg_item else None
+
+        # Construct the Shotgrid API query filters
+        filters = [
+            ["path", "contains", file_path],
+            ["entity.Asset.sg_asset_type", "is_not", "Shot"],  # Optional filter to exclude shots
+        ]
+
+        # Specify the fields to retrieve for the versions
+        fields = ["id", "code", "created_at", "user", "action"]
+
+        # Make the Shotgrid API call to search for versions
+        versions = self._app.shotgun("Version", filters, fields, order=[{"field_name": "created_at", "direction": "asc"}])
+
+        logger.debug(">>>>>>>>>>   versions {}".format(versions))
+
     def _on_fix_seleted(self):
         """
         When someone clicks on the "Fix Selected" button
@@ -1960,76 +2101,7 @@ class AppDialog(QtGui.QWidget):
 
 
     ########################################################################################
-    def _publish_pending_data_using_publisher_ui(self):
-        """
-        Publish Depot Data
-        """
-        #selected_item = self._get_selected_entity()
-        #sg_entity = shotgun_model.get_sg_data(selected_item)
-        # logger.debug(">>>>>>>>>>  sg_entity {}".format(sg_entity))
-        #logger.debug(">>>>>>>>>>  self._pending_data_to_publish {}".format(self._pending_data_to_publish))
 
-        if self._pending_data_to_publish:
-            msg = "\n <span style='color:#2C93E2'>Submitting pending files...</span> \n"
-            self._add_log(msg, 2)
-            # Create publish file
-            out_file = open(self._publish_files_path, 'w')
-            out_file.write('Pending Files\n')
-            # Create a new Perforce changelist
-
-            del_files, other_files = 0, 0
-            for sg_item in self._pending_data_to_publish:
-                logger.debug(">>>>>>>>>>  sg_item: {}".format(sg_item))
-                # sg_item["entity"] = sg_entity
-                if 'path' in sg_item:
-                    file_to_submit = sg_item['path'].get('local_path', None)
-                    if file_to_submit:
-                        msg = "{}".format(file_to_submit)
-                        self._add_log(msg, 4)
-                        action = self._get_action(sg_item)
-                        if action not in ["delete"]:
-                            out_file.write('%s\n' % file_to_submit)
-                            other_files += 1
-                            #add_res = add_to_change(self._p4, change, file_to_submit)
-                            #action_result = self._p4.run("edit", "-c", change, "-v", file_to_submit)
-                        else:
-                            del_res = add_to_change(self._p4, self._del_change, file_to_submit)
-                            logger.debug(">>>>>>>>>>  File added to changlist for deletion: {}".format(del_res))
-                            del_files += 1
-
-            out_file.close()
-
-            if del_files > 0:
-                msg = "\n <span style='color:#2C93E2'>Submitting files for deletion ...</span> \n"
-                self._add_log(msg, 2)
-                submit_del_res = submit_change(self._p4, self._del_change)
-                logger.debug(">>>>>>>>>>  Result of deleting files: {}".format(submit_del_res))
-
-            # Run the publisher UI
-            if other_files > 0:
-                engine = sgtk.platform.current_engine()
-                engine.commands["Publish..."]["callback"]()
-
-            msg = "\n <span style='color:#2C93E2'>Updating the Pending view ...</span> \n"
-            self._add_log(msg, 2)
-            # Update the Pending view
-            self._update_pending_view()
-            #msg = "\n <span style='color:#2C93E2'>Updating the Pending view is complete</span> \n"
-            #self._add_log(msg, 2)
-
-
-            # msg = "\n <span style='color:#2C93E2'>Publishing files is complete</span> \n"
-            # self._add_log(msg, 2)
-            #msg = "\n <span style='color:#2C93E2'>Reloading data ...</span> \n"
-            #self._add_log(msg, 2)
-            #self._reload_treeview()
-
-
-        else:
-            msg = "\n <span style='color:#2C93E2'>Check files in the Pending view to publish using the Shotgrid Publisher</span> \n"
-            self._add_log(msg, 2)
-
-        self._pending_data_to_publish = []
 
     # Perforce connection, Sync, and related GUI items
     def _publish_submitted_data_using_publisher_ui(self):
@@ -3333,7 +3405,7 @@ class AppDialog(QtGui.QWidget):
             # tell the publish view to change
             self._load_publishes_for_entity_item(selected_item)
 
-    def _get_entity_path(self, entity_data):
+    def _get_entity_info(self, entity_data):
         """
         Get entity path
         """
@@ -3369,7 +3441,7 @@ class AppDialog(QtGui.QWidget):
         logger.debug(">>>>>>>>>>  self.main_view_mode is: {}".format(self.main_view_mode))
         self._fstat_dict = {}
         entity_data = self._reload_treeview()
-        self._entity_path, entity_id, entity_type = self._get_entity_path(entity_data)
+        self._entity_path, entity_id, entity_type = self._get_entity_info(entity_data)
         logger.debug(">>>>>>>>>>>>>>>>>> self._entity_path: {}".format(self._entity_path))
         #entity_data = self._reload_treeview()
         #model = self.ui.publish_view.model()
@@ -3507,7 +3579,7 @@ class AppDialog(QtGui.QWidget):
         # Get the entity data
         entity_data = self._load_publishes_for_entity_item(selected_item)
         # Get the entity path, id and type
-        self._entity_path, entity_id, entity_type = self._get_entity_path(entity_data)
+        self._entity_path, entity_id, entity_type = self._get_entity_info(entity_data)
         # Get the current publish data
         self.get_current_publish_data(entity_id, entity_type)
 
@@ -3635,6 +3707,7 @@ class AppDialog(QtGui.QWidget):
                                 if new_change:
                                     msg += "to changelist {}".format(new_change)
                                 self._add_log(msg, 3)
+
                                 # Publish the file
                                 # logger.debug(">>>> sg_item to publish: {}", sg_item)
                                 # msg = "Publishing file: {}".format(depot_file)
@@ -3644,6 +3717,8 @@ class AppDialog(QtGui.QWidget):
                                 # publish_result = publisher.commandline_publishing()
 
                                 if action in ["delete"]:
+                                    # Todo: Fix this if needed
+                                    # self._pubish_file_for_deletion(sg_item, depot_file)
                                     item.setEnabled(False)
                                 else:
                                     item.setEnabled(True)
@@ -3659,151 +3734,57 @@ class AppDialog(QtGui.QWidget):
         self._publish_model.hard_refresh()
         # self._publish_model.async_refresh()
 
-    def _on_publish_model_action_old(self, action):
-        #if not self._p4:
-        #    self._connect()
-        selected_indexes = self.ui.publish_view.selectionModel().selectedIndexes()
-        for model_index in selected_indexes:
-            proxy_model = model_index.model()
-            source_index = proxy_model.mapToSource(model_index)
-            item = source_index.model().itemFromIndex(source_index)
+    # Todo: Fix this if needed
+    def _pubish_file_for_deletion(self, sg_item, depot_file):
 
-            is_folder = item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
-            if not is_folder:
-                sg_item = shotgun_model.get_sg_data(model_index)
+        # Publish the file for deletion
+        # Get the entity info
+        entity_path, entity_id, entity_type = self._get_entity_info(sg_item)
 
-                if "path" in sg_item:
-                    if "local_path" in sg_item["path"]:
-                        target_file = sg_item["path"].get("local_path", None)
-                        depot_file = sg_item.get("depotFile", None)
-                        """
-                        if action in ["add", "move/add", "edit", "delete"]:
-                            msg = "{} file {}".format(action, depot_file)
+        filters = [[]]
+        if entity_type == "Asset":
+            filters = [
+                ["entity.Asset.id", "is", entity_id],
+            ]
+        elif entity_type == "Shot":
+            filters = [
+                ["entity.Shot.id", "is", entity_id],
+            ]
+        elif entity_type == "Task":
+            filters = [
+                ["task.Task.id", "is", entity_id],
+            ]
 
-                            perform_actions = PerformActions(self._p4, sg_item, action)
-                            new_sg_item = perform_actions.run()
+        entity_published_files = self._app.shotgun.find(
+            "PublishedFile",
+            filters,
+            ["entity", "path_cache", "path", "version_number"],
+            #["entity", "path_cache", "path", "version_number", "id", "code", "created_at", "user"],
+            # ["entity", "path_cache", "path", "version_number", "name", "description", "created_at", "created_by", "image", "published_file_type", "task","],
+        )
+        entity_versions = self._app.shotgun.find(
+            "Version",
+            filters,
+            ["entity", "path_cache", "path", "version_number"],
+            #["entity", "path_cache", "path", "version_number", "id", "code", "created_at", "user"],
+            # ["entity", "path_cache", "path", "version_number", "name", "description", "created_at", "created_by", "image", "published_file_type", "task","],
+        )
 
-                            if new_sg_item:
-                                new_change = new_sg_item.get("headChange", None)
-                                if new_change:
-                                    msg += "to changelist {}".format(new_change)
-                                self._add_log(msg, 3)
-                                # Publish the file
-                                # logger.debug(">>>> sg_item to publish: {}", sg_item)
-                                msg = "Publishing file: {}".format(depot_file)
-                                self._add_log(msg, 3)
-
-                                publisher = PublishItem(sg_item)
-                                publish_result = publisher.commandline_publishing()
-
-                                if action in ["delete"]:
-                                    item.setEnabled(False)
-                                else:
-                                    item.setEnabled(True)
-
-                        elif action == "revert":
-                            msg = "Revert file {} ...".format(target_file)
-                            self._add_log(msg, 3)
-                            # p4_result = self._p4.run("revert", "-v", target_file)
-                            p4_result = self._p4.run("revert", target_file)
-
-                        """
-                        if action == "add" or action == "move/add":
-                            msg = "Add file {} to changelist {}".format(target_file, target_change)
-                            self._add_log(msg, 3)
-                            # self._p4.run("add", args)
-                            p4_result = self._p4.run("add", "-v", target_file)
-                            if p4_result:
-                                logger.debug("----->>>>>>>    p4_result is: {}".format(p4_result))
-                                if depot_file:
-                                    fstat_list = self._p4.run("fstat", depot_file)
-                                    if fstat_list:
-                                        fstat = fstat_list[0]
-                                        head_change = fstat.get("headChange", None)
-                                        sg_item["headChange"] = head_change
-                                # self._update_fstat_data()
-                                sg_item["sg_status_list"] = "p4add"
-                                sg_item["action"] = "add"
-                                sg_item["description"] = "Adding file"
-                                # item.setData(sg_item, SgLatestPublishModel.SG_DATA_ROLE)
-                                item.setEnabled(True)
-
-                        elif action == "edit":
-                            msg = "Edit file {} to changelist {}".format(target_file, target_change)
-                            self._add_log(msg, 3)
-                            # self._p4.run("edit", args)
-                            p4_result = self._p4.run("edit", "-v", target_file)
-                            if p4_result:
-                                if depot_file:
-                                    fstat_list = self._p4.run("fstat", depot_file)
-                                    if fstat_list:
-                                        fstat = fstat_list[0]
-                                        head_change = fstat.get("headChange", None)
-                                        sg_item["headChange"] = head_change
-                                # self._update_fstat_data()
-                                sg_item["sg_status_list"] = "p4edit"
-                                sg_item["action"] = "edit"
-                                sg_item["description"] = "Editing file"
-                                item.setEnabled(True)
-                                # item.setData(sg_item, SgLatestPublishModel.SG_DATA_ROLE)
-
-                        elif action == "delete":
-                            # msg = "Open file {} in a client workspace for deletion from the depot using changelist {}".format(target_file, target_change)
-                            msg = "Delete file {} to changelist {} ...".format(target_file, target_change)
-                            self._add_log(msg, 3)
-                            # self._p4.run("delete", args)
-                            p4_result = self._p4.run("delete", "-v", target_file)
-                            if p4_result:
-                                if depot_file:
-                                    fstat_list = self._p4.run("fstat", depot_file)
-                                    if fstat_list:
-                                        fstat = fstat_list[0]
-                                        head_change = fstat.get("headChange", None)
-                                        sg_item["headChange"] = head_change
-
-                                sg_item["sg_status_list"] = "p4del"
-                                sg_item["action"] = "delete"
-                                sg_item["description"] = "Deleting file"
-                                item.setEnabled(False)
-                                #item.setFlags(QtGui.NoItemFlags)
-                                #item.setData(sg_item, SgLatestPublishModel.SG_DATA_ROLE)
-                        elif action == "revert":
-                            msg = "Revert file {} ...".format(target_file)
-                            self._add_log(msg, 3)
-                            #p4_result = self._p4.run("revert", "-v", target_file)
-                            p4_result = self._p4.run("revert", target_file)
-
-                        # Finally, publish the file
-                        if action in ["add", "move/add", "edit", "delete"]:
-                            # logger.debug(">>>> sg_item to publish: {}", sg_item)
-                            msg = "Publishing file: {}".format(target_file)
-                            self._add_log(msg, 3)
-                            publisher = PublishItem(sg_item)
-                            publish_result = publisher.commandline_publishing()
+        logger.debug(">>>> entity_published_files: {}", entity_published_files)
+        logger.debug(">>>> entity_versions: {}", entity_versions)
 
 
 
-        self._update_perforce_data()
-        # self.print_publish_data()
-        self._publish_model.hard_refresh()
-        #self._publish_model.async_refresh()
-
-
-    def _get_treeview_entity_old(self):
         """
-        Slot triggered when someone changes the selection in a treeview.
+        logger.debug(">>>> sg_item to publish: {}", sg_item)
+        msg = "Publishing file for deletion: {}".format(depot_file)
+        self._add_log(msg, 3)
+
+        publisher = PublishItem(sg_item)
+        publish_result = publisher.commandline_publishing()
         """
-        selected_item = self._get_selected_entity()
 
-        # update breadcrumbs
-        self._populate_entity_breadcrumbs(selected_item)
 
-        # tell details panel to clear itself
-        self._setup_details_panel([])
-
-        # tell publish UI to update itself
-        sg_data = self._load_publishes_for_entity_item(selected_item)
-        return sg_data
 
     def _get_treeview_entity(self):
         """
@@ -4245,8 +4226,96 @@ class AppDialog(QtGui.QWidget):
         depot_path = "/{}".format(depot_path)
         return depot_path
 
+    def _find_task_context(self, path):
+        # Try to get the context more specifically from the path on disk
+        tk = sgtk.sgtk_from_path(path)
+        context = tk.context_from_path(path)
 
-################################################################################################
+        if not context:
+            self.log_debug(f"{path} does not correspond to any context!")
+            return None
+
+        # In case the task folder is not registered for some reason, we can try to find it
+        if not context.task:
+            # Publishing Asset
+            if context.entity["type"] == "CustomEntity03":
+                # We can only hope to match this file if it already is in a Step folder
+                if context.step:
+                    file_name = os.path.splitext(os.path.basename(path))[0]
+                    # Get all the possible tasks for this Asset Step
+                    context_tasks = context.sgtk.shotgun.find("Task", [["entity", "is", context.entity],
+                                                                       ["step", "is", context.step]], ["content"])
+                    for context_task in context_tasks:
+                        # Build the regex pattern using https://regex101.com/r/uK8Ca4/1
+                        task_name = context_task.get("content")
+                        regex = r"\S*(" + re.escape(task_name) + r"){1}(?:_\w*)?$"
+                        matches = re.finditer(regex, file_name)
+                        for matchNum, match in enumerate(matches, start=1):
+                            for group in match.groups():
+                                # Assuming there is only ever one match since the match is at the end of the string
+                                if group == task_name:
+                                    return tk.context_from_entity("Task", context_task["id"])
+                                    # Cinematics
+            elif context.entity["type"] == "Sequence" or context.entity["type"] == "Shot":
+                if context.step:
+                    return self._find_context(tk, context, path)
+            # All other entities
+            else:
+                # This is either an Asset root or an Animation
+                if not context.step:
+                    context_entity = context.sgtk.shotgun.find_one(context.entity["type"],
+                                                                   [["id", "is", context.entity["id"]]],
+                                                                   ["sg_asset_parent", "sg_asset_type"])
+                    # Must be an animation...
+                    if context_entity.get("sg_asset_type") == "Animations":
+                        return self._find_context(tk, context, path)
+
+                elif context.step['name'] == "Animations":
+                    return self._find_context(tk, context, path)
+
+                elif context.step['name'] != "Animations":
+                    # file_folder = os.path.basename(os.path.dirname(path))
+                    step_tasks = context.sgtk.shotgun.find("Task", [["entity", "is", context.entity],
+                                                                    ["step", "is", context.step]],
+                                                           ['content', 'step', 'sg_status_list'])
+                    step_tasks_list = [task for task in step_tasks if task['step'] == context.step]
+                    if len(step_tasks_list) == 1:
+                        return tk.context_from_entity("Task", step_tasks_list[0]["id"])
+                    else:
+                        try:
+                            active_tasks = [task for task in step_tasks if task[
+                                'sg_status_list'] not in inactive_task_states]  # context.sgtk.shotgun.find_one("Task", [["content", "is", file_folder],["entity", "is", context.entity],["step", "is", context.step]])
+                            if len(active_tasks) == 1:
+                                return tk.context_from_entity("Task", active_tasks[0]["id"])
+                                # TODO: Add a check for tasks belonging to the current user if this still doesn't narrow it down
+                        except:
+                            pass
+
+        return context
+
+    def _find_context(self, tk, context, path):
+        file_name = os.path.splitext(os.path.basename(path))[0]
+        # SWC JR: This could get slow if there are a lot of tasks, not sure if there is a way to query instead
+        tasks = context.sgtk.shotgun.find("Task", [["entity", "is", context.entity]], ['content'])
+        match_length = len(file_name)
+        new_context_id = None
+
+        for task in tasks:
+            task_content = task['content']
+            new_length = len(file_name) - len(task_content)
+            if f"_{task_content}" in file_name and new_length < match_length:
+                # We found a matching task
+                new_context_id = task['id']
+                # This is the new best task
+                match_length = new_length
+
+        if new_context_id:
+            context = tk.context_from_entity("Task", new_context_id)
+
+        return context
+
+
+    ################################################################################################
 # Helper stuff
 
 
