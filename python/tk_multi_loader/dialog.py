@@ -1875,7 +1875,7 @@ class AppDialog(QtGui.QWidget):
             msg = "\n <span style='color:#2C93E2'>Submitting files for deletion...</span> \n"
             self._add_log(msg, 2)
 
-            self._publish_deleted_data_using_command_line(deleted_data_to_publish)
+
 
             for sg_item in deleted_data_to_publish:
                 # logger.debug(">>>>>>>>>>  sg_item: {}".format(sg_item))
@@ -1892,6 +1892,8 @@ class AppDialog(QtGui.QWidget):
             if self._del_change:
                 submit_del_res = submit_change(self._p4, self._del_change)
                 logger.debug(">>>>>>>>>>  Result of deleting files: {}".format(submit_del_res))
+
+            self._publish_deleted_data_using_command_line(deleted_data_to_publish)
 
 
     def _publish_deleted_data_using_command_line(self, deleted_data_to_publish):
