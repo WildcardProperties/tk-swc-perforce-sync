@@ -25,7 +25,7 @@ shotgun_model = sgtk.platform.import_framework(
 ShotgunModel = shotgun_model.ShotgunModel
 
 
-class SgLatestPublishModel(ShotgunModel):
+class SgEntityPublishModel(ShotgunModel):
 
     """
     Model which handles the main spreadsheet view which displays the latest version of all
@@ -73,7 +73,7 @@ class SgLatestPublishModel(ShotgunModel):
         entity_item_hash = item.data(self.ASSOCIATED_TREE_VIEW_ITEM_ROLE)
         return self._associated_items.get(entity_item_hash)
 
-    def load_data(self, item, child_folders, show_sub_items, additional_sg_filters):
+    def load_data(self, sg_data, child_folders, show_sub_items, additional_sg_filters):
         """
         Clears the model and sets it up for a particular entity.
         Loads any cached data that exists.
@@ -88,9 +88,9 @@ class SgLatestPublishModel(ShotgunModel):
         """
 
         app = sgtk.platform.current_bundle()
-        sg_data = {}
+        sg_filters = None
 
-        if item is None:
+        if sg_data is None:
             # nothing selected in the treeview
             # passing none to _load_data indicates that no query should be executed
             sg_filters = None
@@ -98,55 +98,14 @@ class SgLatestPublishModel(ShotgunModel):
         else:
             # we have a selection!
 
-            if show_sub_items:
-                # special mode -- in this case we don't show any of the
-                # child folders and only the partial matches of all the leaf nodes
 
-                # for example, this may return
-                # entity type shot, [["sequence", "is", "xxx"]] or
-                # entity type shot, [["status", "is", "ip"]] or
-
-                # note! Because of nasty bug https://bugreports.qt-project.org/browse/PYSIDE-158,
-                # we cannot pull the model directly from the item but have to pull it from
-                # the model index instead.
-                model_idx = item.index()
-                model = model_idx.model()
-                partial_filters = model.get_filters(item)
-                entity_type = model.get_entity_type()
-
-                # now get a list of matches from the above query from
-                # shotgun - note that this is a synchronous call so
-                # it may 'pause' execution briefly for the user
-                data = app.shotgun.find(entity_type, partial_filters)
-
-                # now create the final query for the model - this will be
-                # a big in statement listing all the ids returned from
-                # the previous query, asking the model to only show the
-                # items matching the previous query.
-                #
-                # note that for tasks, we link via the task field
-                # rather than the std entity link field
-                #
-                if entity_type == "Task":
-                    sg_filters = [["task", "in", data]]
-                elif entity_type == "Version":
-                    sg_filters = [["version", "in", data]]
-                else:
-                    sg_filters = [["entity", "in", data]]
-
-                # lastly, when we are in this special mode, the main view
-                # is no longer functioning as a browsable hierarchy
-                # but is switching into more of a paradigm of an inverse
-                # database. Indicate the difference by not showing any folders
-                child_folders = []
-
-            else:
+           if not show_sub_items:
                 # standard mode - show folders and items for the currently selected item
                 # for leaf nodes and for tree nodes which are connected to an entity,
                 # show matches.
 
                 # Extract the Shotgun data and field value from the node item.
-                (sg_data, field_value) = model_item_data.get_item_data(item)
+                field_value = sg_data.get("code", None)
 
                 #logger.debug(">>>>>>>>>>>>>> entity sg_data is: {}".format(sg_data))
                 #logger.debug(">>>>>>>>>>>>>> entity field_value is: {}".format(field_value))
@@ -293,6 +252,7 @@ class SgLatestPublishModel(ShotgunModel):
                 entity_id = entity.get("id", "N/A")
                 tooltip += "<br><br><b>Entity ID:</b> %s" % entity_id
 
+
         item.setToolTip(tooltip)
 
     ############################################################################################
@@ -338,7 +298,7 @@ class SgLatestPublishModel(ShotgunModel):
             type_id = (
                 self.invisibleRootItem()
                 .child(x)
-                .data(SgLatestPublishModel.TYPE_ID_ROLE)
+                .data(SgEntityPublishModel.TYPE_ID_ROLE)
             )
             type_id_aggregates[type_id] += 1
         self._publish_type_model.set_active_types(type_id_aggregates)
@@ -376,14 +336,14 @@ class SgLatestPublishModel(ShotgunModel):
             )
 
             # make the item searchable by name
-            item.setData(tree_view_item.text(), SgLatestPublishModel.SEARCHABLE_NAME)
+            item.setData(tree_view_item.text(), SgEntityPublishModel.SEARCHABLE_NAME)
 
             # all of the items created in this class get special role data assigned.
-            item.setData(True, SgLatestPublishModel.IS_FOLDER_ROLE)
+            item.setData(True, SgEntityPublishModel.IS_FOLDER_ROLE)
 
             # associate the tree view node hash with this node.
             item.setData(
-                tree_view_item_hash, SgLatestPublishModel.ASSOCIATED_TREE_VIEW_ITEM_ROLE
+                tree_view_item_hash, SgEntityPublishModel.ASSOCIATED_TREE_VIEW_ITEM_ROLE
             )
 
             # Extract the Shotgun data and field value from the tree view item.
@@ -397,9 +357,9 @@ class SgLatestPublishModel(ShotgunModel):
             tree_view_field_data = {"value": field_value}
 
             # copy across the std fields SG_ASSOCIATED_FIELD_ROLE and SG_DATA_ROLE
-            item.setData(tree_view_sg_data, SgLatestPublishModel.SG_DATA_ROLE)
+            item.setData(tree_view_sg_data, SgEntityPublishModel.SG_DATA_ROLE)
             item.setData(
-                tree_view_field_data, SgLatestPublishModel.SG_ASSOCIATED_FIELD_ROLE
+                tree_view_field_data, SgEntityPublishModel.SG_ASSOCIATED_FIELD_ROLE
             )
 
             # see if we can get a thumbnail for this node!
@@ -433,7 +393,7 @@ class SgLatestPublishModel(ShotgunModel):
         """
 
         # indicate that shotgun data is NOT folder data
-        item.setData(False, SgLatestPublishModel.IS_FOLDER_ROLE)
+        item.setData(False, SgEntityPublishModel.IS_FOLDER_ROLE)
 
         # start figuring out the searchable tokens for this item
         search_str = ""
@@ -441,12 +401,12 @@ class SgLatestPublishModel(ShotgunModel):
         # add the associated publish type (both id and name) as special roles
         type_link = sg_data.get(self._publish_type_field)
         if type_link:
-            item.setData(type_link["id"], SgLatestPublishModel.TYPE_ID_ROLE)
-            item.setData(type_link["name"], SgLatestPublishModel.PUBLISH_TYPE_NAME_ROLE)
+            item.setData(type_link["id"], SgEntityPublishModel.TYPE_ID_ROLE)
+            item.setData(type_link["name"], SgEntityPublishModel.PUBLISH_TYPE_NAME_ROLE)
             search_str += "%s " % type_link["name"]
         else:
-            item.setData(None, SgLatestPublishModel.TYPE_ID_ROLE)
-            item.setData("No Type", SgLatestPublishModel.PUBLISH_TYPE_NAME_ROLE)
+            item.setData(None, SgEntityPublishModel.TYPE_ID_ROLE)
+            item.setData("No Type", SgEntityPublishModel.PUBLISH_TYPE_NAME_ROLE)
 
         # add name and version to search string
         if sg_data.get("name"):
@@ -455,7 +415,7 @@ class SgLatestPublishModel(ShotgunModel):
             # add this in as "v012" to make it easy to search for say all versions 12 but
             # exclude v112:s
             search_str += " v%03d" % sg_data["version_number"]
-        item.setData(search_str, SgLatestPublishModel.SEARCHABLE_NAME)
+        item.setData(search_str, SgEntityPublishModel.SEARCHABLE_NAME)
 
     def _populate_default_thumbnail(self, item):
         """
@@ -500,7 +460,7 @@ class SgLatestPublishModel(ShotgunModel):
 
         # pass the thumbnail through out special image compositing methods
         # before associating it with the model
-        is_folder = item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
+        is_folder = item.data(SgEntityPublishModel.IS_FOLDER_ROLE)
         if is_folder:
             # composite the thumbnail nicely on top of the folder icon
             thumb = utils.create_overlayed_folder_thumbnail(image)

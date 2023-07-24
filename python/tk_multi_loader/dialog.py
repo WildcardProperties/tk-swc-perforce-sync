@@ -31,6 +31,7 @@ from .date_time import create_publish_timestamp
 from .model_hierarchy import SgHierarchyModel
 from .model_entity import SgEntityModel
 from .model_latestpublish import SgLatestPublishModel
+from .model_entitypublish import SgEntityPublishModel
 from .model_publishtype import SgPublishTypeModel
 from .model_status import SgStatusModel
 from .proxymodel_latestpublish import SgLatestPublishProxyModel
@@ -61,7 +62,7 @@ from collections import defaultdict, OrderedDict
 import os
 from os.path import expanduser
 import time
-
+import tempfile
 
 logger = sgtk.platform.get_logger(__name__)
 
@@ -96,7 +97,7 @@ class AppDialog(QtGui.QWidget):
     (MAIN_VIEW_LIST, MAIN_VIEW_THUMB, MAIN_VIEW_PERFORCE, MAIN_VIEW_SUBMITTED, MAIN_VIEW_PENDING) = range(5)
 
     # signal emitted whenever the selected publish changes
-    # in either the main view or the details history view
+    # in either the main view or the details file_history view
     selection_changed = QtCore.Signal()
 
     def __init__(self, action_manager, parent=None):
@@ -163,8 +164,8 @@ class AppDialog(QtGui.QWidget):
         # details pane
         self._details_pane_visible = False
 
-        self._details_action_menu = QtGui.QMenu()
-        self.ui.detail_actions_btn.setMenu(self._details_action_menu)
+        self._file_details_action_menu = QtGui.QMenu()
+        self.ui.file_detail_actions_btn.setMenu(self._file_details_action_menu)
 
         self.ui.info.clicked.connect(self._toggle_details_pane)
 
@@ -173,40 +174,41 @@ class AppDialog(QtGui.QWidget):
         # self.ui.perforce_mode.clicked.connect(self._on_perforce_mode_clicked)
         self.ui.submitted_mode.clicked.connect(self._on_submitted_mode_clicked)
         self.ui.pending_mode.clicked.connect(self._on_pending_mode_clicked)
+        ###########################################
+        # File History
+        self._publish_file_history_model = SgPublishHistoryModel(self, self._task_manager)
 
-        self._publish_history_model = SgPublishHistoryModel(self, self._task_manager)
-
-        self._publish_history_model_overlay = ShotgunModelOverlayWidget(
-            self._publish_history_model, self.ui.history_view
+        self._publish_file_history_model_overlay = ShotgunModelOverlayWidget(
+            self._publish_file_history_model, self.ui.file_history_view
         )
 
-        self._publish_history_proxy = QtGui.QSortFilterProxyModel(self)
-        self._publish_history_proxy.setSourceModel(self._publish_history_model)
+        self._publish_file_history_proxy = QtGui.QSortFilterProxyModel(self)
+        self._publish_file_history_proxy.setSourceModel(self._publish_file_history_model)
 
         # now use the proxy model to sort the data to ensure
         # higher version numbers appear earlier in the list
-        # the history model is set up so that the default display
+        # the file_history model is set up so that the default display
         # role contains the version number field in shotgun.
         # This field is what the proxy model sorts by default
         # We set the dynamic filter to true, meaning QT will keep
         # continously sorting. And then tell it to use column 0
         # (we only have one column in our models) and descending order.
-        self._publish_history_proxy.setDynamicSortFilter(True)
-        self._publish_history_proxy.sort(0, QtCore.Qt.DescendingOrder)
+        self._publish_file_history_proxy.setDynamicSortFilter(True)
+        self._publish_file_history_proxy.sort(0, QtCore.Qt.DescendingOrder)
 
-        self.ui.history_view.setModel(self._publish_history_proxy)
-        self._history_delegate = SgPublishHistoryDelegate(
-            self.ui.history_view, self._status_model, self._action_manager
+        self.ui.file_history_view.setModel(self._publish_file_history_proxy)
+        self._file_history_delegate = SgPublishHistoryDelegate(
+            self.ui.file_history_view, self._status_model, self._action_manager
         )
-        self.ui.history_view.setItemDelegate(self._history_delegate)
+        self.ui.file_history_view.setItemDelegate(self._file_history_delegate)
 
-        # event handler for when the selection in the history view is changing
+        # event handler for when the selection in the file_history view is changing
         # note! Because of some GC issues (maya 2012 Pyside), need to first establish
         # a direct reference to the selection model before we can set up any signal/slots
         # against it
-        self._history_view_selection_model = self.ui.history_view.selectionModel()
-        self._history_view_selection_model.selectionChanged.connect(
-            self._on_history_selection
+        self._file_history_view_selection_model = self.ui.file_history_view.selectionModel()
+        self._file_history_view_selection_model.selectionChanged.connect(
+            self._on_file_history_selection
         )
 
         self._multiple_publishes_pixmap = QtGui.QPixmap(
@@ -215,19 +217,317 @@ class AppDialog(QtGui.QWidget):
         self._no_selection_pixmap = QtGui.QPixmap(":/res/no_item_selected_512x400.png")
         self._no_pubs_found_icon = QtGui.QPixmap(":/res/no_publishes_found.png")
 
-        self.ui.detail_playback_btn.clicked.connect(self._on_detail_version_playback)
+        self.ui.file_detail_playback_btn.clicked.connect(self._on_detail_version_playback)
         self._current_version_detail_playback_url = None
 
         # set up right click menu for the main publish view
-        self._refresh_history_action = QtGui.QAction("Refresh", self.ui.history_view)
-        self._refresh_history_action.triggered.connect(
-            self._publish_history_model.async_refresh
+        self._refresh_file_history_action = QtGui.QAction("Refresh", self.ui.file_history_view)
+        self._refresh_file_history_action.triggered.connect(
+            self._publish_file_history_model.async_refresh
         )
-        self.ui.history_view.addAction(self._refresh_history_action)
-        self.ui.history_view.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
+        self.ui.file_history_view.addAction(self._refresh_file_history_action)
+        self.ui.file_history_view.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
 
         # if an item in the list is double clicked the default action is run
-        self.ui.history_view.doubleClicked.connect(self._on_history_double_clicked)
+        self.ui.file_history_view.doubleClicked.connect(self._on_file_history_double_clicked)
+        ###########################################
+        # SG Retriever
+        """
+        # set up the shotgun data retriever
+        self._shotgun_data = self._app.import_module("shotgun_data")
+
+        # set up data retriever and start work:
+        self._sg_data_retriever = self._shotgun_data.ShotgunDataRetriever(
+            parent=self, bg_task_manager=bg_task_manager
+        )
+        self.__thumb_map = {}
+        #self._sg_data_retriever.work_completed.connect(
+        #    self.__on_data_retriever_work_completed
+        #)
+        #self._sg_data_retriever.work_failure.connect(
+        #    self.__on_data_retriever_work_failure
+        #)
+        self._sg_data_retriever.start()
+        """
+        ###########################################
+        # Entity Parents publish model
+        # self._temp_dir = tempfile.mkdtemp(prefix="asset_image_")
+        self._temp_dir = tempfile.mkdtemp()
+        #self._entity_details_action_menu = QtGui.QMenu()
+        #self.ui.entity_detail_actions_btn.setMenu(self._entity_details_action_menu)
+
+        # load and initialize cached publish type model
+        self._entity_parents_type_model = SgPublishTypeModel(
+            self, self._action_manager, self._settings_manager, self._task_manager
+        )
+        self.ui.publish_type_list.setModel(self._entity_parents_type_model)
+
+        self._entity_parents_type_overlay = ShotgunModelOverlayWidget(
+            self._entity_parents_type_model, self.ui.publish_type_list
+        )
+
+        self._entity_parents_model = SgEntityPublishModel(
+            self, self._entity_parents_type_model, self._task_manager
+        )
+
+        self._parents_main_overlay = ShotgunModelOverlayWidget(
+            self._entity_parents_model, self.ui.entity_parents_view
+        )
+
+        # set up a proxy model to cull results based on type selection
+        self._entity_parents_proxy_model = SgLatestPublishProxyModel(self)
+        self._entity_parents_proxy_model.setSourceModel(self._entity_parents_model)
+
+        # whenever the number of columns change in the proxy model
+        # check if we should display the "sorry, no entity_parentses found" overlay
+        #self._entity_parents_model.cache_loaded.connect(self._on_entity_parents_content_change)
+        #self._entity_parents_model.data_refreshed.connect(self._on_entity_parents_content_change)
+        #self._entity_parents_proxy_model.filter_changed.connect(
+        #    self._on_entity_parents_content_change
+        #)
+
+        # hook up view -> proxy model -> model
+        self.ui.entity_parents_view.setModel(self._entity_parents_proxy_model)
+
+        # set up custom delegates to use when drawing the main area
+        self._entity_parents_thumb_delegate = SgPublishThumbDelegate(
+            self.ui.entity_parents_view, self._action_manager
+        )
+
+        self._entity_parents_list_delegate = SgPublishListDelegate(
+            self.ui.entity_parents_view, self._action_manager
+        )
+
+        # recall which the most recently mode used was and set that
+        #main_view_mode = self._settings_manager.retrieve(
+        #    "main_view_mode", self.MAIN_VIEW_THUMB
+        #)
+        # self._set_main_view_mode(main_view_mode)
+        #self._set_main_view_mode(self.MAIN_VIEW_THUMB)
+
+        # whenever the type list is checked, update the entity_parents filters
+        #self._entity_parents_type_model.itemChanged.connect(
+        #    self._apply_type_filters_on_publishes
+        #)
+
+        # if an item in the table is double clicked the default action is run
+        #self.ui.entity_parentsentity_parents_view.doubleClicked.connect(self._on_entity_parents_double_clicked)
+
+        # event handler for when the selection in the publish view is changing
+        # note! Because of some GC issues (maya 2012 Pyside), need to first establish
+        # a direct reference to the selection model before we can set up any signal/slots
+        # against it
+        self.ui.entity_parents_view.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
+        self._entity_parents_view_selection_model = self.ui.entity_parents_view.selectionModel()
+        #self._entity_parents_view_selection_model.selectionChanged.connect(
+        #    self._on_entity_parents_selection
+        #)
+
+        # set up right click menu for the main publish view
+
+        # self._add_action = QtGui.QAction("Add", self.ui.entity_parents_view)
+        # self._add_action.triggered.connect(lambda: self._on_entity_parents_model_action("add"))
+        # self._edit_action = QtGui.QAction("Edit", self.ui.entity_parents_view)
+        # self._edit_action.triggered.connect(lambda: self._on_entity_parents_model_action("edit"))
+        # self._delete_action = QtGui.QAction("Delete", self.ui.entity_parents_view)
+        # self._delete_action.triggered.connect(lambda: self._on_entity_parents_model_action("delete"))
+        # self._revert_action = QtGui.QAction("Revert", self.ui.entity_parents_view)
+        # self._revert_action.triggered.connect(lambda: self._on_entity_parents_model_action("revert"))
+
+        # self._refresh_action = QtGui.QAction("Refresh", self.ui.entity_parents_view)
+        # self._refresh_action.triggered.connect(self._entity_parents_model.async_refresh)
+
+        self.ui.entity_parents_view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        # self.ui.entity_parents_view.customContextMenuRequested.connect(
+        #     self._show_entity_parents_actions
+        # )
+        """
+        # Entity Parents History
+        self._publish_entity_parents_model = SgPublishHistoryModel(self, self._task_manager)
+
+        self._publish_entity_parents_model_overlay = ShotgunModelOverlayWidget(
+            self._publish_entity_parents_model, self.ui.entity_parents_view
+        )
+
+        self._publish_entity_parents_proxy = QtGui.QSortFilterProxyModel(self)
+        self._publish_entity_parents_proxy.setSourceModel(self._publish_entity_parents_model)
+
+        # now use the proxy model to sort the data to ensure
+        # higher version numbers appear earlier in the list
+        # the entity_parents model is set up so that the default display
+        # role contains the version number field in shotgun.
+        # This field is what the proxy model sorts by default
+        # We set the dynamic filter to true, meaning QT will keep
+        # continously sorting. And then tell it to use column 0
+        # (we only have one column in our models) and descending order.
+        self._publish_entity_parents_proxy.setDynamicSortFilter(True)
+        self._publish_entity_parents_proxy.sort(0, QtCore.Qt.DescendingOrder)
+
+        self.ui.entity_parents_view.setModel(self._publish_entity_parents_proxy)
+        self._entity_parents_delegate = SgPublishHistoryDelegate(
+            self.ui.entity_parents_view, self._status_model, self._action_manager
+        )
+        self.ui.entity_parents_view.setItemDelegate(self._entity_parents_delegate)
+
+        # event handler for when the selection in the entity_parents view is changing
+        # note! Because of some GC issues (maya 2012 Pyside), need to first establish
+        # a direct reference to the selection model before we can set up any signal/slots
+        # against it
+        self._entity_parents_view_selection_model = self.ui.entity_parents_view.selectionModel()
+        """
+        """
+        
+        self._entity_parents_view_selection_model.selectionChanged.connect(
+            self._on_entity_parents_selection
+        )
+        # set up right click menu for the main publish view
+        self._refresh_entity_parents_action = QtGui.QAction("Refresh", self.ui.entity_parents_view)
+        self._refresh_entity_parents_action.triggered.connect(
+            self._publish_entity_parents_model.async_refresh
+        )
+        self.ui.entity_parents_view.addAction(self._refresh_entity_parents_action)
+        self.ui.entity_parents_view.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
+
+        # if an item in the list is double clicked the default action is run
+        self.ui.entity_parents_view.doubleClicked.connect(self._on_entity_parents_double_clicked)
+        """
+        ###########################################
+        # Entity Children publish model
+
+        # load and initialize cached publish type model
+        self._entity_children_type_model = SgPublishTypeModel(
+            self, self._action_manager, self._settings_manager, self._task_manager
+        )
+        self.ui.publish_type_list.setModel(self._entity_children_type_model)
+
+        self._entity_children_type_overlay = ShotgunModelOverlayWidget(
+            self._entity_children_type_model, self.ui.publish_type_list
+        )
+
+        self._entity_children_model = SgEntityPublishModel(
+            self, self._entity_children_type_model, self._task_manager
+        )
+
+        self._children_main_overlay = ShotgunModelOverlayWidget(
+            self._entity_children_model, self.ui.entity_children_view
+        )
+
+        # set up a proxy model to cull results based on type selection
+        self._entity_children_proxy_model = SgLatestPublishProxyModel(self)
+        self._entity_children_proxy_model.setSourceModel(self._entity_children_model)
+
+        # whenever the number of columns change in the proxy model
+        # check if we should display the "sorry, no entity_childrenes found" overlay
+        #self._entity_children_model.cache_loaded.connect(self._on_entity_children_content_change)
+        #self._entity_children_model.data_refreshed.connect(self._on_entity_children_content_change)
+        #self._entity_children_proxy_model.filter_changed.connect(
+        #    self._on_entity_children_content_change
+        #)
+
+        # hook up view -> proxy model -> model
+        self.ui.entity_children_view.setModel(self._entity_children_proxy_model)
+
+        # set up custom delegates to use when drawing the main area
+        self._entity_children_thumb_delegate = SgPublishThumbDelegate(
+            self.ui.entity_children_view, self._action_manager
+        )
+
+        self._entity_children_list_delegate = SgPublishListDelegate(
+            self.ui.entity_children_view, self._action_manager
+        )
+
+        # recall which the most recently mode used was and set that
+        main_view_mode = self._settings_manager.retrieve(
+            "main_view_mode", self.MAIN_VIEW_THUMB
+        )
+        # self._set_main_view_mode(main_view_mode)
+        #self._set_main_view_mode(self.MAIN_VIEW_THUMB)
+
+        # whenever the type list is checked, update the entity_children filters
+        # self._entity_children_type_model.itemChanged.connect(
+        #    self._apply_type_filters_on_publishes
+        # )
+
+        # if an item in the table is double clicked the default action is run
+        # self.ui.entity_childrenentity_children_view.doubleClicked.connect(self._on_entity_children_double_clicked)
+
+        # event handler for when the selection in the publish view is changing
+        # note! Because of some GC issues (maya 2012 Pyside), need to first establish
+        # a direct reference to the selection model before we can set up any signal/slots
+        # against it
+        self.ui.entity_children_view.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
+        self._entity_children_view_selection_model = self.ui.entity_children_view.selectionModel()
+        #self._entity_children_view_selection_model.selectionChanged.connect(
+        #    self._on_entity_children_selection
+        #)
+
+        # set up right click menu for the main publish view
+
+        # self._add_action = QtGui.QAction("Add", self.ui.entity_parents_view)
+        # self._add_action.triggered.connect(lambda: self._on_entity_parents_model_action("add"))
+        # self._edit_action = QtGui.QAction("Edit", self.ui.entity_parents_view)
+        # self._edit_action.triggered.connect(lambda: self._on_entity_parents_model_action("edit"))
+        # self._delete_action = QtGui.QAction("Delete", self.ui.entity_parents_view)
+        # self._delete_action.triggered.connect(lambda: self._on_entity_parents_model_action("delete"))
+        # self._revert_action = QtGui.QAction("Revert", self.ui.entity_parents_view)
+        # self._revert_action.triggered.connect(lambda: self._on_entity_parents_model_action("revert"))
+
+        # self._refresh_action = QtGui.QAction("Refresh", self.ui.entity_parents_view)
+        # self._refresh_action.triggered.connect(self._entity_parents_model.async_refresh)
+
+        self.ui.entity_parents_view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        # self.ui.entity_parents_view.customContextMenuRequested.connect(
+        #     self._show_entity_parents_actions
+        # )
+        # Entity Children History
+        """
+        self._publish_entity_children_model = SgPublishHistoryModel(self, self._task_manager)
+
+        self._publish_entity_children_model_overlay = ShotgunModelOverlayWidget(
+            self._publish_entity_children_model, self.ui.entity_children_view
+        )
+
+        self._publish_entity_children_proxy = QtGui.QSortFilterProxyModel(self)
+        self._publish_entity_children_proxy.setSourceModel(self._publish_entity_children_model)
+
+        # now use the proxy model to sort the data to ensure
+        # higher version numbers appear earlier in the list
+        # the entity_children model is set up so that the default display
+        # role contains the version number field in shotgun.
+        # This field is what the proxy model sorts by default
+        # We set the dynamic filter to true, meaning QT will keep
+        # continously sorting. And then tell it to use column 0
+        # (we only have one column in our models) and descending order.
+        self._publish_entity_children_proxy.setDynamicSortFilter(True)
+        self._publish_entity_children_proxy.sort(0, QtCore.Qt.DescendingOrder)
+
+        self.ui.entity_children_view.setModel(self._publish_entity_children_proxy)
+        self._entity_children_delegate = SgPublishHistoryDelegate(
+            self.ui.entity_children_view, self._status_model, self._action_manager
+        )
+        self.ui.entity_children_view.setItemDelegate(self._entity_children_delegate)
+
+        # event handler for when the selection in the entity_children view is changing
+        # note! Because of some GC issues (maya 2012 Pyside), need to first establish
+        # a direct reference to the selection model before we can set up any signal/slots
+        # against it
+        self._entity_children_view_selection_model = self.ui.entity_children_view.selectionModel()
+        """
+        """
+        self._entity_children_view_selection_model.selectionChanged.connect(
+            self._on_entity_children_selection
+        )
+        # set up right click menu for the main publish view
+        self._refresh_entity_children_action = QtGui.QAction("Refresh", self.ui.entity_children_view)
+        self._refresh_entity_children_action.triggered.connect(
+            self._publish_entity_children_model.async_refresh
+        )
+        self.ui.entity_children_view.addAction(self._refresh_entity_children_action)
+        self.ui.entity_children_view.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
+
+        # if an item in the list is double clicked the default action is run
+        self.ui.entity_children_view.doubleClicked.connect(self._on_entity_children_double_clicked)
+        """
 
         #################################################
         # load and initialize cached publish type model
@@ -347,6 +647,8 @@ class AppDialog(QtGui.QWidget):
 
         self.ui.check_all.clicked.connect(self._publish_type_model.select_all)
         self.ui.check_none.clicked.connect(self._publish_type_model.select_none)
+        self.ui.sync_entity_files.clicked.connect(self._on_sync_entity_files)
+
 
         #################################################
         # thumb scaling
@@ -358,17 +660,41 @@ class AppDialog(QtGui.QWidget):
         self.ui.thumb_scale.valueChanged.connect(self._on_thumb_size_slider_change)
 
         #################################################
-        # setup history
+        # setup file_history
 
-        self._history = []
-        self._history_index = 0
-        # state flag used by history tracker to indicate that the
+        self._file_history = []
+        self._file_history_index = 0
+        # state flag used by file_history tracker to indicate that the
         # current navigation operation is happen as a part of a
         # back/forward operation and not part of a user's click
-        self._history_navigation_mode = False
+        self._file_history_navigation_mode = False
         self.ui.navigation_home.clicked.connect(self._on_home_clicked)
         self.ui.navigation_prev.clicked.connect(self._on_back_clicked)
         self.ui.navigation_next.clicked.connect(self._on_forward_clicked)
+        #################################################
+        # setup entity parents
+
+        self._entity_parents = []
+        self._entity_parents_index = 0
+        # state flag used by entity_parents tracker to indicate that the
+        # current navigation operation is happen as a part of a
+        # back/forward operation and not part of a user's click
+        self._entity_parents_navigation_mode = False
+        #self.ui.navigation_home.clicked.connect(self._on_home_clicked)
+        #self.ui.navigation_prev.clicked.connect(self._on_back_clicked)
+        #self.ui.navigation_next.clicked.connect(self._on_forward_clicked)
+        #################################################
+        # setup entity children
+
+        self._entity_children = []
+        self._entity_children_index = 0
+        # state flag used by entity_children tracker to indicate that the
+        # current navigation operation is happen as a part of a
+        # back/forward operation and not part of a user's click
+        self._entity_children_navigation_mode = False
+        # self.ui.navigation_home.clicked.connect(self._on_home_clicked)
+        # self.ui.navigation_prev.clicked.connect(self._on_back_clicked)
+        # self.ui.navigation_next.clicked.connect(self._on_forward_clicked)
 
         #################################################
         # set up cog button actions
@@ -416,7 +742,6 @@ class AppDialog(QtGui.QWidget):
         self._pending_publish_list = []
         self._change_dict = {}
         self._entity_path = None
-        #self.publish_files_ui.add_publish_files_button.clicked.connect(self.post_publish)
         #################################################
         # Perforce Views
         self.main_view_mode = self.MAIN_VIEW_THUMB
@@ -526,8 +851,8 @@ class AppDialog(QtGui.QWidget):
         """
         Get the selected sg_publish details
         """
-        # check to see if something is selected in the details history view:
-        selection_model = self.ui.history_view.selectionModel()
+        # check to see if something is selected in the details file_history view:
+        selection_model = self.ui.file_history_view.selectionModel()
         if selection_model.hasSelection():
             # only handle single selection atm
             proxy_index = selection_model.selection().indexes()[0]
@@ -592,7 +917,7 @@ class AppDialog(QtGui.QWidget):
             # note that we pull out a fresh handle to the selection model
             # as these objects sometimes are deleted internally in the view
             # and therefore persisting python handles may not be valid
-            self.ui.history_view.selectionModel().clear()
+            self.ui.file_history_view.selectionModel().clear()
             self.ui.publish_view.selectionModel().clear()
 
             # disconnect some signals so we don't go all crazy when
@@ -1057,9 +1382,9 @@ class AppDialog(QtGui.QWidget):
             depot_file = "{}#{}".format(depot_file, head_rev)
         return depot_file
 
-    def _on_history_selection(self, selected, deselected):
+    def _on_file_history_selection(self, selected, deselected):
         """
-        Called when the selection changes in the history view in the details panel
+        Called when the selection changes in the file_history view in the details panel
 
         :param selected:    Items that have been selected
         :param deselected:  Items that have been deselected
@@ -1067,9 +1392,9 @@ class AppDialog(QtGui.QWidget):
         # emit the selection_changed signal
         self.selection_changed.emit()
 
-    def _on_history_double_clicked(self, model_index):
+    def _on_file_history_double_clicked(self, model_index):
         """
-        When someone double clicks on a publish in the history view, run the
+        When someone double clicks on a publish in the file_history view, run the
         default action
 
         :param model_index:    The model index of the item that was double clicked
@@ -1294,7 +1619,7 @@ class AppDialog(QtGui.QWidget):
         """
         Executed when someone clicks the show/hide details button
         """
-        if self.ui.details.isVisible():
+        if self.ui.details_tab.isVisible():
             self._set_details_pane_visiblity(False)
         else:
             self._set_details_pane_visiblity(True)
@@ -1309,24 +1634,531 @@ class AppDialog(QtGui.QWidget):
         if visible == False:
             # hide details pane
             self._details_pane_visible = False
-            self.ui.details.setVisible(False)
+            self.ui.details_tab.setVisible(False)
             self.ui.info.setText("Show Details")
 
         else:
             # show details pane
             self._details_pane_visible = True
-            self.ui.details.setVisible(True)
+            self.ui.details_tab.setVisible(True)
             self.ui.info.setText("Hide Details")
 
             # if there is something selected, make sure the detail
             # section is focused on this
             selection_model = self.ui.publish_view.selectionModel()
 
-            self._setup_details_panel(selection_model.selectedIndexes())
+            self._setup_file_details_panel(selection_model.selectedIndexes())
 
-    def _setup_details_panel(self, items):
+    def _setup_entity_details_panel(self, entity_data, item):
         """
-        Sets up the details panel with info for a given item.
+        Sets up the entity details panel with info for a given item.
+        """
+
+        def __make_table_row(left, right):
+            """
+            Helper method to make a detail table row
+            """
+            return (
+                    "<tr><td><b style='color:#2C93E2'>%s</b>&nbsp;</td><td>%s</td></tr>"
+                    % (left, right)
+            )
+        if entity_data:
+            entity_name = entity_data.get("code", None)
+            entity_type = entity_data.get("type", None)
+            entity_id = entity_data.get("id", None)
+            for field in entity_data.keys():
+                if "image" in field and entity_data[field] is not None:
+                    image_url = entity_data.get(field)
+                    logger.debug("Image url: %s" % image_url)
+                    thumb_pixmap = QtGui.QPixmap.fromImage(image_url)
+                    self.ui.entity_details_image.setPixmap(thumb_pixmap)
+                    #self._request_thumbnail_download(self, item, field, image_url, entity_type, entity_id)
+                    """
+                    image_path = os.path.join(self._temp_dir, "asset_image.jpg")
+                    logger.debug("Downloading image %s to %s" % (image_url, image_path))
+                    self._app.shotgun.download_attachment(image_url, image_path)
+                    thumb_pixmap = QtGui.QPixmap(image_path)
+                    self.ui.entity_details_image.setPixmap(thumb_pixmap)
+                    """
+
+            msg = ""
+
+            if entity_name:
+                msg += __make_table_row("Name", "%s" % entity_name)
+
+            if entity_type:
+                msg += __make_table_row("Type", "%s" % entity_type)
+
+            if entity_id:
+                msg += __make_table_row("ID", "%s" % entity_id)
+
+            entity_status = entity_data.get("sg_status_list", None)
+            if entity_status:
+                msg += __make_table_row("Status", "%s" % entity_status)
+
+            entity_description = entity_data.get("description", None)
+            if entity_description:
+                # get the first 30 chars of the description
+                entity_description = entity_description[:30]
+                msg += __make_table_row("Description", "%s" % entity_description)
+
+            entity_asset_library_dict = entity_data.get("sg_asset_library", None)
+            if entity_asset_library_dict:
+                entity_asset_library = entity_asset_library_dict.get("name", None)
+                if entity_asset_library:
+                    msg += __make_table_row("Asset Library", "%s" % entity_asset_library)
+
+            entity_asset_type = entity_data.get("sg_asset_type", None)
+            if entity_asset_type:
+                msg += __make_table_row("Asset Type", "%s" % entity_asset_type)
+
+            self.ui.entity_details_header.setText("<table>%s</table>" % msg)
+            """
+            # sort out the actions button
+            actions = self._action_manager.get_actions_for_publish(
+                entity_data, self._action_manager.UI_AREA_DETAILS
+            )
+            if len(actions) == 0:
+                self.ui.entity_detail_actions_btn.setVisible(False)
+            else:
+                self.ui.entity_detail_actions_btn.setVisible(True)
+                self._entity_details_action_menu.clear()
+                for a in actions:
+                    self._dynamic_widgets.append(a)
+                    self._entity_details_action_menu.addAction(a)
+            """
+    def _request_thumbnail_download(self, item, field, url, entity_type, entity_id):
+        """
+        Request that a thumbnail is downloaded for an item. If a thumbnail is successfully
+        retrieved, either from disk (cached) or via shotgun, the method _populate_thumbnail()
+        will be called. If you want to control exactly how your shotgun thumbnail is
+        to appear in the UI, you can subclass this method. For example, you can subclass
+        this method and perform image composition prior to the image being added to
+        the item object.
+
+        .. note:: This is an advanced method which you can use if you want to load thumbnail
+            data other than the standard 'image' field. If that's what you need, simply make
+            sure that you set the download_thumbs parameter to true when you create the model
+            and standard thumbnails will be automatically downloaded. This method is either used
+            for linked thumb fields or if you want to download thumbnails for external model data
+            that doesn't come from Shotgun.
+
+        :param item: :class:`~PySide.QtGui.QStandardItem` which belongs to this model
+        :param field: Shotgun field where the thumbnail is stored. This is typically ``image`` but
+                      can also for example be ``sg_sequence.Sequence.image``.
+        :param url: thumbnail url
+        :param entity_type: Shotgun entity type
+        :param entity_id: Shotgun entity id
+        """
+        if url is None:
+            # nothing to download. bad input. gracefully ignore this request.
+            return
+
+        if not self._sg_data_retriever:
+            raise sgtk.ShotgunModelError("Data retriever is not available!")
+
+        uid = self._sg_data_retriever.request_thumbnail(
+            url, entity_type, entity_id, field, self.__bg_load_thumbs
+        )
+
+        # keep tabs of this and call out later - note that we use a weakref to allow
+        # the model item to be gc'd if it's removed from the model before the thumb
+        # request completes.
+        self.__thumb_map[uid] = {"item_ref": weakref.ref(item), "field": field}
+
+
+    def __bg_load_thumbs(self, uid, thumb_path):
+        """
+        Callback from the data retriever when a thumbnail has been downloaded.
+        """
+        # get the item ref
+        item_ref = self.__thumb_map[uid]["item_ref"]
+        field = self.__thumb_map[uid]["field"]
+        del self.__thumb_map[uid]
+
+        # get the item
+        item = item_ref()
+        if not item:
+            # item has been removed from the model
+            return
+
+        # populate the thumbnail
+        self._populate_thumbnail(item, field, thumb_path)
+
+    def _setup_entity_parent_and_children(self, entity_data):
+        """
+        Sets up the entity parents and children panel with info for a given item.
+        :param entity_data:
+        :return:
+        """
+        self.entity_parents = []
+        self.entity_children = []
+        if entity_data:
+            # get the entity id
+            entity_id = entity_data.get("id", None)
+            # get the entity type
+            entity_type = entity_data.get("type", None)
+            if entity_id and entity_type:
+                filters = [["id", "is", entity_id]]
+                #fields = ["id", "code", "type", "parents", "sg_asset_parent", "sg_assets", "sg_asset_library", "asset_section", "asset_category", "sg_asset_type", "sg_status_list"]
+                fields = ["id", "code", "type", "parents", "sg_asset_parent", "sg_assets", "project", "sg_asset_library", "asset_section", "asset_category", "sg_asset_type", "sg_status_list"]
+
+                # get the entity
+                published_entity = self._app.shotgun.find_one(entity_type, filters, fields)
+                # get the asset parent
+                asset_parents = published_entity.get("sg_asset_parent", None)
+                # get the parents
+                linked_assets = published_entity.get("parents", None)
+                # combine the parents
+                self.entity_parents = asset_parents + linked_assets if asset_parents and linked_assets else asset_parents or linked_assets
+
+                # Get the children
+                self.entity_children = published_entity.get("sg_assets", None)
+
+                logger.debug(">>>>>>>>>>> Published entity: %s" % published_entity)
+                logger.debug(">>>>>>>>>>> Asset Parent: %s" % asset_parents)
+                logger.debug(">>>>>>>>>>> Linked Assets: %s" % linked_assets)
+                logger.debug(">>>>>>>>>>>Parents: %s" % self.entity_parents)
+                logger.debug(">>>>>>>>>>> Asset Children: %s" % self.entity_children)
+
+                self._populate_parents_tab(self.entity_parents)
+                self._populate_children_tab(self.entity_children)
+
+    def _populate_parents_tab(self, parents):
+        """ Populate the parents tab with the parent entities of the selected entity"""
+        """
+        parent_publish_files = self._get_parents_publish_files()
+        if parent_publish_files:
+            self._set_entity_tabs_ui_visibility(True)
+            for parent_publish_file in parent_publish_files:
+                self._load_publishes_for_parents_entity(self, parent_publish_file) 
+                # self._publish_entity_parents_model.load_data(parent_publish_file)
+                pass
+        """
+
+        parents_item_list = []
+        if parents:
+            for parent in parents:
+                if parent:
+                    # get the entity id
+                    entity_id = parent.get("id", None)
+                    # get the entity type
+                    entity_type = parent.get("type", None)
+                    if entity_id and entity_type:
+
+                        filters = [["id", "is", entity_id]]
+                        fields = ["id", "code", "type", "parents", "sg_asset_parent", "sg_assets", "project", "name", 'image',
+                                  "path", "task", "publish_type_field", 'published_file_type', 'created_by', 'created_at',
+                                  "sg_asset_library", "asset_section", "asset_category", "sg_asset_type", "sg_status_list"]
+
+                        # get the entity
+                        published_entity = self._app.shotgun.find_one(entity_type, filters, fields)
+
+                        if not published_entity:
+                            continue
+
+                        # Get the name from published_entity, if not available, use parent's "name" or "code"
+                        published_entity["name"] = published_entity.get("name") or parent.get("name") or parent.get("code", "No Name")
+
+                        # Get the task from published_entity, if not available, use parent's "task"
+                        published_entity["task"] = published_entity.get("task") or parent.get("task") or None
+
+                        # Get the entity from published_entity, if not available, use parent's "entity"
+                        published_entity["entity"] = published_entity.get("entity") or parent.get("entity") or None
+
+                        # Get the publish_type_field from published_entity, if not available, use parent's "publish_type_field"
+                        published_entity["publish_type_field"] = published_entity.get("publish_type_field") or parent.get("publish_type_field") or None
+
+                        # Get the published_file_type from published_entity, if not available, use parent's "published_file_type"
+                        published_entity["published_file_type"] = published_entity.get("published_file_type") or parent.get("published_file_type") or None
+
+                        # logger.debug(">>>>>>>>>>> Parent Published entity: %s" % published_entity)
+
+                        parents_item_list.append(published_entity)
+
+        # load the parents into the model
+        self.ui.entity_parents_view.selectionModel().clear()
+        if parents_item_list:
+            self.ui.entity_parents_view.setEnabled(True)
+            for parent_item in parents_item_list:
+                self._load_publishes_for_parents_entity(parent_item)
+
+
+
+
+
+
+    def _set_entity_tabs_ui_visibility(self, is_publish):
+            """
+            Helper method to enable disable publish specific details UI
+            """
+
+            #self.ui.version_file_history_label.setEnabled(is_publish)
+            #self.ui.file_history_view.setEnabled(is_publish)
+            self.ui.entity_parents_view.setEnabled(is_publish)
+            self.ui.entity_children_view.setEnabled(is_publish)
+
+            # hide actions and playback stuff
+            #self.ui.file_detail_actions_btn.setVisible(is_publish)
+            #self.ui.file_detail_playback_btn.setVisible(is_publish)
+
+    def _populate_children_tab(self, children):
+        """ Populate the children tab with the child entities of the selected entity"""
+        """
+        children_publish_files = self._get_children_publish_files()
+        if children_publish_files:
+            self._set_entity_tabs_ui_visibility(True)
+            for child_publish_file in children_publish_files:
+                #self._publish_entity_children_model.load_data(child_publish_file)
+                pass
+        """
+        children_item_list = []
+        for child in children:
+            if child:
+                # get the entity id
+                entity_id = child.get("id", None)
+                # get the entity type
+                entity_type = child.get("type", None)
+                if entity_id and entity_type:
+                    filters = [["id", "is", entity_id]]
+                    fields = ["id", "code", "type", "parents", "sg_asset_parent", "sg_assets", "project", "name", 'image',
+                              "path", "task", "publish_type_field", 'published_file_type', 'created_by', 'created_at',
+                              "sg_asset_library", "asset_section", "asset_category", "sg_asset_type", "sg_status_list"]
+
+                    # get the entity
+                    published_entity = self._app.shotgun.find_one(entity_type, filters, fields)
+                    if not published_entity:
+                        continue
+
+                   # Get the name from published_entity, if not available, use child's "name" or "code"
+                    published_entity["name"] = published_entity.get("name") or child.get("name") or child.get("code", "No Name")
+
+                    # Get the task from published_entity, if not available, use child's "task"
+                    published_entity["task"] = published_entity.get("task") or child.get("task") or None
+
+                    # Get the entity from published_entity, if not available, use child's "entity"
+                    published_entity["entity"] = published_entity.get("entity") or child.get("entity") or None
+
+                    # Get the publish_type_field from published_entity, if not available, use `publish_type_field` from child
+                    published_entity["publish_type_field"] = published_entity.get("publish_type_field") or child.get("publish_type_field") or None
+
+                    # Get the published_file_type from published_entity, if not available, use `published_file_type` from child
+                    published_entity["published_file_type"] = published_entity.get("published_file_type") or child.get("published_file_type") or None
+
+                    # logger.debug(">>>>>>>>>>> Child Published entity: %s" % published_entity)
+                    children_item_list.append(published_entity)
+
+            # load the children into the model
+            self.ui.entity_children_view.selectionModel().clear()
+            if children_item_list:
+                self.ui.entity_children_view.setEnabled(True)
+                for child_item in children_item_list:
+                    self._load_publishes_for_children_entity(child_item)
+
+
+    def _get_parents_publish_files(self):
+        """ Get the published files for the parents of the selected entity"""
+        self.entity_parents_published_files_list = []
+        for parent in self.entity_parents:
+            if parent:
+                parent_type = parent.get("type", None)
+                parent_id = parent.get("id", None)
+                if parent_id and parent_type:
+                    filters = [["entity", "is", {"type": parent_type, "id": parent_id}]]
+                    fields = ["id", "code", "type", "entity", "parents", "sg_asset_parent", "sg_assets", "project", "name", "image",
+                              "path", "task", "publish_type_field", 'published_file_type', 'created_by', 'created_at',
+                              "sg_asset_library", "asset_section", "asset_category", "sg_asset_type", "sg_status_list"]
+                    published_files = self._app.shotgun.find("PublishedFile", filters, fields)
+                    self.entity_parents_published_files_list.extend(published_files)
+        # logger.debug(">>>>>>>>>>> Entity parents Published Files: %s" % self.entity_parents_published_files_list)
+        return self.entity_parents_published_files_list
+
+
+    def _get_children_publish_files(self):
+        """ Get the published files for the children of the selected entity"""
+        self.entity_children_published_files_list = []
+        for child in self.entity_children:
+            if child:
+                child_type = child.get("type", None)
+                child_id = child.get("id", None)
+                if child_id and child_type:
+                    filters = [["entity", "is", {"type": child_type, "id": child_id}]]
+                    fields = ["id", "code", "type", "entity", "parents", "sg_asset_parent", "sg_assets", "project", "name", "image",
+                              "path", "task", "publish_type_field", 'published_file_type', 'created_by', 'created_at',
+                              "sg_asset_library", "asset_section", "asset_category", "sg_asset_type", "sg_status_list"]
+                    published_files = self._app.shotgun.find("PublishedFile", filters, fields)
+                    self.entity_children_published_files_list.extend(published_files)
+
+
+        # logger.debug(">>>>>>>>>>> Entity children Published Files: %s" % self.entity_children_published_files_list)
+        return self.entity_children_published_files_list
+
+    def _prepare_entity_parents_published_files(self):
+        """ Sync the published files for the parents of the selected entity"""
+        self._get_parents_publish_files()
+        files_to_sync = []
+        msg = "\n <span style='color:#2C93E2'>Preparing entity parents files...</span> \n"
+        self._add_log(msg, 2)
+        for published_file in self.entity_parents_published_files_list:
+            if 'path' in published_file:
+                local_path = published_file['path'].get('local_path', None)
+                if local_path:
+                    head_rev = published_file.get('headRev', None)
+                    have_rev = published_file.get('haveRev', None)
+                    msg = "Checking file {}".format(local_path)
+                    self._add_log(msg, 4)
+
+                    # logger.debug(">>>>>>>>>>> (1) head_rev:{} have_rev:{}".format(head_rev, have_rev))
+                    if not head_rev and not have_rev:
+                        # fstat_list = self._p4.run_fstat(local_path + '/...')
+                        fstat_list = self._p4.run_fstat(local_path)
+                        # logger.debug(">>>>>>>>>>> fstat_list:{}".format(fstat_list))
+                        if fstat_list:
+                            for file_info in fstat_list:
+                                if file_info:
+                                    if isinstance(file_info, list) and len(file_info) == 1:
+                                        file_info = file_info[0]
+                                    # logger.debug(">>>>>>>>>>> file_info:{}".format(file_info))
+                                    head_rev = file_info.get('headRev', None)
+                                    have_rev = file_info.get('haveRev', None)
+                                    # logger.debug(">>>>>>>>>>> (2) head_rev:{} have_rev:{}".format(head_rev, have_rev))
+                                    published_file["headRev"] = head_rev
+                                    published_file["haveRev"] = have_rev
+                        # logger.debug(">>>>>>>>>>> (3) head_rev:{} have_rev:{}".format(head_rev, have_rev))
+                    if head_rev:
+                        if not have_rev:
+                            have_rev = "0"
+                        if self._to_sync(have_rev, head_rev):
+                            files_to_sync.append(local_path)
+
+        return files_to_sync
+
+    def _sync_entity_parents_published_files(self):
+        """ Sync the published files for the parents of the selected entity"""
+        files_to_sync = self._prepare_entity_parents_published_files()
+
+        files_to_sync_count = len(files_to_sync)
+        if files_to_sync_count == 0:
+            msg = "\n <span style='color:#2C93E2'>No file sync required for entity parents.</span> \n"
+            self._add_log(msg, 2)
+
+        elif files_to_sync_count > 0:
+
+            msg = "\n <span style='color:#2C93E2'>Syncing {} published files of entity parents.... </span> \n".format(files_to_sync_count)
+            self._add_log(msg, 2)
+            self._do_sync_files_threading_thread_2(files_to_sync, entity=True)
+
+            msg = "\n <span style='color:#2C93E2'>Syncing entity parents published files is complete</span> \n"
+            self._add_log(msg, 2)
+
+    def _prepare_entity_children_published_files(self):
+        """ Sync the published files for the children of the selected entity"""
+        self._get_children_publish_files()
+        files_to_sync = []
+        msg = "\n <span style='color:#2C93E2'>Preparing entity children files...</span> \n"
+        self._add_log(msg, 2)
+        for published_file in self.entity_children_published_files_list:
+            if 'path' in published_file:
+                local_path = published_file['path'].get('local_path', None)
+                if local_path:
+                    msg = "Checking file {}".format(local_path)
+                    self._add_log(msg, 4)
+                    head_rev = published_file.get('headRev', None)
+                    have_rev = published_file.get('haveRev', None)
+                    # logger.debug(">>>>>>>>>>> (1) head_rev:{} have_rev:{}".format(head_rev, have_rev))
+                    if not head_rev and not have_rev:
+                        # fstat_list = self._p4.run_fstat(local_path + '/...')
+                        fstat_list = self._p4.run_fstat(local_path)
+                        # logger.debug(">>>>>>>>>>> fstat_list:{}".format(fstat_list))
+                        if fstat_list:
+                            for file_info in fstat_list:
+                                if file_info:
+                                    if isinstance(file_info, list) and len(file_info) == 1:
+                                        file_info = file_info[0]
+                                    # logger.debug(">>>>>>>>>>> file_info:{}".format(file_info))
+                                    head_rev = file_info.get('headRev', None)
+                                    have_rev = file_info.get('haveRev', None)
+                                    # logger.debug(">>>>>>>>>>> (2) head_rev:{} have_rev:{}".format(head_rev, have_rev))
+                                    published_file["headRev"] = head_rev
+                                    published_file["haveRev"] = have_rev
+                        # logger.debug(">>>>>>>>>>> (3) head_rev:{} have_rev:{}".format(head_rev, have_rev))
+                    if head_rev:
+                        if not have_rev:
+                            have_rev = "0"
+                        if self._to_sync(have_rev, head_rev):
+                            files_to_sync.append(local_path)
+
+        return files_to_sync
+
+    def _sync_entity_children_published_files(self):
+        """ Sync the published files for the children of the selected entity"""
+        files_to_sync = self._prepare_entity_children_published_files()
+
+        files_to_sync_count = len(files_to_sync)
+        if files_to_sync_count == 0:
+            msg = "\n <span style='color:#2C93E2'>No file sync required for entity children.</span> \n"
+            self._add_log(msg, 2)
+
+        elif files_to_sync_count > 0:
+            msg = "\n <span style='color:#2C93E2'>Syncing {} published files of entity children.... </span> \n".format(files_to_sync_count)
+            self._add_log(msg, 2)
+            self._do_sync_files_threading_thread_2(files_to_sync, entity=True)
+
+            msg = "\n <span style='color:#2C93E2'>Syncing entity children published files is complete</span> \n"
+            self._add_log(msg, 2)
+
+    def _on_sync_entity_files(self):
+        """
+        Callback method when the sync entity files button is clicked
+        """
+        self._sync_entity_parents_published_files()
+        self._sync_entity_children_published_files()
+
+    def _load_publishes_for_parents_entity(self, sg_data):
+        """
+        Load the publishes for the parents of the selected entity
+        :param sg_data: Shotgun data for the selected entity
+        """
+        child_folders = []
+        # No need to show sub items if we are in the entity presets mode.
+        show_sub_items = False
+        self.ui.entity_parents_view.setStyleSheet("")
+        self._entity_parents_thumb_delegate.set_sub_items_mode(False)
+        self._entity_parents_list_delegate.set_sub_items_mode(False)
+
+        # now finally load up the data in the entity_parents model
+        publish_filters = self._entity_presets[
+            self._current_entity_preset
+        ].publish_filters
+        self._entity_parents_model.load_data(
+            sg_data, child_folders, show_sub_items, publish_filters
+        )
+
+    def _load_publishes_for_children_entity(self, sg_data):
+        """
+        Load the publishes for the children of the selected entity
+        :param sg_data: Shotgun data for the selected entity
+        """
+        child_folders = []
+        # No need to show sub items if we are in the entity presets mode.
+        show_sub_items = False
+        self.ui.entity_children_view.setStyleSheet("")
+        self._entity_children_thumb_delegate.set_sub_items_mode(False)
+        self._entity_children_list_delegate.set_sub_items_mode(False)
+
+        # now finally load up the data in the entity_children model
+        publish_filters = self._entity_presets[
+            self._current_entity_preset
+        ].publish_filters
+
+        self._entity_children_model.load_data(
+            sg_data, child_folders, show_sub_items, publish_filters
+        )
+
+
+    def _setup_file_details_panel(self, items):
+        """
+        Sets up the file details panel with info for a given item.
         """
 
         def __make_table_row(left, right):
@@ -1342,23 +2174,27 @@ class AppDialog(QtGui.QWidget):
             """
             Helper method to enable disable publish specific details UI
             """
-            # disable version history stuff
-            self.ui.version_history_label.setEnabled(is_publish)
-            self.ui.history_view.setEnabled(is_publish)
+            # disable version file_history stuff
+            self.ui.version_file_history_label.setEnabled(is_publish)
+            self.ui.file_history_view.setEnabled(is_publish)
+            self.ui.entity_parents_view.setEnabled(is_publish)
+            self.ui.entity_children_view.setEnabled(is_publish)
 
             # hide actions and playback stuff
-            self.ui.detail_actions_btn.setVisible(is_publish)
-            self.ui.detail_playback_btn.setVisible(is_publish)
+            self.ui.file_detail_actions_btn.setVisible(is_publish)
+            self.ui.file_detail_playback_btn.setVisible(is_publish)
 
-        def __clear_publish_history(pixmap):
-            """
-            Helper method that clears the history view on the right hand side.
+            #self.ui.entity_detail_actions_btn.setVisible(is_publish)
 
-            :param pixmap: image to set at the top of the history view.
+        def __clear_publish_file_history(pixmap):
             """
-            self._publish_history_model.clear()
-            self.ui.details_header.setText("")
-            self.ui.details_image.setPixmap(pixmap)
+            Helper method that clears the file_history view on the right hand side.
+
+            :param pixmap: image to set at the top of the file_history view.
+            """
+            self._publish_file_history_model.clear()
+            self.ui.file_details_header.setText("")
+            self.ui.file_details_image.setPixmap(pixmap)
             __set_publish_ui_visibility(False)
 
         # note - before the UI has been shown, querying isVisible on the actual
@@ -1367,9 +2203,9 @@ class AppDialog(QtGui.QWidget):
             return
 
         if len(items) == 0:
-            __clear_publish_history(self._no_selection_pixmap)
+            __clear_publish_file_history(self._no_selection_pixmap)
         elif len(items) > 1:
-            __clear_publish_history(self._multiple_publishes_pixmap)
+            __clear_publish_file_history(self._multiple_publishes_pixmap)
         else:
 
             model_index = items[0]
@@ -1391,19 +2227,19 @@ class AppDialog(QtGui.QWidget):
                 logger.debug(">>>>> Type is {}".format(sg_data.get('type', None)))
                 if published_file_type not in ['PublishedFile']:
                 # if not published_file_type:
-                    __clear_publish_history(self._no_selection_pixmap)
+                    __clear_publish_file_history(self._no_selection_pixmap)
                     return
             """
-            # render out details
+            # render out file_details
             thumb_pixmap = item.icon().pixmap(512)
-            self.ui.details_image.setPixmap(thumb_pixmap)
+            self.ui.file_details_image.setPixmap(thumb_pixmap)
 
             if sg_data is None:
                 # an item which doesn't have any sg data directly associated
                 # typically an item higher up the tree
                 # just use the default text
                 folder_name = __make_table_row("Name", item.text())
-                self.ui.details_header.setText("<table>%s</table>" % folder_name)
+                self.ui.file_details_header.setText("<table>%s</table>" % folder_name)
                 __set_publish_ui_visibility(False)
 
             elif item.data(SgLatestPublishModel.IS_FOLDER_ROLE):
@@ -1434,11 +2270,11 @@ class AppDialog(QtGui.QWidget):
                 )
                 msg += __make_table_row("Status", status_name)
                 msg += __make_table_row("Description", desc_str)
-                self.ui.details_header.setText("<table>%s</table>" % msg)
+                self.ui.file_details_header.setText("<table>%s</table>" % msg)
 
-                # blank out the version history
+                # blank out the version file_history
                 __set_publish_ui_visibility(False)
-                self._publish_history_model.clear()
+                self._publish_file_history_model.clear()
 
             else:
                 # this is a publish!
@@ -1451,13 +2287,13 @@ class AppDialog(QtGui.QWidget):
                     sg_item, self._action_manager.UI_AREA_DETAILS
                 )
                 if len(actions) == 0:
-                    self.ui.detail_actions_btn.setVisible(False)
+                    self.ui.file_detail_actions_btn.setVisible(False)
                 else:
-                    self.ui.detail_playback_btn.setVisible(True)
-                    self._details_action_menu.clear()
+                    self.ui.file_detail_playback_btn.setVisible(True)
+                    self._file_details_action_menu.clear()
                     for a in actions:
                         self._dynamic_widgets.append(a)
-                        self._details_action_menu.addAction(a)
+                        self._file_details_action_menu.addAction(a)
 
                 # if there is an associated version, show the play button
                 if sg_item.get("version"):
@@ -1467,10 +2303,10 @@ class AppDialog(QtGui.QWidget):
                         sg_item["version"]["id"],
                     )
 
-                    self.ui.detail_playback_btn.setVisible(True)
+                    self.ui.file_detail_playback_btn.setVisible(True)
                     self._current_version_detail_playback_url = url
                 else:
-                    self.ui.detail_playback_btn.setVisible(False)
+                    self.ui.file_detail_playback_btn.setVisible(False)
                     self._current_version_detail_playback_url = None
 
                 if sg_item.get("name") is None:
@@ -1542,13 +2378,13 @@ class AppDialog(QtGui.QWidget):
                         msg += __make_table_row("Action", head_action)
 
 
-                self.ui.details_header.setText("<table>%s</table>" % msg)
+                self.ui.file_details_header.setText("<table>%s</table>" % msg)
 
                 # tell details pane to load stuff
                 sg_data = item.get_sg_data()
-                self._publish_history_model.load_data(sg_data)
+                self._publish_file_history_model.load_data(sg_data)
 
-            self.ui.details_header.updateGeometry()
+            self.ui.file_details_header.updateGeometry()
 
     def _on_detail_version_playback(self):
         """
@@ -1562,53 +2398,53 @@ class AppDialog(QtGui.QWidget):
             )
 
     ########################################################################################
-    # history related
+    # file_history related
 
-    def _compute_history_button_visibility(self):
+    def _compute_file_history_button_visibility(self):
         """
-        compute history button enabled/disabled state based on contents of history stack.
+        compute file_history button enabled/disabled state based on contents of file_history stack.
         """
         self.ui.navigation_next.setEnabled(True)
         self.ui.navigation_prev.setEnabled(True)
-        if self._history_index == len(self._history):
+        if self._file_history_index == len(self._file_history):
             self.ui.navigation_next.setEnabled(False)
-        if self._history_index == 1:
+        if self._file_history_index == 1:
             self.ui.navigation_prev.setEnabled(False)
 
-    def _add_history_record(self, preset_caption, std_item):
+    def _add_file_history_record(self, preset_caption, std_item):
         """
-        Adds a record to the history stack
+        Adds a record to the file_history stack
         """
-        # self._history_index is a one based index that points at the currently displayed
+        # self._file_history_index is a one based index that points at the currently displayed
         # item. If it is not pointing at the last element, it means a user has stepped back
-        # in that case, discard the history after the current item and add this new record
+        # in that case, discard the file_history after the current item and add this new record
         # after the current item
 
         if (
-            not self._history_navigation_mode
-        ):  # do not add to history when browsing the history :)
-            # chop off history at the point we are currently
-            self._history = self._history[: self._history_index]
-            # append our current item to the chopped history
-            self._history.append({"preset": preset_caption, "item": std_item})
-            self._history_index += 1
+            not self._file_history_navigation_mode
+        ):  # do not add to file_history when browsing the file_history :)
+            # chop off file_history at the point we are currently
+            self._file_history = self._file_history[: self._file_history_index]
+            # append our current item to the chopped file_history
+            self._file_history.append({"preset": preset_caption, "item": std_item})
+            self._file_history_index += 1
 
         # now compute buttons
-        self._compute_history_button_visibility()
+        self._compute_file_history_button_visibility()
 
-    def _history_navigate_to_item(self, preset, item):
+    def _file_history_navigate_to_item(self, preset, item):
         """
         Focus in on an item in the tree view.
         """
         # tell rest of event handlers etc that this navigation
-        # is part of a history click. This will ensure that no
-        # *new* entries are added to the history log when we
+        # is part of a file_history click. This will ensure that no
+        # *new* entries are added to the file_history log when we
         # are clicking back/next...
-        self._history_navigation_mode = True
+        self._file_history_navigation_mode = True
         try:
             self._select_item_in_entity_tree(preset, item)
         finally:
-            self._history_navigation_mode = False
+            self._file_history_navigation_mode = False
 
     def _on_home_clicked(self):
         """
@@ -1650,8 +2486,8 @@ class AppDialog(QtGui.QWidget):
         if found_hierarchy_preset:
             # We're about to programmatically set the tab and then the item, so inform
             # the tab switcher that this is a combo operation and shouldn't be tracked
-            # by the history.
-            self._select_tab(found_hierarchy_preset, track_in_history=False)
+            # by the file_history.
+            self._select_tab(found_hierarchy_preset, track_in_file_history=False)
             # Kick off an async load of an entity, which in the context of the loader
             # is always meant to switch select that item.
             preset.model.async_item_from_entity(ctx.entity)
@@ -1668,21 +2504,21 @@ class AppDialog(QtGui.QWidget):
         """
         User clicks the back button
         """
-        self._history_index += -1
+        self._file_history_index += -1
         # get the data for this guy (note: index are one based)
-        d = self._history[self._history_index - 1]
-        self._history_navigate_to_item(d["preset"], d["item"])
-        self._compute_history_button_visibility()
+        d = self._file_history[self._file_history_index - 1]
+        self._file_history_navigate_to_item(d["preset"], d["item"])
+        self._compute_file_history_button_visibility()
 
     def _on_forward_clicked(self):
         """
         User clicks the forward button
         """
-        self._history_index += 1
+        self._file_history_index += 1
         # get the data for this guy (note: index are one based)
-        d = self._history[self._history_index - 1]
-        self._history_navigate_to_item(d["preset"], d["item"])
-        self._compute_history_button_visibility()
+        d = self._file_history[self._file_history_index - 1]
+        self._file_history_navigate_to_item(d["preset"], d["item"])
+        self._compute_file_history_button_visibility()
 
     ########################################################################################
     # filter view
@@ -1763,9 +2599,9 @@ class AppDialog(QtGui.QWidget):
         selected_indexes = self.ui.publish_view.selectionModel().selectedIndexes()
 
         if len(selected_indexes) == 0:
-            self._setup_details_panel([])
+            self._setup_file_details_panel([])
         else:
-            self._setup_details_panel(selected_indexes)
+            self._setup_file_details_panel(selected_indexes)
 
         # emit the selection changed signal:
         self.selection_changed.emit()
@@ -1833,7 +2669,7 @@ class AppDialog(QtGui.QWidget):
         # self._publish_model.hard_refresh()
 
         #self._reload_treeview()
-        #self._setup_details_panel([])
+        #self._setup_file_details_panel([])
 
         # self._update_perforce_data()
     def _publish_other_pending_data(self, other_data_to_publish):
@@ -1866,7 +2702,6 @@ class AppDialog(QtGui.QWidget):
             engine = sgtk.platform.current_engine()
             engine.commands["Publish..."]["callback"]()
 
-
     def _publish_delete_pending_data(self, deleted_data_to_publish):
         """
         Publish Depot Data in the Pending view that needs to be deleted.
@@ -1875,18 +2710,16 @@ class AppDialog(QtGui.QWidget):
             msg = "\n <span style='color:#2C93E2'>Submitting files for deletion...</span> \n"
             self._add_log(msg, 2)
 
-
-
             for sg_item in deleted_data_to_publish:
                 # logger.debug(">>>>>>>>>>  sg_item: {}".format(sg_item))
 
                 file_to_submit = sg_item.get('path', {}).get('local_path', None) if 'path' in sg_item else None
 
                 if file_to_submit:
-                        msg = "{}".format(file_to_submit)
-                        self._add_log(msg, 4)
-                        del_res = add_to_change(self._p4, self._del_change, file_to_submit)
-                        logger.debug(">>>>>>>>>>  File added to changlist for deletion: {}".format(del_res))
+                    msg = "{}".format(file_to_submit)
+                    self._add_log(msg, 4)
+                    del_res = add_to_change(self._p4, self._del_change, file_to_submit)
+                    logger.debug(">>>>>>>>>>  File added to changlist for deletion: {}".format(del_res))
 
             # Submit the changelist
             if self._del_change:
@@ -1894,7 +2727,6 @@ class AppDialog(QtGui.QWidget):
                 logger.debug(">>>>>>>>>>  Result of deleting files: {}".format(submit_del_res))
 
             self._publish_deleted_data_using_command_line(deleted_data_to_publish)
-
 
     def _publish_deleted_data_using_command_line(self, deleted_data_to_publish):
         """
@@ -1979,7 +2811,7 @@ class AppDialog(QtGui.QWidget):
         #self._publish_submitted_data_using_publisher_ui()
         self._publish_submitted_data_using_command_line()
 
-        self._setup_details_panel([])
+        self._setup_file_details_panel([])
         self._on_treeview_item_selected()
         
     def _on_fix_all(self):
@@ -1998,20 +2830,8 @@ class AppDialog(QtGui.QWidget):
         #self._publish_submitted_data_using_publisher_ui()
         self._publish_submitted_data_using_command_line()
 
-        self._setup_details_panel([])
+        self._setup_file_details_panel([])
         self._on_treeview_item_selected()
-
-       
-    def post_publish(self):
-        msg = "\n <span style='color:#2C93E2'>Publish is complete, reloading data</span> \n"
-        self._add_log(msg, 2)
-
-        self._submitted_data_to_publish = []
-        self._reload_treeview()
-        self._setup_details_panel([])
-        self._update_perforce_data()
-        #self.print_publish_data()
-        #self._on_treeview_item_selected()
 
 
     def _create_publisher_dir(self):
@@ -2078,12 +2898,12 @@ class AppDialog(QtGui.QWidget):
             msg = "\n <span style='color:#2C93E2'>Reloading data ...</span> \n"
             self._add_log(msg, 2)
             self._status_model.hard_refresh()
-            self._publish_history_model.hard_refresh()
+            self._publish_file_history_model.hard_refresh()
             # self._publish_type_model.hard_refresh()
             self._publish_model.hard_refresh()
             #for p in self._entity_presets:
             #    self._entity_presets[p].model.hard_refresh()
-            self._setup_details_panel([])
+            self._setup_file_details_panel([])
             # self._get_perforce_summary()
 
             msg = "\n <span style='color:#2C93E2'>Reloading data is complete</span> \n"
@@ -2540,7 +3360,7 @@ class AppDialog(QtGui.QWidget):
         sync_threads.start()
         sync_threads.join()
 
-    def _do_sync_files_threading_thread_2(self, files_to_sync):
+    def _do_sync_files_threading_thread_2(self, files_to_sync, entity=None):
         self.sync_command = []
         self.sync_command.append("sync")
         self.sync_command.append("-f")
@@ -2768,7 +3588,7 @@ class AppDialog(QtGui.QWidget):
         Hard reload all caches
         """
         self._status_model.hard_refresh()
-        self._publish_history_model.hard_refresh()
+        self._publish_file_history_model.hard_refresh()
         self._publish_type_model.hard_refresh()
         self._publish_model.hard_refresh()
         for p in self._entity_presets:
@@ -2780,7 +3600,7 @@ class AppDialog(QtGui.QWidget):
         Hard reload all caches
         """
         self._status_model.hard_refresh()
-        self._publish_history_model.hard_refresh()
+        self._publish_file_history_model.hard_refresh()
         self._publish_type_model.hard_refresh()
         self._publish_model.hard_refresh()
 
@@ -2813,13 +3633,13 @@ class AppDialog(QtGui.QWidget):
 
         return selected_item
 
-    def _select_tab(self, tab_caption, track_in_history):
+    def _select_tab(self, tab_caption, track_in_file_history):
         """
         Programmatically selects a tab based on the requested caption.
 
         :param str tab_caption: Name of the tab to bring forward.
-        :param track_in_history: If ``True``, the tab switch will be registered in the
-            history.
+        :param track_in_file_history: If ``True``, the tab switch will be registered in the
+            file_history.
         """
         if tab_caption != self._current_entity_preset:
             for idx in range(self.ui.entity_preset_tabs.count()):
@@ -2835,7 +3655,7 @@ class AppDialog(QtGui.QWidget):
                     finally:
                         self._disable_tab_event_handler = False
                     # now run the logic for the switching
-                    self._switch_profile_tab(idx, track_in_history)
+                    self._switch_profile_tab(idx, track_in_file_history)
 
     def _select_item_in_entity_tree(self, tab_caption, item):
         """
@@ -2845,7 +3665,7 @@ class AppDialog(QtGui.QWidget):
         Item can be None - in this case, nothing is selected.
         """
         # this method is called when someone clicks the home button,
-        # clicks the back/forward history buttons or double clicks on
+        # clicks the back/forward file_history buttons or double clicks on
         # a folder in the thumbnail UI.
 
         # there are three basic cases here:
@@ -2894,7 +3714,7 @@ class AppDialog(QtGui.QWidget):
             selection_model.clear()
 
             # note: the on-select event handler will take over at this point and register
-            # history, handle click logic etc.
+            # file_history, handle click logic etc.
 
     def _load_entity_presets(self):
         """
@@ -3356,15 +4176,15 @@ class AppDialog(QtGui.QWidget):
         """
         if not self._disable_tab_event_handler:
             curr_tab_index = self.ui.entity_preset_tabs.currentIndex()
-            self._switch_profile_tab(curr_tab_index, track_in_history=True)
+            self._switch_profile_tab(curr_tab_index, track_in_file_history=True)
 
-    def _switch_profile_tab(self, new_index, track_in_history):
+    def _switch_profile_tab(self, new_index, track_in_file_history):
         """
         Switches to use the specified profile tab.
 
         :param new_index: tab index to switch to
-        :param track_in_history: Hint to this method that the actions should be tracked in the
-            history.
+        :param track_in_file_history: Hint to this method that the actions should be tracked in the
+            file_history.
         """
         # qt returns unicode/qstring here so force to str
         curr_tab_name = shotgun_model.sanitize_qt(
@@ -3382,8 +4202,8 @@ class AppDialog(QtGui.QWidget):
         else:
             self.ui.show_sub_items.show()
 
-        if self._history_navigation_mode == False:
-            # When we are not navigating back and forth as part of history navigation,
+        if self._file_history_navigation_mode == False:
+            # When we are not navigating back and forth as part of file_history navigation,
             # ask the currently visible view to (background async) refresh its data.
             # Refreshing the data only makes sense for SgEntityModel based tabs since
             # SgHierarchyModel does not yet support this kind of functionality.
@@ -3391,18 +4211,18 @@ class AppDialog(QtGui.QWidget):
             if isinstance(model, SgEntityModel):
                 model.async_refresh()
 
-        if track_in_history:
+        if track_in_file_history:
             # figure out what is selected
             selected_item = self._get_selected_entity()
 
             # update breadcrumbs
             self._populate_entity_breadcrumbs(selected_item)
 
-            # add history record
-            self._add_history_record(self._current_entity_preset, selected_item)
+            # add file_history record
+            self._add_file_history_record(self._current_entity_preset, selected_item)
 
             # tell details view to clear
-            self._setup_details_panel([])
+            self._setup_file_details_panel([])
 
             # tell the publish view to change
             self._load_publishes_for_entity_item(selected_item)
@@ -3436,14 +4256,26 @@ class AppDialog(QtGui.QWidget):
                 self._add_log(msg, 2)
         return entity_path, entity_id, entity_type
 
+
     def _on_treeview_item_selected(self):
         """
         Slot triggered when someone changes the selection in a treeview.
         """
         logger.debug(">>>>>>>>>>  self.main_view_mode is: {}".format(self.main_view_mode))
         self._fstat_dict = {}
-        entity_data = self._reload_treeview()
+        entity_data, item = self._reload_treeview()
+
+        #logger.debug(">>>>>>>>>>1 In _on_treeview_item_selected entity_data is: {}".format(entity_data))
+        if self._details_pane_visible:
+            msg = "\n <span style='color:#2C93E2'>Loading entity parents and children ...</span> \n"
+            self._add_log(msg, 2)
+            # Set up the entity details panel
+            self._setup_entity_details_panel(entity_data, item)
+            # Set up the entity parents and children
+            self._setup_entity_parent_and_children(entity_data)
+
         self._entity_path, entity_id, entity_type = self._get_entity_info(entity_data)
+
         logger.debug(">>>>>>>>>>>>>>>>>> self._entity_path: {}".format(self._entity_path))
         #entity_data = self._reload_treeview()
         #model = self.ui.publish_view.model()
@@ -3805,11 +4637,11 @@ class AppDialog(QtGui.QWidget):
             model.fetchMore(selected_item.index())
 
 
-        # notify history
-        self._add_history_record(self._current_entity_preset, selected_item)
+        # notify file_history
+        self._add_file_history_record(self._current_entity_preset, selected_item)
 
         # tell details panel to clear itself
-        self._setup_details_panel([])
+        self._setup_file_details_panel([])
 
         # tell publish UI to update itself
         sg_data = self._load_publishes_for_entity_item(selected_item)
@@ -3831,15 +4663,15 @@ class AppDialog(QtGui.QWidget):
         if selected_item and model.canFetchMore(selected_item.index()):
             model.fetchMore(selected_item.index())
 
-        # notify history
-        self._add_history_record(self._current_entity_preset, selected_item)
+        # notify file_history
+        self._add_file_history_record(self._current_entity_preset, selected_item)
 
         # tell details panel to clear itself
-        self._setup_details_panel([])
+        self._setup_file_details_panel([])
 
         # tell publish UI to update itself
         sg_data = self._load_publishes_for_entity_item(selected_item)
-        return sg_data
+        return sg_data, selected_item
 
     def _load_publishes_for_entity_item(self, item):
         """
@@ -3932,11 +4764,11 @@ class AppDialog(QtGui.QWidget):
         sg_data = self._publish_model.load_data(
             item, child_folders, show_sub_items, publish_filters
         )
-        #logger.info(">>>> item is {}".format(item))
-        #logger.info(">>>> child_folders is {}".format(child_folders))
-        #logger.info(">>>> show_sub_items is {}".format(show_sub_items))
-        #logger.info(">>>> publish_filters is {}".format(publish_filters))
-        #logger.info(">>>> sg_data is {}".format(sg_data))
+        # logger.info(">>>>>>>>>>>>>>>>>>>>>>> item is {}".format(item))
+        # logger.info(">>>> child_folders is {}".format(child_folders))
+        # logger.info(">>>> show_sub_items is {}".format(show_sub_items))
+        # logger.info(">>>> publish_filters is {}".format(publish_filters))
+        # logger.info(">>>> sg_data is {}".format(sg_data))
         return sg_data
 
 
