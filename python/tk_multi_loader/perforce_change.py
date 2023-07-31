@@ -72,6 +72,41 @@ def add_to_change(p4, change, file_paths):
     return add_res
 
 
+def add_to_default_changelist(p4, file_paths):
+    """
+    Add the specified files to the specified change
+    """
+    # add the files to the default changelist
+
+    add_res = None
+    try:
+        default_changelist = p4.fetch_change()
+        msg = "default changelist:: %s" % (default_changelist)
+        log.debug(msg)
+        if not default_changelist:
+            default_changelist = p4.save_change(default_changelist)
+            msg = "Created default changelist:: %s" % (default_changelist)
+            log.debug(msg)
+
+        # Mark the file for delete in the default changelist
+        #p4.run_edit('-c', default_changelist, '-d', file_path)
+
+        # use reopen command which works with local file paths.
+        # fetch/modify/save_change only works with depot paths!
+        change = default_changelist.get("Change", None )
+        if change:
+            add_res = p4.run_reopen("-c", change, file_paths)
+        #add_res = p4.run_reopen('-c', default_changelist,file_paths)
+        # add_res = p4.run_edit("-c", str(change), file_paths)
+
+    except:
+        msg = "Perforce: %s" % (p4.errors[0] if p4.errors else e)
+        log.debug(msg)
+    #except P4Exception as e:
+    #   raise TankError("Perforce: %s" % (p4.errors[0] if p4.errors else e))
+    return add_res
+
+
 def find_change_containing(p4, path):
     """
     Find the current change that the specified path is in.
@@ -89,7 +124,7 @@ def find_change_containing(p4, path):
     return change
 
 
-def submit_change(p4, change):
+def submit_change_original(p4, change):
     """
     Submit the specified change
     """
@@ -114,6 +149,30 @@ def submit_change(p4, change):
         msg = "Perforce: %s" % (p4.errors[0] if p4.errors else e)
         log.debug(msg)
 
+def submit_change(p4, change, filelist):
+    """
+    Submit the specified change
+    """
+    try:
+        change_spec = p4.fetch_change("-o", str(change))
+        submit = p4.run_submit(change_spec, filelist)
+        """
+        run_submit returns a list of dicts, something like this:
+        [{'change': '90', 'locked': '2'},
+         "Possible string in here",
+         {'action': 'edit',
+          'depotFile': '//deva/Tool/ScorchedEarth/ToolCategory/ToolTestAsset/deva_ScorchedEarth_ToolTestAsset_concept.psd',
+          'rev': '2'},
+         {'action': 'edit',
+          'depotFile': '//deva/Tool/ScorchedEarth/ToolCategory/ToolTestAsset/deva_ScorchedEarth_ToolTestAsset_concept_alt.psd',
+          'rev': '4'},
+         {'submittedChange': '90'}]
+        """
+        log.debug("Return of run_submit: {}".format(submit))
+        return submit
+    except:
+        msg = "Perforce: %s" % (p4.errors[0] if p4.errors else e)
+        log.debug(msg)
 
 def get_change_details(p4, changes):
     """

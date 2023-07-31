@@ -58,6 +58,7 @@ from .publish_files_ui import PublishFilesUI
 from .publish_app import MultiPublish2
 from .perforce_change import create_change, add_to_change, submit_change
 from .treeview_widget import TreeViewWidget
+from .changelist_selection_operation import ChangelistSelection
 from collections import defaultdict, OrderedDict
 import os
 from os.path import expanduser
@@ -270,9 +271,9 @@ class AppDialog(QtGui.QWidget):
             self, self._entity_parents_type_model, self._task_manager
         )
 
-        self._parents_main_overlay = ShotgunModelOverlayWidget(
-            self._entity_parents_model, self.ui.entity_parents_view
-        )
+        #self._parents_main_overlay = ShotgunModelOverlayWidget(
+        #    self._entity_parents_model, self.ui.entity_parents_view
+        #)
 
         # set up a proxy model to cull results based on type selection
         self._entity_parents_proxy_model = SgLatestPublishProxyModel(self)
@@ -285,7 +286,7 @@ class AppDialog(QtGui.QWidget):
         #self._entity_parents_proxy_model.filter_changed.connect(
         #    self._on_entity_parents_content_change
         #)
-
+        """
         # hook up view -> proxy model -> model
         self.ui.entity_parents_view.setModel(self._entity_parents_proxy_model)
 
@@ -297,7 +298,7 @@ class AppDialog(QtGui.QWidget):
         self._entity_parents_list_delegate = SgPublishListDelegate(
             self.ui.entity_parents_view, self._action_manager
         )
-
+        """
         # recall which the most recently mode used was and set that
         #main_view_mode = self._settings_manager.retrieve(
         #    "main_view_mode", self.MAIN_VIEW_THUMB
@@ -317,8 +318,8 @@ class AppDialog(QtGui.QWidget):
         # note! Because of some GC issues (maya 2012 Pyside), need to first establish
         # a direct reference to the selection model before we can set up any signal/slots
         # against it
-        self.ui.entity_parents_view.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
-        self._entity_parents_view_selection_model = self.ui.entity_parents_view.selectionModel()
+        #self.ui.entity_parents_view.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
+        #self._entity_parents_view_selection_model = self.ui.entity_parents_view.selectionModel()
         #self._entity_parents_view_selection_model.selectionChanged.connect(
         #    self._on_entity_parents_selection
         #)
@@ -337,17 +338,17 @@ class AppDialog(QtGui.QWidget):
         # self._refresh_action = QtGui.QAction("Refresh", self.ui.entity_parents_view)
         # self._refresh_action.triggered.connect(self._entity_parents_model.async_refresh)
 
-        self.ui.entity_parents_view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        #self.ui.entity_parents_view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         # self.ui.entity_parents_view.customContextMenuRequested.connect(
         #     self._show_entity_parents_actions
         # )
-        """
+
         # Entity Parents History
         self._publish_entity_parents_model = SgPublishHistoryModel(self, self._task_manager)
 
-        self._publish_entity_parents_model_overlay = ShotgunModelOverlayWidget(
-            self._publish_entity_parents_model, self.ui.entity_parents_view
-        )
+        #self._publish_entity_parents_model_overlay = ShotgunModelOverlayWidget(
+        #    self._publish_entity_parents_model, self.ui.entity_parents_view
+        #)
 
         self._publish_entity_parents_proxy = QtGui.QSortFilterProxyModel(self)
         self._publish_entity_parents_proxy.setSourceModel(self._publish_entity_parents_model)
@@ -363,18 +364,18 @@ class AppDialog(QtGui.QWidget):
         self._publish_entity_parents_proxy.setDynamicSortFilter(True)
         self._publish_entity_parents_proxy.sort(0, QtCore.Qt.DescendingOrder)
 
-        self.ui.entity_parents_view.setModel(self._publish_entity_parents_proxy)
-        self._entity_parents_delegate = SgPublishHistoryDelegate(
-            self.ui.entity_parents_view, self._status_model, self._action_manager
-        )
-        self.ui.entity_parents_view.setItemDelegate(self._entity_parents_delegate)
+        #self.ui.entity_parents_view.setModel(self._publish_entity_parents_proxy)
+        #self._entity_parents_delegate = SgPublishHistoryDelegate(
+        #    self.ui.entity_parents_view, self._status_model, self._action_manager
+        #)
+        #self.ui.entity_parents_view.setItemDelegate(self._entity_parents_delegate)
 
         # event handler for when the selection in the entity_parents view is changing
         # note! Because of some GC issues (maya 2012 Pyside), need to first establish
         # a direct reference to the selection model before we can set up any signal/slots
         # against it
-        self._entity_parents_view_selection_model = self.ui.entity_parents_view.selectionModel()
-        """
+        #self._entity_parents_view_selection_model = self.ui.entity_parents_view.selectionModel()
+
         """
         
         self._entity_parents_view_selection_model.selectionChanged.connect(
@@ -393,7 +394,7 @@ class AppDialog(QtGui.QWidget):
         """
         ###########################################
         # Entity Children publish model
-
+        """
         # load and initialize cached publish type model
         self._entity_children_type_model = SgPublishTypeModel(
             self, self._action_manager, self._settings_manager, self._task_manager
@@ -479,6 +480,7 @@ class AppDialog(QtGui.QWidget):
         # self.ui.entity_parents_view.customContextMenuRequested.connect(
         #     self._show_entity_parents_actions
         # )
+        """
         # Entity Children History
         """
         self._publish_entity_children_model = SgPublishHistoryModel(self, self._task_manager)
@@ -512,6 +514,7 @@ class AppDialog(QtGui.QWidget):
         # a direct reference to the selection model before we can set up any signal/slots
         # against it
         self._entity_children_view_selection_model = self.ui.entity_children_view.selectionModel()
+
         """
         """
         self._entity_children_view_selection_model.selectionChanged.connect(
@@ -527,6 +530,8 @@ class AppDialog(QtGui.QWidget):
 
         # if an item in the list is double clicked the default action is run
         self.ui.entity_children_view.doubleClicked.connect(self._on_entity_children_double_clicked)
+        """
+        """
         """
 
         #################################################
@@ -607,6 +612,12 @@ class AppDialog(QtGui.QWidget):
         self._edit_action.triggered.connect(lambda: self._on_publish_model_action("edit"))
         self._delete_action = QtGui.QAction("Delete", self.ui.publish_view)
         self._delete_action.triggered.connect(lambda: self._on_publish_model_action("delete"))
+        # Add changlist as submenus to the delete action
+
+        self._change_lists = QtGui.QAction("1001", self._delete_action)
+        self._change_lists.triggered.connect(lambda: self._on_publish_model_action("1001"))
+
+
         self._revert_action = QtGui.QAction("Revert", self.ui.publish_view)
         self._revert_action.triggered.connect(lambda: self._on_publish_model_action("revert"))
 
@@ -647,7 +658,7 @@ class AppDialog(QtGui.QWidget):
 
         self.ui.check_all.clicked.connect(self._publish_type_model.select_all)
         self.ui.check_none.clicked.connect(self._publish_type_model.select_none)
-        self.ui.sync_entity_files.clicked.connect(self._on_sync_entity_files)
+        # self.ui.sync_entity_files.clicked.connect(self._on_sync_entity_files)
 
 
         #################################################
@@ -769,8 +780,11 @@ class AppDialog(QtGui.QWidget):
             self._drive = self._root_path[0:2]
 
         # "delete" change
-        self._del_change = create_change(self._p4, "Deleting files")
-        self._actions_change = create_change(self._p4, "Perform actions")
+        # self._del_change = create_change(self._p4, "Deleting files")
+        self.default_changelist = self._p4.fetch_change()
+        # self.default_changelist = "0"
+        self._actions_change = self.default_changelist.get("Change")
+        # self._actions_change = create_change(self._p4, "Perform actions")
 
         #################################################
         # Perforce data
@@ -1826,14 +1840,13 @@ class AppDialog(QtGui.QWidget):
 
     def _populate_parents_tab(self, parents):
         """ Populate the parents tab with the parent entities of the selected entity"""
-        """
         parent_publish_files = self._get_parents_publish_files()
         if parent_publish_files:
             self._set_entity_tabs_ui_visibility(True)
             for parent_publish_file in parent_publish_files:
                 self._load_publishes_for_parents_entity(self, parent_publish_file) 
-                # self._publish_entity_parents_model.load_data(parent_publish_file)
-                pass
+                self._publish_entity_parents_model.load_data(parent_publish_file)
+
         """
 
         parents_item_list = []
@@ -1882,9 +1895,7 @@ class AppDialog(QtGui.QWidget):
             self.ui.entity_parents_view.setEnabled(True)
             for parent_item in parents_item_list:
                 self._load_publishes_for_parents_entity(parent_item)
-
-
-
+        """
 
 
 
@@ -1904,13 +1915,12 @@ class AppDialog(QtGui.QWidget):
 
     def _populate_children_tab(self, children):
         """ Populate the children tab with the child entities of the selected entity"""
-        """
+
         children_publish_files = self._get_children_publish_files()
         if children_publish_files:
             self._set_entity_tabs_ui_visibility(True)
             for child_publish_file in children_publish_files:
-                #self._publish_entity_children_model.load_data(child_publish_file)
-                pass
+                self._publish_entity_children_model.load_data(child_publish_file)
         """
         children_item_list = []
         for child in children:
@@ -1954,6 +1964,7 @@ class AppDialog(QtGui.QWidget):
                 self.ui.entity_children_view.setEnabled(True)
                 for child_item in children_item_list:
                     self._load_publishes_for_children_entity(child_item)
+        """
 
 
     def _get_parents_publish_files(self):
@@ -2177,8 +2188,8 @@ class AppDialog(QtGui.QWidget):
             # disable version file_history stuff
             self.ui.version_file_history_label.setEnabled(is_publish)
             self.ui.file_history_view.setEnabled(is_publish)
-            self.ui.entity_parents_view.setEnabled(is_publish)
-            self.ui.entity_children_view.setEnabled(is_publish)
+            #self.ui.entity_parents_view.setEnabled(is_publish)
+            #self.ui.entity_children_view.setEnabled(is_publish)
 
             # hide actions and playback stuff
             self.ui.file_detail_actions_btn.setVisible(is_publish)
@@ -2685,16 +2696,17 @@ class AppDialog(QtGui.QWidget):
             out_file.write('Pending Files\n')
             # Create a new Perforce changelist
 
-            for sg_item in other_data_to_publish:
-                # logger.debug(">>>>>>>>>>  sg_item: {}".format(sg_item))
-                if 'path' in sg_item:
-                    file_to_submit = sg_item['path'].get('local_path', None)
-                    if file_to_submit:
-                        msg = "{}".format(file_to_submit)
-                        self._add_log(msg, 4)
-                        out_file.write('%s\n' % file_to_submit)
-                        #add_res = add_to_change(self._p4, change, file_to_submit)
-                        #action_result = self._p4.run("edit", "-c", change, "-v", file_to_submit)
+            for key in other_data_to_publish:
+                for sg_item in other_data_to_publish[key]:
+                    # logger.debug(">>>>>>>>>>  sg_item: {}".format(sg_item))
+                    if sg_item and 'path' in sg_item:
+                        file_to_submit = sg_item['path'].get('local_path', None)
+                        if file_to_submit:
+                            msg = "{}".format(file_to_submit)
+                            self._add_log(msg, 4)
+                            out_file.write('%s\n' % file_to_submit)
+                            #add_res = add_to_change(self._p4, change, file_to_submit)
+                            #action_result = self._p4.run("edit", "-c", change, "-v", file_to_submit)
 
             out_file.close()
 
@@ -2706,25 +2718,29 @@ class AppDialog(QtGui.QWidget):
         """
         Publish Depot Data in the Pending view that needs to be deleted.
         """
+        files_to_delete = []
         if deleted_data_to_publish:
             msg = "\n <span style='color:#2C93E2'>Submitting files for deletion...</span> \n"
             self._add_log(msg, 2)
+            for key in deleted_data_to_publish:
 
-            for sg_item in deleted_data_to_publish:
-                # logger.debug(">>>>>>>>>>  sg_item: {}".format(sg_item))
+                for sg_item in deleted_data_to_publish[key]:
+                    # logger.debug(">>>>>>>>>>  sg_item: {}".format(sg_item))
 
-                file_to_submit = sg_item.get('path', {}).get('local_path', None) if 'path' in sg_item else None
+                    file_to_submit = sg_item.get('path', {}).get('local_path', None) if 'path' in sg_item else None
 
-                if file_to_submit:
-                    msg = "{}".format(file_to_submit)
-                    self._add_log(msg, 4)
-                    del_res = add_to_change(self._p4, self._del_change, file_to_submit)
-                    logger.debug(">>>>>>>>>>  File added to changlist for deletion: {}".format(del_res))
-
-            # Submit the changelist
-            if self._del_change:
-                submit_del_res = submit_change(self._p4, self._del_change)
-                logger.debug(">>>>>>>>>>  Result of deleting files: {}".format(submit_del_res))
+                    if file_to_submit:
+                        msg = "{}".format(file_to_submit)
+                        self._add_log(msg, 4)
+                        submit_del_res = submit_change(self._p4, file_to_submit)
+                        logger.debug(">>>>>>>>>>  Result of deleting files: {}".format(submit_del_res))
+                        if submit_del_res:
+                            # Check if submit_del_res is a list
+                            if isinstance(submit_del_res, list) and len(submit_del_res) > 0:
+                                submit_del_res = submit_del_res[0]
+                                if 'submittedChange' in submit_del_res:
+                                    sg_item['submittedChange'] = submit_del_res['submittedChange']
+                                    self._publish_deleted_data_using_command_line([sg_item])
 
             self._publish_deleted_data_using_command_line(deleted_data_to_publish)
 
@@ -2742,6 +2758,8 @@ class AppDialog(QtGui.QWidget):
                 if target_context.entity and file_path:
                     sg_item["entity"] = target_context.entity
 
+
+                    """
                     # Extract the base name without extension
                     base_name = os.path.splitext(os.path.basename(file_path))[0]
 
@@ -2764,7 +2782,7 @@ class AppDialog(QtGui.QWidget):
                         # New custom field "sg_hidden"
                         # sg.update("PublishedFile", published_file_id, {"sg_hidden": True})
                         pass
-
+                    """
                     # Publish the file to Shotgrid with a new version number and "delete" action
 
                     publisher = PublishItem(sg_item)
@@ -4261,7 +4279,7 @@ class AppDialog(QtGui.QWidget):
         """
         Slot triggered when someone changes the selection in a treeview.
         """
-        logger.debug(">>>>>>>>>>  self.main_view_mode is: {}".format(self.main_view_mode))
+        logger.debug(">>>>>>>>>>  view_mode is: {}".format(self.main_view_mode))
         self._fstat_dict = {}
         entity_data, item = self._reload_treeview()
 
@@ -4272,7 +4290,7 @@ class AppDialog(QtGui.QWidget):
             # Set up the entity details panel
             self._setup_entity_details_panel(entity_data, item)
             # Set up the entity parents and children
-            self._setup_entity_parent_and_children(entity_data)
+            # self._setup_entity_parent_and_children(entity_data)
 
         self._entity_path, entity_id, entity_type = self._get_entity_info(entity_data)
 
@@ -4531,15 +4549,30 @@ class AppDialog(QtGui.QWidget):
                         depot_file = sg_item.get("depotFile", None)
 
                         if action in ["add", "move/add", "edit", "delete"]:
-                            msg = "{} file {}".format(action, depot_file)
+                            sg_item_action = sg_item.get("action", None)
+                            if sg_item_action and sg_item_action == "delete":
+                                msg = "Cannot perform the action on the file {} as it has already been marked for deletion or is deleted.".format(
+                                    depot_file)
+                                self._add_log(msg, 2)
+                                return
 
-                            perform_actions = PerformActions(self._p4, sg_item, action, self._actions_change)
-                            new_sg_item = perform_actions.run()
+                            if action == "delete":
+                                msg = "Marking file {} for deletion ...".format(depot_file)
+                            else:
+                                msg = "{} file {}".format(action, depot_file)
+                            self._add_log(msg, 2)
+                            self.peform_changelist_selection(sg_item, action)
 
+
+                            #changelist_selection_operation.run(p4=self._p4, sg_item=sg_item, action=action, parent=self)
+                            #perform_actions = PerformActions(self._p4, sg_item, action, self._actions_change)
+                            #new_sg_item = perform_actions.run()
+                            # new_sg_item = changelist_selection_operation.get_sg_item()
+                            """
                             if new_sg_item:
                                 new_change = new_sg_item.get("headChange", None)
                                 if new_change:
-                                    msg += "to changelist {}".format(new_change)
+                                    msg += " to changelist {}".format(new_change)
                                 self._add_log(msg, 3)
 
                                 # Publish the file
@@ -4556,15 +4589,24 @@ class AppDialog(QtGui.QWidget):
                                     item.setEnabled(False)
                                 else:
                                     item.setEnabled(True)
+                            """
 
                         elif action == "revert":
                             msg = "Revert file {} ...".format(target_file)
                             self._add_log(msg, 3)
                             # p4_result = self._p4.run("revert", "-v", target_file)
                             p4_result = self._p4.run("revert", target_file)
+                            if p4_result:
+                                self.refresh_publish_data()
 
+
+
+    def peform_changelist_selection(self, sg_item, action):
+        perform_action = ChangelistSelection(self._p4, sg_item=sg_item, action=action, parent=self)
+        perform_action.show()
+
+    def refresh_publish_data(self):
         self._update_perforce_data()
-        # self.print_publish_data()
         self._publish_model.hard_refresh()
         # self._publish_model.async_refresh()
 

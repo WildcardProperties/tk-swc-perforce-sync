@@ -1,10 +1,10 @@
 
-from .perforce_change import create_change, add_to_change, submit_change
+from .perforce_change import create_change, add_to_change, submit_change, add_to_default_changelist
 import sgtk
 logger = sgtk.platform.get_logger(__name__)
 
 class PerformActions():
-    def __init__(self, p4, sg_item, action, change):
+    def __init__(self, p4, sg_item, action, change, desc):
         self.p4 = p4
         self.sg_item = sg_item
         self.action = action
@@ -12,6 +12,8 @@ class PerformActions():
         self.depot_file = sg_item.get("depotFile", None)
         self.local_path = self.get_local_path()
         self.description = "{} file".format(action)
+        if desc:
+            self.description = desc.strip()
         self.status_dict = {
             "add": "p4add",
             "move/add": "p4add",
@@ -66,6 +68,8 @@ class PerformActions():
         if self.local_path:
             # add_res = add_to_change(self.p4, self.change, self.depot_file)
             add_res = add_to_change(self.p4, self.change, self.local_path)
+
+            #add_res = add_to_default_changelist(self.p4, self.local_path)
             logger.debug(">>>> add_res: {}".format(add_res))
         return add_res
 
@@ -78,7 +82,7 @@ class PerformActions():
         if action:
             action_result = self.p4.run(action, "-c", self.change, "-v", self.local_path)
             # action_result = self.p4.run(action, "-c", self.change, "-v", self.depot_file)
-            logger.debug(">>>> action_result: {}".format(action_result))
+            logger.debug(">>>> In perform_action: action_result: {}".format(action_result))
         return action_result
 
 

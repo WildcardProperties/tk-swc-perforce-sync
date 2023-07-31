@@ -187,21 +187,28 @@ class TreeViewWidget(QtWidgets.QWidget):
         return data_to_publish
 
     def get_selected_publish_items_by_action(self):
-        delete_data_to_publish = []
-        other_data_to_publish = []
+        delete_data_to_publish = {}
+        other_data_to_publish = {}
         selected = self.tree_view.selectionModel().selectedIndexes()
         for index in selected:
-            key = self.model.data(index)
-            if key:
-                if key in self.publish_dict:
-                    sg_item = self.publish_dict.get(key, None)
+            depot_key = self.model.data(index)
+            if depot_key:
+                if depot_key in self.publish_dict:
+                    sg_item = self.publish_dict.get(depot_key, None)
                     if sg_item:
-                        action = self._get_action(sg_item)
-                        if action not in ["delete"]:
-                            other_data_to_publish.append(sg_item)
-                        else:
-                            delete_data_to_publish.append(sg_item)
+                        key = sg_item.get("key", None)
+                        if key:
 
+                            action = self._get_action(sg_item)
+                            if action not in ["delete"]:
+                                if key not in other_data_to_publish:
+                                    other_data_to_publish[key] = []
+                                other_data_to_publish[key].append(sg_item)
+
+                            else:
+                                if key not in delete_data_to_publish:
+                                    delete_data_to_publish[key] = []
+                                delete_data_to_publish[key].append(sg_item)
 
         #logger.debug("<<<<<<<  self.publish_dict: {}".format(self.publish_dict))
         #logger.debug("<<<<<<<  data_to_publish: {}".format(data_to_publish))

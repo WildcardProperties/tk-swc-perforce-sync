@@ -396,7 +396,11 @@ class PublishItem():
         sg_fields = {}
         try:
             sg_fields["sg_p4_depo_path"] = self.sg_item.get("depotFile", None)
-            change_number = self.sg_item.get("headChange", None)
+            submittedChange = self.sg_item.get("submittedChange", None)
+            if submittedChange:
+                change_number = int(submittedChange)
+            else:
+                change_number = self.sg_item.get("headChange", None)
             if change_number:
                 sg_fields["sg_p4_change_number"] = int(change_number)
             # sg_fields["Status"] = self.sg_item.get("headAction", None)

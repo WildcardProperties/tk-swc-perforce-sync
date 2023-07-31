@@ -496,6 +496,7 @@ class Ui_Dialog(object):
         self.verticalLayout_3.addWidget(self.file_history_view)
 
         # Entity details
+        """
         self.entity_details = QtGui.QGroupBox(Dialog)
         self.entity_details.setMinimumSize(QtCore.QSize(300, 0))
         self.entity_details.setMaximumSize(QtCore.QSize(300, 16777215))
@@ -536,6 +537,7 @@ class Ui_Dialog(object):
         self.verticalLayout_4 = QtGui.QVBoxLayout()
         self.verticalLayout_4.setObjectName("verticalLayout_4")
         """
+        """
         self.entity_detail_playback_btn = QtGui.QToolButton(self.entity_details)
         self.entity_detail_playback_btn.setMinimumSize(QtCore.QSize(55, 55))
         self.entity_detail_playback_btn.setMaximumSize(QtCore.QSize(55, 55))
@@ -558,7 +560,7 @@ class Ui_Dialog(object):
         self.entity_detail_actions_btn.setObjectName("entity_detail_actions_btn")
         self.verticalLayout_4.addWidget(self.entity_detail_actions_btn)
         """
-
+        """
         self.horizontalLayout_5_2.addLayout(self.verticalLayout_4)
         self.verticalLayout_3_2.addLayout(self.horizontalLayout_5_2)
 
@@ -603,7 +605,9 @@ class Ui_Dialog(object):
         self.entity_children_view.setHorizontalScrollMode(QtGui.QAbstractItemView.ScrollPerPixel)
         self.entity_children_view.setUniformItemSizes(True)
         self.entity_children_view.setObjectName("entity_children_view")
+        """
 
+        """
         self.sync_entity_files = QtGui.QToolButton(Dialog)
         sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(0)
@@ -613,14 +617,14 @@ class Ui_Dialog(object):
         self.sync_entity_files.setMinimumSize(QtCore.QSize(80, 26))
         self.sync_entity_files.setObjectName("Sync entity files")
         #self.horizontalLayout_6.addWidget(self.sync_entity_files)
-
-        self.entity_tab.addTab(self.entity_parents_view, "Parents")
-        self.entity_tab.addTab(self.entity_children_view, "Children")
-        self.verticalLayout_3_2.addWidget(self.entity_tab)
-        self.verticalLayout_3_2.addWidget(self.sync_entity_files)
+        """
+        #self.entity_tab.addTab(self.entity_parents_view, "Parents")
+        #self.entity_tab.addTab(self.entity_children_view, "Children")
+        #self.verticalLayout_3_2.addWidget(self.entity_tab)
+        #self.verticalLayout_3_2.addWidget(self.sync_entity_files)
 
         self.details_tab.addTab(self.file_details, "Files")
-        self.details_tab.addTab(self.entity_details, "Entity")
+        #self.details_tab.addTab(self.entity_details, "Entity")
 
         # self.verticalLayout_3_2.setStretch(1, 1)
         #self.horizontalLayout_3.addWidget(self.file_details)
@@ -706,7 +710,7 @@ class Ui_Dialog(object):
         self.file_detail_actions_btn.setText(QtGui.QApplication.translate("Dialog", "Actions", None, QtGui.QApplication.UnicodeUTF8))
         self.version_file_history_label.setText(QtGui.QApplication.translate("Dialog", "<small>Complete Version File History</small>", None, QtGui.QApplication.UnicodeUTF8))
         self.file_history_view.setAccessibleName(QtGui.QApplication.translate("Dialog", "file_history_view", None, QtGui.QApplication.UnicodeUTF8))
-
+        """
         self.entity_details_image.setAccessibleName(QtGui.QApplication.translate("Dialog", "entity_details_image", None, QtGui.QApplication.UnicodeUTF8))
         self.entity_details_image.setText(QtGui.QApplication.translate("Dialog", "Entity Image", None, QtGui.QApplication.UnicodeUTF8))
         #self.entity_details_header.setText(QtGui.QApplication.translate("Dialog", "TextLabel", None, QtGui.QApplication.UnicodeUTF8))
@@ -716,6 +720,7 @@ class Ui_Dialog(object):
         self.entity_parents_view.setAccessibleName(QtGui.QApplication.translate("Dialog", "parents_history_view", None, QtGui.QApplication.UnicodeUTF8))
         #self.entity_children_label.setText(QtGui.QApplication.translate("Dialog", "<small>Complete Children History</small>", None, QtGui.QApplication.UnicodeUTF8))
         self.entity_children_view.setAccessibleName(QtGui.QApplication.translate("Dialog", "parents_history_view", None, QtGui.QApplication.UnicodeUTF8))
-        self.sync_entity_files.setToolTip(QtGui.QApplication.translate("Dialog", "Sync All", None, QtGui.QApplication.UnicodeUTF8))
-        self.sync_entity_files.setText(QtGui.QApplication.translate("Dialog", "Sync Alll", None, QtGui.QApplication.UnicodeUTF8))
+        #self.sync_entity_files.setToolTip(QtGui.QApplication.translate("Dialog", "Sync All", None, QtGui.QApplication.UnicodeUTF8))
+        #self.sync_entity_files.setText(QtGui.QApplication.translate("Dialog", "Sync Alll", None, QtGui.QApplication.UnicodeUTF8))
+        """
 from . import resources_rc
