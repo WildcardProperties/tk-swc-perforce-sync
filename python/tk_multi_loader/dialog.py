@@ -1726,7 +1726,7 @@ class AppDialog(QtGui.QWidget):
             if entity_asset_type:
                 msg += __make_table_row("Asset Type", "%s" % entity_asset_type)
 
-            self.ui.entity_details_header.setText("<table>%s</table>" % msg)
+            # self.ui.entity_details_header.setText("<table>%s</table>" % msg)
             """
             # sort out the actions button
             actions = self._action_manager.get_actions_for_publish(
@@ -4288,7 +4288,7 @@ class AppDialog(QtGui.QWidget):
             msg = "\n <span style='color:#2C93E2'>Loading entity parents and children ...</span> \n"
             self._add_log(msg, 2)
             # Set up the entity details panel
-            self._setup_entity_details_panel(entity_data, item)
+            # self._setup_entity_details_panel(entity_data, item)
             # Set up the entity parents and children
             # self._setup_entity_parent_and_children(entity_data)
 
