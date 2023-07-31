@@ -281,6 +281,14 @@ class SgLatestPublishModel(ShotgunModel):
             tooltip += "<br><br><b>Head action:</b> %s" % (
                     sg_item.get("headAction") or "N/A"
             )
+        if sg_item.get("headChange"):
+            tooltip += "<br><br><b>Head change:</b> %s" % (
+                    sg_item.get("headChange") or "N/A"
+            )
+        if sg_item.get("change"):
+            tooltip += "<br><br><b>Change:</b> %s" % (
+                    sg_item.get("change") or "N/A"
+            )
         if sg_item.get("action"):
             tooltip += "<br><br><b>Action:</b> %s" % (
                     sg_item.get("action") or "N/A"
