@@ -3151,8 +3151,10 @@ class AppDialog(QtGui.QWidget):
                 if 'path' in sg_item:
                     local_path = sg_item['path'].get('local_path', None)
                     if local_path:
+                        """
                         action = sg_item.get("action", None)
                         head_action = sg_item.get("headAction", None)
+                        
                         if action and action != head_action:
                             files_to_sync.append(local_path)
                             msg = "Publishing file: {}...".format(local_path)
@@ -3160,10 +3162,11 @@ class AppDialog(QtGui.QWidget):
                             publisher = PublishItem(sg_item)
                             publish_result = publisher.commandline_publishing()
                         else:
-                            have_rev = sg_item.get('haveRev', "0")
-                            head_rev = sg_item.get('headRev', "0")
-                            if self._to_sync(have_rev, head_rev):
-                                files_to_sync.append(local_path)
+                        """
+                        have_rev = sg_item.get('haveRev', "0")
+                        head_rev = sg_item.get('headRev', "0")
+                        if self._to_sync(have_rev, head_rev):
+                            files_to_sync.append(local_path)
 
         return files_to_sync, total_file_count
 
