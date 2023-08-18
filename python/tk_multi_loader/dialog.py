@@ -994,14 +994,8 @@ class AppDialog(QtGui.QWidget):
             if depot_files:
                 for depot_file in depot_files:
                     if depot_file:
-                        client_file = self._get_client_file(depot_file)
-                        if client_file:
-                            sg_item = {}
-                            sg_item["depotFile"] = depot_file
-                            sg_item["path"] = {}
-                            sg_item["path"]["local_path"] = client_file
-                            self._change_dict[key].append(sg_item)
-                        """
+
+
                         fstat_list = self._p4.run("fstat", depot_file)
                         if fstat_list:
                             sg_item = fstat_list[0]
@@ -1016,18 +1010,19 @@ class AppDialog(QtGui.QWidget):
                                 sg_item["path"] = {}
                                 sg_item["path"]["local_path"] = file_path
                             #    sg_item["name"] = os.path.basename(file_path)
-                            # have_rev = sg_item.get('haveRev', "0")
-                            # head_rev = sg_item.get('headRev', "0")
-                            # sg_item["revision"] = "#{}/{}".format(have_rev, head_rev)
+                            have_rev = sg_item.get('haveRev', "0")
+                            head_rev = sg_item.get('headRev', "0")
+                            sg_item["revision"] = "#{}/{}".format(have_rev, head_rev)
+                            sg_item["action"] = sg_item.get("action", None) or sg_item.get("headAction", None)
 
                             #  sg_item["code"] = "{}#{}".format(sg_item.get("name", None), head_rev)
-                            # p4_status = self._get_action(sg_item)
+                            p4_status = self._get_action(sg_item)
                             #sg_item["sg_status_list"] = self._get_p4_status(p4_status)
 
                             #sg_item["depot_file_type"] = self._get_publish_type(file_path)
 
                             self._change_dict[key].append(sg_item)
-                        """
+
 
 
 
@@ -1039,7 +1034,7 @@ class AppDialog(QtGui.QWidget):
         workspace = client.get("Client", None)
         # Get the pending changelists
         change_lists = self._p4.run_changes("-l", "-s", "pending", "-c", workspace)
-        # logger.debug("<<<<<<<  change_lists: {}".format(change_lists))
+        logger.debug("<<<<<<<  change_lists: {}".format(change_lists))
 
         for change_list in change_lists:
             key = change_list.get("change", None)
@@ -1069,16 +1064,21 @@ class AppDialog(QtGui.QWidget):
 
                         for depot_file, rev, action in change_file_info:
                             if depot_file:
-                                client_file = self._get_client_file(depot_file)
-                                if client_file:
-                                    sg_item = {}
-                                    sg_item["depotFile"] = depot_file
-                                    sg_item["path"] = {}
-                                    sg_item["path"]["local_path"] = client_file
-                                    sg_item["headRev"] = rev
-                                    sg_item["action"] = action
-                                    sg_item["headChange"] = key
-                                    self._change_dict[key].append(sg_item)
+                                fstat_list = self._p4.run("fstat", depot_file)
+                                if fstat_list:
+                                    fstat = fstat_list[0]
+                                    client_file = self._get_client_file(depot_file)
+                                    if client_file:
+                                        sg_item = {}
+                                        sg_item["depotFile"] = depot_file
+                                        sg_item["path"] = {}
+                                        sg_item["path"]["local_path"] = client_file
+                                        sg_item["headRev"] = fstat.get("headRev", "0")
+                                        sg_item["haveRev"] = fstat.get("haveRev", "0")
+                                        sg_item["revision"] = "#{}/{}".format(sg_item["haveRev"], sg_item["headRev"])
+                                        sg_item["action"] = action
+                                        sg_item["headChange"] = key
+                                        self._change_dict[key].append(sg_item)
 
 
             #logger.debug("key {}:{}".format(key, self._change_dict[key]))
@@ -1565,6 +1565,16 @@ class AppDialog(QtGui.QWidget):
     def _populate_submitted_widget(self):
 
         self.ui.submitted_scroll.setVisible(True)
+
+        msg = "\n <span style='color:#2C93E2'>Updating data ...</span> \n"
+        self._add_log(msg, 2)
+        logger.debug(">>>>>>>>>>  update_fstat_data...")
+        self._update_fstat_data()
+        # logger.debug(">>>>>>>>>>  Updating self._fstat_dict is: {}")
+        # for key, sg_item in self._fstat_dict.items():
+        #    logger.debug("{}:{}".format(key, sg_item))
+        logger.debug(">>>>>>>>>>  fix_fstat_dict...")
+        self._fix_fstat_dict()
 
         length = len(self._fstat_dict)
         if length > 0:
@@ -4303,10 +4313,16 @@ class AppDialog(QtGui.QWidget):
             logger.debug(">>>>>>>>>>>>>> entity_id is: {}".format(entity_id))
             logger.debug(">>>>>>>>>>>>>> entity_type is: {}".format(entity_type))
             logger.debug(">>>>>>>>>>>>>> entity_path is: {}".format(entity_path))
-            if not entity_path or len(entity_path) == 0:
-                self._app.sgtk.create_filesystem_structure(entity_type, entity_id)
-                entity_path = self._app.sgtk.paths_from_entity(entity_type, entity_id)
-                # logger.debug(">>>>>>>>>>>>>> entity_path2 is: {}".format(entity_path))
+            """
+            try:
+                if not entity_path or len(entity_path) == 0:
+                    self._app.sgtk.create_filesystem_structure(entity_type, entity_id)
+                    entity_path = self._app.sgtk.paths_from_entity(entity_type, entity_id)
+                    # logger.debug(">>>>>>>>>>>>>> entity_path2 is: {}".format(entity_path))
+            except Exception as e:
+                logger.debug(">>>>>>>>>>>>>> Unable to create file system structure: {}".format(e))
+                pass
+            """
             if entity_path and len(entity_path) > 0:
                 entity_path = entity_path[-1]
                 msg = "\n <span style='color:#2C93E2'>Entity path: {}</span> \n".format(entity_path)
@@ -4424,23 +4440,23 @@ class AppDialog(QtGui.QWidget):
     def _update_perforce_data(self):
         logger.debug(">>>>>>>>>>  _get_perforce_data: START")
         logger.debug(">>>>>>>>>>  get_peforce_data...")
+        msg = "\n <span style='color:#2C93E2'>Getting Perforce data ...</span> \n"
+        self._add_log(msg, 2)
         self._get_perforce_data()
-        #logger.debug(">>>>>>>>>>  self._fstat_dict is: {}")
-        # for key, sg_item in self._fstat_dict.items():
-        #     logger.debug("{}:{}".format(key, sg_item))
+        msg = "\n <span style='color:#2C93E2'>Getting Perforce data is complete</span> \n"
+        self._add_log(msg, 2)
+
+        """
         #self._publish_model.async_refresh()
         msg = "\n <span style='color:#2C93E2'>Updating data ...</span> \n"
         self._add_log(msg, 2)
         logger.debug(">>>>>>>>>>  update_fstat_data...")
         self._update_fstat_data()
-        #logger.debug(">>>>>>>>>>  Updating self._fstat_dict is: {}")
-        #for key, sg_item in self._fstat_dict.items():
-        #    logger.debug("{}:{}".format(key, sg_item))
+       
         logger.debug(">>>>>>>>>>  fix_fstat_dict...")
         self._fix_fstat_dict()
-        # logger.debug(">>>>>>>>>>  Fixing self._fstat_dict is: {}")
-        # for key, sg_item in self._fstat_dict.items():
-        #    logger.debug("{}:{}".format(key, sg_item))
+        """
+
 
         # self._get_depot_files_to_publish()
 
@@ -4507,6 +4523,7 @@ class AppDialog(QtGui.QWidget):
                                 self._fstat_dict[key]["Published"] = True
 
     def _fix_fstat_dict(self):
+
         for key in self._fstat_dict:
             file_path = self._fstat_dict[key].get("clientFile", None)
             #logger.debug("----->>>>>>>    self._fstat_dict[key]: {}".format(self._fstat_dict[key]))
@@ -4516,14 +4533,15 @@ class AppDialog(QtGui.QWidget):
                 self._fstat_dict[key]["path"] = {}
                 self._fstat_dict[key]["path"]["local_path"] = file_path
 
-            have_rev = self._fstat_dict[key].get('haveRev', "0")
+            #have_rev = self._fstat_dict[key].get('haveRev', "0")
             head_rev = self._fstat_dict[key].get('headRev', "0")
-            self._fstat_dict[key]["revision"] = "#{}/{}".format(have_rev, head_rev)
+            #self._fstat_dict[key]["revision"] = "#{}/{}".format(have_rev, head_rev)
             self._fstat_dict[key]["code"] = "{}#{}".format(self._fstat_dict[key].get("name", None), head_rev)
             p4_status = self._fstat_dict[key].get("headAction", None)
             self._fstat_dict[key]["sg_status_list"] = self._get_p4_status(p4_status)
 
             self._fstat_dict[key]["depot_file_type"] = self._get_publish_type(file_path)
+            """
             depot_path = self._fstat_dict[key].get("depotFile", None)
             if depot_path:
                 description, p4_user = self._get_file_log(depot_path, head_rev)
@@ -4531,8 +4549,19 @@ class AppDialog(QtGui.QWidget):
                     self._fstat_dict[key]["description"] = description
                 if p4_user:
                     self._fstat_dict[key]["p4_user"] = p4_user
+            """
 
             #self._submitted_data_to_publish.append(sg_item)
+
+    def _get_submitted_changelists(self, folder_path):
+
+        changes = self._p4.run_changes('-s', 'submitted', folder_path + '/...')
+
+        for change in changes:
+            key = change['change']
+            if key not in self._submitted_changes:
+                self._submitted_changes[key] = change
+
 
     def _get_depot_files_to_publish(self):
         for key, sg_item in self._fstat_dict.items():
@@ -4560,6 +4589,7 @@ class AppDialog(QtGui.QWidget):
 
     def _on_publish_model_action(self, action):
         selected_indexes = self.ui.publish_view.selectionModel().selectedIndexes()
+        selected_actions = []
         for model_index in selected_indexes:
             proxy_model = model_index.model()
             source_index = proxy_model.mapToSource(model_index)
@@ -4579,43 +4609,18 @@ class AppDialog(QtGui.QWidget):
                             if sg_item_action and sg_item_action == "delete":
                                 msg = "Cannot perform the action on the file {} as it has already been marked for deletion or is deleted.".format(
                                     depot_file)
+
                                 self._add_log(msg, 2)
-                                return
+                                continue
 
                             if action == "delete":
                                 msg = "Marking file {} for deletion ...".format(depot_file)
                             else:
                                 msg = "{} file {}".format(action, depot_file)
                             self._add_log(msg, 2)
-                            self.peform_changelist_selection(sg_item, action)
+                            selected_actions.append((sg_item, action))
 
 
-                            #changelist_selection_operation.run(p4=self._p4, sg_item=sg_item, action=action, parent=self)
-                            #perform_actions = PerformActions(self._p4, sg_item, action, self._actions_change)
-                            #new_sg_item = perform_actions.run()
-                            # new_sg_item = changelist_selection_operation.get_sg_item()
-                            """
-                            if new_sg_item:
-                                new_change = new_sg_item.get("headChange", None)
-                                if new_change:
-                                    msg += " to changelist {}".format(new_change)
-                                self._add_log(msg, 3)
-
-                                # Publish the file
-                                # logger.debug(">>>> sg_item to publish: {}", sg_item)
-                                # msg = "Publishing file: {}".format(depot_file)
-                                # self._add_log(msg, 3)
-
-                                # publisher = PublishItem(sg_item)
-                                # publish_result = publisher.commandline_publishing()
-
-                                if action in ["delete"]:
-                                    # Todo: Fix this if needed
-                                    # self._pubish_file_for_deletion(sg_item, depot_file)
-                                    item.setEnabled(False)
-                                else:
-                                    item.setEnabled(True)
-                            """
 
                         elif action == "revert":
                             msg = "Revert file {} ...".format(target_file)
@@ -4625,10 +4630,14 @@ class AppDialog(QtGui.QWidget):
                             if p4_result:
                                 self.refresh_publish_data()
 
+        if selected_actions:
+            self.peform_changelist_selection(selected_actions)
 
 
-    def peform_changelist_selection(self, sg_item, action):
-        perform_action = ChangelistSelection(self._p4, sg_item=sg_item, action=action, parent=self)
+
+
+    def peform_changelist_selection(self, selected_actions):
+        perform_action = ChangelistSelection(self._p4, selected_actions=selected_actions, parent=self)
         perform_action.show()
 
     def refresh_publish_data(self):
@@ -4936,6 +4945,7 @@ class AppDialog(QtGui.QWidget):
         """
         item_path_dict = defaultdict(int)
         self._fstat_dict = {}
+        self._submitted_changes = {}
         self._submitted_data_to_publish = []
 
         logger.debug("self._entity_path is: {}".format(self._entity_path))
@@ -4955,6 +4965,8 @@ class AppDialog(QtGui.QWidget):
                 logger.debug(">>>>>>>>>>  key is: {}".format(key))
                 key = self._convert_local_to_depot(key).rstrip('/')
                 fstat_list = self._p4.run_fstat('-Of', key + '/...')
+                self._get_submitted_changelists(key)
+                # logger.debug(">>>>>>>>>>  self._submitted_changes is: {}".format(self._submitted_changes))
 
                 for fstat in fstat_list:
                     if isinstance(fstat, list) and len(fstat) == 1:
@@ -4964,17 +4976,32 @@ class AppDialog(QtGui.QWidget):
 
                     if client_file:
                         newkey = self._create_key(client_file)
-                        head_rev = fstat.get('headRev', None)
+                        head_rev = fstat.get('headRev', "0")
                         newkey = "{}#{}".format(newkey, head_rev)
+                        have_rev = fstat.get('haveRev', "0")
 
                         if newkey not in self._fstat_dict:
                             self._fstat_dict[newkey] = fstat
                             self._fstat_dict[newkey]['Published'] = False
-                            action = fstat.get('action', None)
+                            self._fstat_dict[newkey]["revision"] = "#{}/{}".format(have_rev, head_rev)
+                            #self._fstat_dict[newkey]["code"] = "{}#{}".format(fstat.get("name", None),head_rev)
+                            #self._fstat_dict[newkey]["depot_file_type"] = self._get_publish_type(client_file)
+                            #self._fstat_dict[newkey]["name"] = os.path.basename(client_file)
+                            #self._fstat_dict[newkey]["path"] = {}
+                            #self._fstat_dict[newkey]["path"]["local_path"] = client_file
+
+
+                            action = fstat.get('action', None) or fstat.get('headAction', None)
                             if action:
                                 sg_status = self._get_p4_status(action)
                                 if sg_status:
                                     self._fstat_dict[newkey]['sg_status_list'] = sg_status
+                            # get the user and description for submitted changelists
+                            change = fstat.get('headChange', None)
+                            if change and change in self._submitted_changes:
+                                self._fstat_dict[newkey]['p4_user'] = self._submitted_changes[change]['user']
+                                self._fstat_dict[newkey]['description'] = self._submitted_changes[change]['desc']
+                        # logger.debug(">>>>>>>>>> self._fstat_dict[newkey] is: {}".format(self._fstat_dict[newkey]))
 
 
     def _get_file_log(self, file_path, head_rev):

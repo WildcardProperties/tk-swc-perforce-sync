@@ -301,14 +301,20 @@ class TreeViewWidget(QtWidgets.QWidget):
                         else:
 
                             depot_path = sg_item.get("depotFile", None)
-                            head_rev = sg_item.get("headRev", 0)
+                            head_rev = sg_item.get("headRev", "0")
+                            revision = sg_item.get("revision",  None)
                             is_published = sg_item.get("Published", None)
                             if not is_published:
                                 enable_change_item = True
                             action = self._get_action(sg_item)
                             action_icon = self.get_action_icon(action)
                             if depot_path:
-                                depot_str = "{}#{}".format(depot_path, head_rev)
+                                depot_str = depot_path
+                                if head_rev != "0":
+                                    if revision:
+                                        depot_str = "{} {}".format(depot_path, revision)
+                                    else:
+                                        depot_str = "{}#{}".format(depot_path, head_rev)
                                 depot_item = QtGui.QStandardItem(depot_str)
                                 # depot_item can be dragged, but must not accept drops
                                 depot_item.setFlags(

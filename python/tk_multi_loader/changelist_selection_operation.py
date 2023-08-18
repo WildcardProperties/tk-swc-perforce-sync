@@ -23,14 +23,15 @@ class ChangelistSelection(QtWidgets.QDialog):
 
     WINDOW_TITLE = 'Changelist Selection'
 
-    def __init__(self,  p4, sg_item, action, parent):
+    def __init__(self,  p4, selected_actions, parent):
 
         super(ChangelistSelection, self).__init__(parent)
         
         self.p4 = p4
-        self.sg_item = sg_item
-        self.new_sg_item = self.sg_item
-        self.action = action
+        #self.sg_item = sg_item
+        #self.new_sg_item = self.sg_item
+        #self.action = action
+        self.selected_actions = selected_actions
         self.parent = parent
         self.change = None
 
@@ -110,10 +111,11 @@ class ChangelistSelection(QtWidgets.QDialog):
             change = self.change
             desc = self.changelists_description.text()
             if change:
-                perform_actions = PerformActions(self.p4, self.sg_item, self.action, change, desc)
-                self.new_sg_item = perform_actions.run()
-                if self.new_sg_item:
-                    self.parent.refresh_publish_data()
+                for sg_item, action in self.selected_actions:
+                    perform_actions = PerformActions(self.p4, sg_item, action, change, desc)
+                    self.new_sg_item = perform_actions.run()
+
+                self.parent.refresh_publish_data()
 
         except Exception as e:
             logger.debug("Error setting changelist: {}".format(e))
@@ -123,7 +125,7 @@ class ChangelistSelection(QtWidgets.QDialog):
         if not self.new_sg_item:
             return self.sg_item
 
-def run(p4=None, sg_item=None, action=None, parent=None):
+def run(p4=None, selected_actions=None, parent=None):
     """
     Main function for the application
     """
@@ -131,8 +133,8 @@ def run(p4=None, sg_item=None, action=None, parent=None):
     app = QtWidgets.QApplication.instance()
 
     
-    if loader is None:
-        loader = ChangelistSelection(p4=p4, sg_item=sg_item, action=action, parent=parent)
+    # if loader is None:
+    loader = ChangelistSelection(p4=p4, selected_actions=selected_actions , parent=parent)
 
     loader.show()
 
