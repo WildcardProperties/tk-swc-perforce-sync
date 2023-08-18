@@ -1012,6 +1012,8 @@ class AppDialog(QtGui.QWidget):
                             #    sg_item["name"] = os.path.basename(file_path)
                             have_rev = sg_item.get('haveRev', "0")
                             head_rev = sg_item.get('headRev', "0")
+                            if not have_rev:
+                                have_rev = "0"
                             sg_item["revision"] = "#{}/{}".format(have_rev, head_rev)
                             sg_item["action"] = sg_item.get("action", None) or sg_item.get("headAction", None)
 
@@ -1075,6 +1077,8 @@ class AppDialog(QtGui.QWidget):
                                         sg_item["path"]["local_path"] = client_file
                                         sg_item["headRev"] = fstat.get("headRev", "0")
                                         sg_item["haveRev"] = fstat.get("haveRev", "0")
+                                        if not sg_item["haveRev"]:
+                                            sg_item["haveRev"] = "0"
                                         sg_item["revision"] = "#{}/{}".format(sg_item["haveRev"], sg_item["headRev"])
                                         sg_item["action"] = action
                                         sg_item["headChange"] = key
