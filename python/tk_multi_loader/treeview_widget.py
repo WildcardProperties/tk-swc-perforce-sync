@@ -100,12 +100,41 @@ class SWCTreeView(QtWidgets.QTreeView):
     def setFirstColumn(self, i):
         return self.setFirstColumnSpanned(i, self.rootIndex(), True)
 
-"""
-def add_to_changelist(depot_file, changelist_number):
-    # Use Perforce command line to add the depot file to the specified changelist
-    cmd = ['p4', 'reopen', '-c', str(changelist_number), depot_file]
-    subprocess.run(cmd)
-"""
+class ChangeItem( QtGui.QStandardItem):
+    def __init__(self, parent=None, key=None, data=None, icon=None, enabled=None):
+        super().__init__(parent)
+        self.key = key
+
+        self.setFlags(
+            (self.flags() | QtCore.Qt.ItemFlag.ItemIsDropEnabled) & ~QtCore.Qt.ItemFlag.ItemIsDragEnabled
+        )
+
+        msg = "Changelist# {}".format(self.key)
+        self.setToolTip(msg)
+        self.setData(key, QtCore.Qt.UserRole)
+        self.setSizeHint(QtCore.QSize(0, 25))
+        self.setEditable(False)
+        self.setText(data)
+        self.setIcon(icon)
+        #self.setDropEnabled(enabled)
+        self.setEnabled(enabled)
+
+class DepotItem( QtGui.QStandardItem):
+    def __init__(self, parent=None, key=None, data=None, icon=None, enabled=False, size_hint=25):
+        super().__init__(parent)
+
+
+        self.setIcon(icon)
+        self.setFlags(
+            (
+                self.flags() | QtCore.Qt.ItemFlag.ItemIsDragEnabled) & ~QtCore.Qt.ItemFlag.ItemIsDropEnabled
+        )
+        #self.setData(key, QtCore.Qt.UserRole)
+        self.setSizeHint(QtCore.QSize(0, 25))
+        self.setTextAlignment(
+            QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        self.setText(data)
+        self.setEnabled(enabled)
 
 class TreeViewWidget(QtWidgets.QWidget):
     """
@@ -245,22 +274,85 @@ class TreeViewWidget(QtWidgets.QWidget):
         #return self.main_layout
         return self.tree_view
 
-    def populate_treeview_widget(self):
+    def get_published_status(self, change_list):
+        for sg_item in change_list:
+            if sg_item:
+                is_published = sg_item.get("Published", None)
+                if not is_published:
+                    return True
+        return False
+
+    def populate_treeview_widget_submitted(self):
+        """
+        Populate treeview widget with data from data_dict
+        """
+
+        parent_icon = self.submitted_icon
+        node_dictionary = self._get_change_dictionary_submitted(self.data_dict)
+        item_data = None
+
+        for i, key in enumerate(node_dictionary.keys()):
+            if key:
+                #logger.debug("<<<<<<<  key: {}".format(key))
+                self.tree_view.setFirstColumnSpanned(i, self.tree_view.rootIndex(), True)
+                is_change_not_published = False
+                change_list = node_dictionary[key]
+                if change_list and len(change_list) > 0:
+                    is_change_not_published = self.get_published_status(change_list)
+
+                    sg_item = change_list[0]
+                    if sg_item:
+                        publish_time_txt = self._get_publish_time_info(sg_item)
+                        user_name_txt = sg_item.get("p4_user", None)
+                        description_txt = sg_item.get("description", None)
+
+                        item_data = "{} \t {} \t {} \t {}".format(key, publish_time_txt, user_name_txt, description_txt)
+                change_item = ChangeItem(key=str(key),
+                                                 data=item_data,
+                                                 icon=parent_icon,
+                                                 enabled=is_change_not_published)
+                self.model.appendRow([change_item])
+
+                for sg_item in change_list:
+                    if sg_item:
+                        depot_item = self.create_depot_item(key, sg_item)
+                        if depot_item:
+                            change_item.appendRow(depot_item)
+
+
+
+    def create_depot_item(self, key, sg_item):
+        """ Create depot item """
+        enable_change_item = False
+        depot_path = sg_item.get("depotFile", None)
+        head_rev = sg_item.get("headRev", "0")
+
+        is_published = sg_item.get("Published", None)
+        if not is_published:
+            enable_change_item = True
+        action = self._get_action(sg_item)
+        action_icon = self.get_action_icon(action)
+        if depot_path:
+            depot_str = depot_path
+            if head_rev != "0":
+                revision = sg_item.get("revision", None)
+                if revision:
+                    depot_str = "{}{}".format(depot_path, revision)
+                else:
+                    depot_str = "{}#{}".format(depot_path, head_rev)
+            #logger.debug("<<<<<<<  depot_str: {}".format(depot_str))
+            size_hint = self.tree_view.sizeHint()
+            depot_item = DepotItem(key=key, data=depot_str, icon=action_icon, enabled=enable_change_item, size_hint=size_hint)
+            return depot_item
+        return None
+
+    def populate_treeview_widget_submitted_old(self):
         """
         Populate treeview widget with data from data_dict
         """
         self.publish_dict = {}
         parent_icon = self.submitted_icon
-        node_dictionary = None
-
-        if self.mode in ["submitted"]:
-            node_dictionary = self._get_change_dictionary_submitted(self.data_dict)
-            parent_icon = self.submitted_icon
-        elif self.mode in ["pending"]:
-            node_dictionary = self._get_change_dictionary_pending(self.data_dict)
-            parent_icon = self.pending_icon
-
-        #logger.debug("<<<<<<<  node_dictionary: {}".format(node_dictionary))
+        node_dictionary = self._get_change_dictionary_submitted(self.data_dict)
 
         for i, key in enumerate(node_dictionary.keys()):
             if key:
@@ -276,21 +368,15 @@ class TreeViewWidget(QtWidgets.QWidget):
                 change_item.setToolTip(msg)
                 change_item.setData(key, QtCore.Qt.UserRole)
                 change_item.setSizeHint(QtCore.QSize(0, 25))
-                #change_item.setTextAlignment(QtCore.Qt.AlignVCenter)
                 change_item.setEditable(False)
                 self.model.appendRow([change_item])
 
-                #self.tree_view.setFirstColumn(i)
                 self.tree_view.setFirstColumnSpanned(i, self.tree_view.rootIndex(), True)
                 enable_change_item = False
                 if node_dictionary[key]:
-                    if self.mode in ["pending"]:
-                        if len(node_dictionary[key]) > 1:
-                            parent_icon = self.pending_icon
-                        else:
-                            parent_icon = self.submitted_icon
 
                     for j, sg_item in enumerate(node_dictionary[key]):
+                        logger.debug("<<<<<<<  setting file ...")
                         if 'changeListInfo' in sg_item:
                             publish_time_txt = self._get_publish_time_info(sg_item)
                             user_name_txt = self._get_user_name_info(sg_item)
@@ -302,10 +388,104 @@ class TreeViewWidget(QtWidgets.QWidget):
 
                             depot_path = sg_item.get("depotFile", None)
                             head_rev = sg_item.get("headRev", "0")
-                            revision = sg_item.get("revision",  None)
+                            revision = sg_item.get("revision", None)
                             is_published = sg_item.get("Published", None)
                             if not is_published:
                                 enable_change_item = True
+                            action = self._get_action(sg_item)
+                            action_icon = self.get_action_icon(action)
+                            if depot_path:
+                                depot_str = depot_path
+                                if head_rev != "0":
+                                    if revision:
+                                        depot_str = "{}{}".format(depot_path, revision)
+                                    else:
+                                        depot_str = "{}#{}".format(depot_path, head_rev)
+                                depot_item = QtGui.QStandardItem(depot_str)
+                                # depot_item can be dragged, but must not accept drops
+                                depot_item.setFlags(
+                                    (
+                                                depot_item.flags() | QtCore.Qt.ItemFlag.ItemIsDragEnabled) & ~QtCore.Qt.ItemFlag.ItemIsDropEnabled
+                                )
+                                depot_item.setIcon(action_icon)
+                                depot_item.setData(key, QtCore.Qt.UserRole)
+
+                                depot_item.setSizeHint(self.tree_view.sizeHint())
+
+                                depot_item.setTextAlignment(
+                                    QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+                                change_item.appendRow(depot_item)
+
+                                if is_published:
+                                    depot_item.setEnabled(False)
+                                else:
+                                    if depot_str not in self.publish_dict:
+                                        self.publish_dict[depot_str] = sg_item
+                            """
+                            if j == 0:
+                                publish_time_txt = self._get_publish_time_info(sg_item)
+                                user_name_txt = self._get_user_name_info(sg_item)
+                                description_txt = self._get_description_info(sg_item)
+
+                                msg = "{} \t {} \t {} \t {}".format(key, publish_time_txt, user_name_txt, description_txt)
+                                change_item.setText(msg)
+                            """
+
+                if parent_icon is not None:
+                    change_item.setIcon(parent_icon)
+
+                if enable_change_item:
+                    change_item.setEnabled(True)
+                else:
+                    change_item.setEnabled(False)
+
+    def populate_treeview_widget_pending(self):
+        """
+        Populate treeview widget with data from data_dict
+        """
+        #logger.debug("<<<<<<<  populate_treeview_widget ...")
+        self.publish_dict = {}
+        parent_icon = self.pending_icon
+
+        node_dictionary = self._get_change_dictionary_pending(self.data_dict)
+
+
+        for i, key in enumerate(node_dictionary.keys()):
+            if key:
+                #logger.debug("<<<<<<<  key: {}".format(key))
+                key_str = str(key)
+                change_item = QtGui.QStandardItem(key_str)
+                # change_item must allow drops, but cannot be dragged
+                change_item.setFlags(
+                    (change_item.flags() | QtCore.Qt.ItemFlag.ItemIsDropEnabled) & ~QtCore.Qt.ItemFlag.ItemIsDragEnabled
+                )
+
+                msg = "Changelist# {}".format(key)
+                change_item.setToolTip(msg)
+                change_item.setData(key, QtCore.Qt.UserRole)
+                change_item.setSizeHint(QtCore.QSize(0, 25))
+                change_item.setEditable(False)
+                self.model.appendRow([change_item])
+
+                self.tree_view.setFirstColumnSpanned(i, self.tree_view.rootIndex(), True)
+
+                if node_dictionary[key]:
+
+                    for j, sg_item in enumerate(node_dictionary[key]):
+                        #logger.debug("<<<<<<<  setting file ...")
+                        if 'changeListInfo' in sg_item:
+                            publish_time_txt = self._get_publish_time_info(sg_item)
+                            user_name_txt = sg_item.get("p4_user", None)
+                            description_txt = sg_item.get("description", None)
+
+                            msg = "{} \t {} \t {} \t {}".format(key, publish_time_txt, user_name_txt, description_txt)
+                            change_item.setText(msg)
+                        else:
+
+                            depot_path = sg_item.get("depotFile", None)
+                            head_rev = sg_item.get("headRev", "0")
+                            revision = sg_item.get("revision",  None)
+
                             action = self._get_action(sg_item)
                             action_icon = self.get_action_icon(action)
                             if depot_path:
@@ -322,43 +502,18 @@ class TreeViewWidget(QtWidgets.QWidget):
                                 )
                                 depot_item.setIcon(action_icon)
                                 depot_item.setData(key, QtCore.Qt.UserRole)
-                                #depot_item.setToolTip(key)
-                                #depot_item.setSizeHint(self.tree_view.getSizeHint())
-                                depot_item.setSizeHint(self.tree_view.sizeHint())
-                                #depot_item.setTextAlignment(QtCore.AlignVCenter)
                                 depot_item.setTextAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
                                 change_item.appendRow(depot_item)
 
-                                if self.mode in ["submitted"]:
-                                    if is_published:
-                                        depot_item.setEnabled(False)
-                                    else:
-                                        if depot_str not in self.publish_dict:
-                                            self.publish_dict[depot_str] = sg_item
-                                elif self.mode in ["pending"]:
-                                    if depot_str not in self.publish_dict:
-                                        self.publish_dict[depot_str] = sg_item
-                            if self.mode in ["submitted"] and j == 0:
-                                publish_time_txt = self._get_publish_time_info(sg_item)
-                                user_name_txt = self._get_user_name_info(sg_item)
-                                description_txt = self._get_description_info(sg_item)
 
-                                msg = "{} \t {} \t {} \t {}".format(key, publish_time_txt, user_name_txt, description_txt)
-                                change_item.setText(msg)
+                                if depot_str not in self.publish_dict:
+                                    self.publish_dict[depot_str] = sg_item
 
-                #change_item.setTextAlignment(QtCore.AlignVCenter)
-                #change_item.setTextAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
 
                 if parent_icon is not None:
                     change_item.setIcon(parent_icon)
-                #change_item.setSelectable(False)
-                if self.mode in ["submitted"]:
-                    if enable_change_item:
-                        change_item.setEnabled(True)
-                    else:
-                        change_item.setEnabled(False)
-                elif self.mode in ["pending"]:
-                    change_item.setEnabled(True)
+
+                change_item.setEnabled(True)
 
 
     def _create_perforce_ui(self, data_dict, sorted=None):

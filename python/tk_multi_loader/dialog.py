@@ -57,7 +57,7 @@ from .publish_files_ui import PublishFilesUI
 #from .publish_app import P4SGPUBLISHER
 from .publish_app import MultiPublish2
 from .perforce_change import create_change, add_to_change, submit_change
-from .treeview_widget import TreeViewWidget
+from .treeview_widget import TreeViewWidget, SWCTreeView
 from .changelist_selection_operation import ChangelistSelection
 from collections import defaultdict, OrderedDict
 import os
@@ -1523,7 +1523,6 @@ class AppDialog(QtGui.QWidget):
             self._turn_all_modes_off()
             self.ui.submitted_scroll.setVisible(True)
 
-
             #self.ui.submitted_mode.setIcon(
             #    QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_card_active.png"))
             #)
@@ -1533,9 +1532,9 @@ class AppDialog(QtGui.QWidget):
             self.main_view_mode = self.MAIN_VIEW_SUBMITTED
             self._populate_submitted_widget()
 
-
-
         elif mode == self.MAIN_VIEW_PENDING:
+            msg = "\n <span style='color:#2C93E2'>Populating the pending view. Please wait...</span> \n"
+            self._add_log(msg, 2)
             self._turn_all_modes_off()
             self.ui.pending_scroll.setVisible(True)
             self.ui.pending_mode.setIcon(self.pending_icon)
@@ -1552,7 +1551,7 @@ class AppDialog(QtGui.QWidget):
 
             # publish_widget, self._pending_publish_list = self._create_perforce_ui(self._change_dict, sorted=True)
             self.pending_tree_view = TreeViewWidget(data_dict=self._change_dict, sorted=True, mode="pending", p4=self._p4)
-            self.pending_tree_view.populate_treeview_widget()
+            self.pending_tree_view.populate_treeview_widget_pending()
             publish_widget = self.pending_tree_view.get_treeview_widget()
 
             # Pending Scroll Area
@@ -1569,7 +1568,7 @@ class AppDialog(QtGui.QWidget):
     def _populate_submitted_widget(self):
 
         self.ui.submitted_scroll.setVisible(True)
-
+        self._reset_submitted_widget()
         msg = "\n <span style='color:#2C93E2'>Updating data ...</span> \n"
         self._add_log(msg, 2)
         logger.debug(">>>>>>>>>>  update_fstat_data...")
@@ -1587,7 +1586,7 @@ class AppDialog(QtGui.QWidget):
             self._add_log(msg, 2)
             self.submitted_tree_view = TreeViewWidget(data_dict=self._fstat_dict, sorted=False, mode="submitted",
                                                       p4=self._p4)
-            self.submitted_tree_view.populate_treeview_widget()
+            self.submitted_tree_view.populate_treeview_widget_submitted()
             publish_widget = self.submitted_tree_view.get_treeview_widget()
 
             # Submitted Scroll Area
@@ -1597,6 +1596,10 @@ class AppDialog(QtGui.QWidget):
 
             msg = "\n <span style='color:#2C93E2'>Select files in the Submitted view then click <i>Fix Selected</i> or click <i>Fix All</i> to publish them using the <i>Shotgrid Publisher</i>...</span> \n"
             self._add_log(msg, 2)
+
+    def _reset_submitted_widget(self):
+        null_widget = SWCTreeView()
+        self.ui.submitted_scroll.setWidget(null_widget)
 
     def _update_pending_view(self):
         """
@@ -1608,7 +1611,7 @@ class AppDialog(QtGui.QWidget):
 
         # publish_widget, self._pending_publish_list = self._create_perforce_ui(self._change_dict, sorted=True)
         self.pending_tree_view = TreeViewWidget(data_dict=self._change_dict, sorted=True, mode="pending", p4=self._p4)
-        self.pending_tree_view.populate_treeview_widget()
+        self.pending_tree_view.populate_treeview_widget_pending()
         publish_widget = self.pending_tree_view.get_treeview_widget()
         # Pending Scroll Area
         self.ui.pending_scroll.setWidget(publish_widget)
