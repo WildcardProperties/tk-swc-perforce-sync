@@ -22,8 +22,8 @@ class SWCTreeView(QtWidgets.QTreeView):
         self.setDragEnabled(True)
         self.setDragDropMode(QtWidgets.QTreeView.InternalMove)
 
-        self.setMinimumSize(QtCore.QSize(900, 500))
-        self.setMaximumSize(QtCore.QSize(2000, 800))
+        self.setMinimumSize(QtCore.QSize(1200, 500))
+        self.setMaximumSize(QtCore.QSize(10000, 1000))
         self.setEditTriggers(QtGui.QAbstractItemView.NoEditTriggers)
 
         # self.setProperty("showDropIndicator", False)
