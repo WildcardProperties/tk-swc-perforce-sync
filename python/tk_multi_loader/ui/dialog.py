@@ -285,23 +285,23 @@ class Ui_Dialog(object):
         self.publish_view.setUniformItemSizes(True)
         self.publish_view.setObjectName("publish_view")
         self.horizontalLayout_7.addWidget(self.publish_view)
-        self.verticalLayout.addWidget(self.publish_frame)
 
-        self.submitted_scroll = QtWidgets.QScrollArea(self.middle_area_widget)
+        self.submitted_scroll = QtWidgets.QScrollArea(self.publish_frame)
         self.submitted_scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
         self.submitted_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        #self.submitted_scroll.setWidgetResizable(False)
-
-        self.verticalLayout.addWidget(self.submitted_scroll)
+        # self.verticalLayout.addWidget(self.submitted_scroll)
+        self.horizontalLayout_7.addWidget(self.submitted_scroll)
         self.submitted_scroll.setVisible(False)
 
-        self.pending_scroll = QtWidgets.QScrollArea(self.middle_area_widget)
+        self.pending_scroll = QtWidgets.QScrollArea(self.publish_frame)
         self.pending_scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
         self.pending_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.pending_scroll.setWidgetResizable(False)
-
-        self.verticalLayout.addWidget(self.pending_scroll)
+        #self.pending_scroll.setWidgetResizable(False)
+        self.horizontalLayout_7.addWidget(self.pending_scroll)
+        #self.verticalLayout.addWidget(self.pending_scroll)
         self.pending_scroll.setVisible(False)
+
+        self.verticalLayout.addWidget(self.publish_frame)
 
         """
         self.publish_tabs = QtGui.QTabWidget(Dialog)
