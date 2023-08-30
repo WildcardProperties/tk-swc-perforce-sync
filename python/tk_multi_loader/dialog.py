@@ -1839,6 +1839,46 @@ class AppDialog(QtGui.QWidget):
         # populate the thumbnail
         self._populate_thumbnail(item, field, thumb_path)
 
+    def _get_entity_parents(self, entity_data):
+        """
+        Get the entity parents for a given item.
+        :param entity_data:
+        :return:
+        """
+        self.entity_parents = []
+        if entity_data and "entity" in entity_data:
+            entity_info = entity_data.get("entity", None)
+            if entity_info:
+                # get the entity id
+                entity_id = entity_info.get("id", None)
+                # get the entity type
+                entity_type =entity_info.get("type", None)
+                if entity_id and entity_type:
+                    filters = [["id", "is", entity_id]]
+                    fields = ["id", "code", "type", "parents", "sg_asset_parent", "sg_assets", "project",
+                              "sg_asset_library", "asset_section", "asset_category", "sg_asset_type", "sg_status_list"]
+
+                    # get the entity
+                    published_entities = self._app.shotgun.find(entity_type, filters, fields)
+
+                    logger.debug(">>>>>>>>>>> Published entity: %s" % published_entities)
+                    for published_entity in published_entities:
+                        # get the asset parent
+                        asset_parent = published_entity.get("sg_asset_parent", None)
+                        if asset_parent:
+                            self.entity_parents.append(asset_parent)
+                        # get the parents
+                        linked_assets = published_entity.get("parents", None)
+                        if linked_assets:
+                            self.entity_parents.append(linked_assets)
+
+                    logger.debug(">>>>>>>>>>>Parents: %s" % self.entity_parents)
+                    for entity_parent in self.entity_parents:
+                        entity_path, entity_id, entity_type = self._get_entity_info(entity_parent)
+                        entity_parent["entity_path"] = entity_path
+                    logger.debug(">>>>>>>>>>>Parents with paths: %s" % self.entity_parents)
+
+
     def _setup_entity_parent_and_children(self, entity_data):
         """
         Sets up the entity parents and children panel with info for a given item.
@@ -4345,7 +4385,9 @@ class AppDialog(QtGui.QWidget):
         self._fstat_dict = {}
         entity_data, item = self._reload_treeview()
 
-        #logger.debug(">>>>>>>>>>1 In _on_treeview_item_selected entity_data is: {}".format(entity_data))
+        logger.debug(">>>>>>>>>>1 In _on_treeview_item_selected entity_data is: {}".format(entity_data))
+
+
         """
         if self._details_pane_visible:
             msg = "\n <span style='color:#2C93E2'>Loading entity parents and children ...</span> \n"
@@ -4372,6 +4414,11 @@ class AppDialog(QtGui.QWidget):
 
         self._update_perforce_data()
         self.print_publish_data()
+
+        entity_type = entity_data.get('type', None)
+        if entity_type in ["Task"]:
+            logger.debug(">>> getting entity parents")
+            self._get_entity_parents(entity_data)
         logger.debug(">>> main_view_mode is: {}".format(self.main_view_mode))
         if self.main_view_mode == self.MAIN_VIEW_SUBMITTED:
             self._populate_submitted_widget()
