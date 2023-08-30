@@ -2087,6 +2087,7 @@ class AppDialog(QtGui.QWidget):
     def _prepare_entity_parents_published_files(self):
         """ Sync the published files for the parents of the selected entity"""
         self._get_parents_publish_files()
+        # logger.debug(">>>>>>>>>>> Entity parents Published Files: {}".format(self.entity_parents_published_files_list))
         files_to_sync = []
         msg = "\n <span style='color:#2C93E2'>Preparing entity parents files...</span> \n"
         self._add_log(msg, 2)
@@ -2127,6 +2128,7 @@ class AppDialog(QtGui.QWidget):
     def _sync_entity_parents_published_files(self):
         """ Sync the published files for the parents of the selected entity"""
         files_to_sync = self._prepare_entity_parents_published_files()
+        logger.debug(">>>>>>>>>>> Parent files to sync:{}".format(files_to_sync))
 
         files_to_sync_count = len(files_to_sync)
         if files_to_sync_count == 0:
@@ -2974,6 +2976,11 @@ class AppDialog(QtGui.QWidget):
         """
         When someone clicks on the "Sync" button
         """
+        self._sync_curret_file()
+        self._sync_entity_parents()
+
+
+    def _sync_curret_file(self):
         #if not self._p4:
         #    self._connect()
         files_to_sync, total_file_count = self._get_files_to_sync()
@@ -3006,6 +3013,21 @@ class AppDialog(QtGui.QWidget):
 
             msg = "\n <span style='color:#2C93E2'>Reloading data is complete</span> \n"
             self._add_log(msg, 2)
+
+
+
+
+    def _sync_entity_parents(self):
+        logger.debug(">>> getting entity parents")
+        logger.debug(">>> self._entity_data {}".format(self._entity_data))
+        entity_type = self._entity_data.get('type', None)
+        if entity_type in ["Task"]:
+            logger.debug(">>> getting entity parents")
+            self._get_entity_parents(self._entity_data)
+            logger.debug(">>> preparing entity parents published files")
+            self._prepare_entity_parents_published_files()
+            logger.debug(">>> syncing entity parents published files")
+            self._sync_entity_parents_published_files()
 
     def _get_perforce_summary(self):
         """
@@ -4383,9 +4405,9 @@ class AppDialog(QtGui.QWidget):
         """
         logger.debug(">>>>>>>>>>  view_mode is: {}".format(self.main_view_mode))
         self._fstat_dict = {}
-        entity_data, item = self._reload_treeview()
+        self._entity_data, item = self._reload_treeview()
 
-        logger.debug(">>>>>>>>>>1 In _on_treeview_item_selected entity_data is: {}".format(entity_data))
+        logger.debug(">>>>>>>>>>1 In _on_treeview_item_selected entity_data is: {}".format(self._entity_data))
 
 
         """
@@ -4398,7 +4420,7 @@ class AppDialog(QtGui.QWidget):
             # self._setup_entity_parent_and_children(entity_data)
         """
 
-        self._entity_path, entity_id, entity_type = self._get_entity_info(entity_data)
+        self._entity_path, entity_id, entity_type = self._get_entity_info(self._entity_data)
 
         logger.debug(">>>>>>>>>>>>>>>>>> self._entity_path: {}".format(self._entity_path))
         #entity_data = self._reload_treeview()
@@ -4415,10 +4437,18 @@ class AppDialog(QtGui.QWidget):
         self._update_perforce_data()
         self.print_publish_data()
 
+        """
         entity_type = entity_data.get('type', None)
         if entity_type in ["Task"]:
             logger.debug(">>> getting entity parents")
             self._get_entity_parents(entity_data)
+            logger.debug(">>> preparing entity parents published files")
+            self._prepare_entity_parents_published_files()
+            logger.debug(">>> syncing entity parents published files")
+            self._sync_entity_parents_published_files()
+        """
+
+
         logger.debug(">>> main_view_mode is: {}".format(self.main_view_mode))
         if self.main_view_mode == self.MAIN_VIEW_SUBMITTED:
             self._populate_submitted_widget()
