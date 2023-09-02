@@ -650,9 +650,10 @@ class AppDialog(QtGui.QWidget):
 
         #################################################
         # checkboxes, buttons etc
-        self.ui.fix_seleted.clicked.connect(self._on_fix_seleted)
+        self.ui.fix_selected.clicked.connect(self._on_fix_selected)
         self.ui.fix_all.clicked.connect(self._on_fix_all)
         self.ui.sync_files.clicked.connect(self._on_sync_files)
+        self.ui.sync_parents.clicked.connect(self._on_sync_parents)
         self.ui.submit_files.clicked.connect(self._on_submit_files)
         # self.ui.show_sub_items.toggled.connect(self._on_show_subitems_toggled)
 
@@ -1870,7 +1871,8 @@ class AppDialog(QtGui.QWidget):
                         # get the parents
                         linked_assets = published_entity.get("parents", None)
                         if linked_assets:
-                            self.entity_parents.append(linked_assets)
+                            for parent in linked_assets:
+                                self.entity_parents.append(parent)
 
                     logger.debug(">>>>>>>>>>>Parents: %s" % self.entity_parents)
                     for entity_parent in self.entity_parents:
@@ -2094,11 +2096,20 @@ class AppDialog(QtGui.QWidget):
         for published_file in self.entity_parents_published_files_list:
             if 'path' in published_file:
                 local_path = published_file['path'].get('local_path', None)
+                if local_path in files_to_sync:
+                    continue
                 if local_path:
                     head_rev = published_file.get('headRev', None)
                     have_rev = published_file.get('haveRev', None)
-                    msg = "Checking file {}".format(local_path)
-                    self._add_log(msg, 4)
+                    try:
+                        code = published_file.get('code', None)
+                        if code:
+                            code = code.split("#")[-1]
+                        msg = "Checking file {}#{}".format(local_path, code)
+                        # msg = "Checking file {}".format(local_path)
+                        self._add_log(msg, 4)
+                    except:
+                        pass
 
                     # logger.debug(">>>>>>>>>>> (1) head_rev:{} have_rev:{}".format(head_rev, have_rev))
                     if not head_rev and not have_rev:
@@ -2121,7 +2132,9 @@ class AppDialog(QtGui.QWidget):
                         if not have_rev:
                             have_rev = "0"
                         if self._to_sync(have_rev, head_rev):
-                            files_to_sync.append(local_path)
+                            if local_path not in files_to_sync:
+                                files_to_sync.append(local_path)
+
 
         return files_to_sync
 
@@ -2898,7 +2911,7 @@ class AppDialog(QtGui.QWidget):
 
         logger.debug(">>>>>>>>>>   versions {}".format(versions))
 
-    def _on_fix_seleted(self):
+    def _on_fix_selected(self):
         """
         When someone clicks on the "Fix Selected" button
         Send unpublished depot files in the submitted view to the Shotgrid Publisher.
@@ -2974,13 +2987,19 @@ class AppDialog(QtGui.QWidget):
 
     def _on_sync_files(self):
         """
-        When someone clicks on the "Sync" button
+        When someone clicks on the "Sync Files" button
         """
-        self._sync_curret_file()
+        self._sync_current_file()
+        # self._sync_entity_parents()
+        
+    def _on_sync_parents(self):
+        """
+        When someone clicks on the "Sync Parents" button
+        """
         self._sync_entity_parents()
 
 
-    def _sync_curret_file(self):
+    def _sync_current_file(self):
         #if not self._p4:
         #    self._connect()
         files_to_sync, total_file_count = self._get_files_to_sync()
