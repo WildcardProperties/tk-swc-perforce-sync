@@ -1847,38 +1847,43 @@ class AppDialog(QtGui.QWidget):
         :return:
         """
         self.entity_parents = []
-        if entity_data and "entity" in entity_data:
-            entity_info = entity_data.get("entity", None)
-            if entity_info:
-                # get the entity id
-                entity_id = entity_info.get("id", None)
-                # get the entity type
-                entity_type =entity_info.get("type", None)
-                if entity_id and entity_type:
-                    filters = [["id", "is", entity_id]]
-                    fields = ["id", "code", "type", "parents", "sg_asset_parent", "sg_assets", "project",
-                              "sg_asset_library", "asset_section", "asset_category", "sg_asset_type", "sg_status_list"]
+        if entity_data:
+            entity_id = entity_data.get("id", None)
+            entity_type = entity_data.get("type", None)
+            if "entity" in entity_data:
+                entity_info = entity_data.get("entity", None)
+                if entity_info:
+                    # get the entity id
+                    entity_id = entity_info.get("id", None)
+                    # get the entity type
+                    entity_type =entity_info.get("type", None)
 
-                    # get the entity
-                    published_entities = self._app.shotgun.find(entity_type, filters, fields)
 
-                    logger.debug(">>>>>>>>>>> Published entity: %s" % published_entities)
-                    for published_entity in published_entities:
-                        # get the asset parent
-                        asset_parent = published_entity.get("sg_asset_parent", None)
-                        if asset_parent:
-                            self.entity_parents.append(asset_parent)
-                        # get the parents
-                        linked_assets = published_entity.get("parents", None)
-                        if linked_assets:
-                            for parent in linked_assets:
-                                self.entity_parents.append(parent)
+            if entity_id and entity_type:
+                filters = [["id", "is", entity_id]]
+                fields = ["id", "code", "type", "parents", "sg_asset_parent", "sg_assets", "project",
+                          "sg_asset_library", "asset_section", "asset_category", "sg_asset_type", "sg_status_list"]
 
-                    logger.debug(">>>>>>>>>>>Parents: %s" % self.entity_parents)
-                    for entity_parent in self.entity_parents:
-                        entity_path, entity_id, entity_type = self._get_entity_info(entity_parent)
-                        entity_parent["entity_path"] = entity_path
-                    logger.debug(">>>>>>>>>>>Parents with paths: %s" % self.entity_parents)
+                # get the entity
+                published_entities = self._app.shotgun.find(entity_type, filters, fields)
+
+                logger.debug(">>>>>>>>>>> Published entity: %s" % published_entities)
+                for published_entity in published_entities:
+                    # get the asset parent
+                    asset_parent = published_entity.get("sg_asset_parent", None)
+                    if asset_parent:
+                        self.entity_parents.append(asset_parent)
+                    # get the parents
+                    linked_assets = published_entity.get("parents", None)
+                    if linked_assets:
+                        for parent in linked_assets:
+                            self.entity_parents.append(parent)
+
+                logger.debug(">>>>>>>>>>>Parents: %s" % self.entity_parents)
+                for entity_parent in self.entity_parents:
+                    entity_path, entity_id, entity_type = self._get_entity_info(entity_parent)
+                    entity_parent["entity_path"] = entity_path
+                logger.debug(">>>>>>>>>>>Parents with paths: %s" % self.entity_parents)
 
 
     def _setup_entity_parent_and_children(self, entity_data):
@@ -3039,14 +3044,13 @@ class AppDialog(QtGui.QWidget):
     def _sync_entity_parents(self):
         logger.debug(">>> getting entity parents")
         logger.debug(">>> self._entity_data {}".format(self._entity_data))
-        entity_type = self._entity_data.get('type', None)
-        if entity_type in ["Task"]:
-            logger.debug(">>> getting entity parents")
-            self._get_entity_parents(self._entity_data)
-            logger.debug(">>> preparing entity parents published files")
-            self._prepare_entity_parents_published_files()
-            logger.debug(">>> syncing entity parents published files")
-            self._sync_entity_parents_published_files()
+
+        logger.debug(">>> getting entity parents")
+        self._get_entity_parents(self._entity_data)
+        #logger.debug(">>> preparing entity parents published files")
+        #self._prepare_entity_parents_published_files()
+        logger.debug(">>> syncing entity parents published files")
+        self._sync_entity_parents_published_files()
 
     def _get_perforce_summary(self):
         """
