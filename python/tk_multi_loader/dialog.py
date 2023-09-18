@@ -2779,10 +2779,6 @@ class AppDialog(QtGui.QWidget):
         # self._add_log(msg, 2)
         # self._publish_model.hard_refresh()
 
-        #self._reload_treeview()
-        #self._setup_file_details_panel([])
-
-        # self._update_perforce_data()
     def _publish_other_pending_data(self, other_data_to_publish):
         """
         Publish Depot Data in the Pending view that does not need to be deleted.
@@ -3134,63 +3130,6 @@ class AppDialog(QtGui.QWidget):
             msg = "\n <span style='color:#2C93E2'>Reloading data ...</span> \n"
             self._add_log(msg, 2)
             self._reload_treeview()
-
-        else:
-            msg = "\n <span style='color:#2C93E2'>Check files in the Pending view to publish using the Shotgrid Publisher</span> \n"
-            self._add_log(msg, 2)
-
-        self._submitted_data_to_publish = []
-
-    def _publish_submitted_data_using_publisher_ui_old(self):
-        """
-        Publish Depot Data
-        """
-        selected_item = self._get_selected_entity()
-        sg_entity = shotgun_model.get_sg_data(selected_item)
-        # logger.debug(">>>>>>>>>>  sg_entity {}".format(sg_entity))
-
-        if self._submitted_data_to_publish:
-            msg = "\n <span style='color:#2C93E2'>Sending the following unpublished files to the Shotgrid Publisher...</span> \n"
-            self._add_log(msg, 2)
-            # Create publish file
-            out_file = open(self._publish_files_path, 'w')
-            out_file.write('Depot Files\n')
-            # Create a new Perforce changelist
-            desc = "Fixing files "
-            change = create_change(self._p4, desc)
-
-            for sg_item in self._submitted_data_to_publish:
-                sg_item["entity"] = sg_entity
-                if 'path' in sg_item:
-                    file_to_publish = sg_item['path'].get('local_path', None)
-                    #file_to_publish = sg_item.get("depotFile", None)
-                    if file_to_publish:
-                        msg = "{}".format(file_to_publish)
-                        self._add_log(msg, 4)
-
-                        out_file.write('%s\n' % file_to_publish)
-                        action = sg_item.get("action", None)
-                        if action:
-                            action = self.action_dict[action]
-                            #add_res = add_to_change(self._p4, change, file_to_publish)
-                            # Remove this
-                            action = "edit"
-                            #action_result = self._p4.run(action, "-c", change, "-v", file_to_publish)
-            out_file.close()
-
-            # Run the publisher UI
-
-            engine = sgtk.platform.current_engine()
-            #logger.debug(">>>>>>>>>>  engine is {}".format(engine))
-
-            engine.commands["Publish..."]["callback"]()
-            #logger.debug(">>>>>>>>>>  engine commands are {}".format(engine.commands))
-
-            # msg = "\n <span style='color:#2C93E2'>Publishing files is complete</span> \n"
-            # self._add_log(msg, 2)
-            msg = "\n <span style='color:#2C93E2'>Reloading data ...</span> \n"
-            self._add_log(msg, 2)
-            #self._reload_treeview()
 
         else:
             msg = "\n <span style='color:#2C93E2'>Check files in the Pending view to publish using the Shotgrid Publisher</span> \n"
@@ -4391,7 +4330,7 @@ class AppDialog(QtGui.QWidget):
         Get entity path
         """
         entity_path, entity_id, entity_type = None, 0, None
-        #logger.debug(">>>>>>>>>>>>>> entity_data is: {}".format(entity_data))
+        logger.debug(">>>>>>>>>>>>>> entity_data is: {}".format(entity_data))
         if entity_data:
             entity_id = entity_data.get('id', 0)
             entity_type = entity_data.get('type', None)
@@ -4401,26 +4340,91 @@ class AppDialog(QtGui.QWidget):
                     if entity:
                         entity_id = entity.get('id', 0)
                         entity_type = entity.get('type', None)
+
             entity_path = self._app.sgtk.paths_from_entity(entity_type, entity_id)
             logger.debug(">>>>>>>>>>>>>> entity_id is: {}".format(entity_id))
             logger.debug(">>>>>>>>>>>>>> entity_type is: {}".format(entity_type))
             logger.debug(">>>>>>>>>>>>>> entity_path is: {}".format(entity_path))
-            """
-            try:
-                if not entity_path or len(entity_path) == 0:
-                    self._app.sgtk.create_filesystem_structure(entity_type, entity_id)
-                    entity_path = self._app.sgtk.paths_from_entity(entity_type, entity_id)
-                    # logger.debug(">>>>>>>>>>>>>> entity_path2 is: {}".format(entity_path))
-            except Exception as e:
-                logger.debug(">>>>>>>>>>>>>> Unable to create file system structure: {}".format(e))
-                pass
-            """
+
             if entity_path and len(entity_path) > 0:
                 entity_path = entity_path[-1]
-                msg = "\n <span style='color:#2C93E2'>Entity path: {}</span> \n".format(entity_path)
-                self._add_log(msg, 2)
+                # msg = "\n <span style='color:#2C93E2'>Entity path: {}</span> \n".format(entity_path)
+                # self._add_log(msg, 2)
         return entity_path, entity_id, entity_type
 
+    def _create_filesystem_structure(self, entity_data):
+        """
+        Get entity path
+        """
+        active_sg_status_list = ["ip", "rdy", "hld", "rev"]
+        entity_path, entity_id, entity_type = None, 0, None
+        logger.debug(">>>>>>>>>>>>>> entity_data is: {}".format(entity_data))
+        if entity_data:
+            entity_id = entity_data.get('id', 0)
+            entity_type = entity_data.get('type', None)
+            entity_name = entity_data.get('name', None)
+            if entity_type:
+                if entity_type in ["Task"]:
+                    entity = entity_data.get("entity", None)
+                    if entity:
+                        entity_id = entity.get('id', 0)
+                        entity_type = entity.get('type', None)
+                        entity_name = entity.get('name', None)
+                        # Create SG file system structure
+                        try:
+                            sg_status = entity_data.get('sg_status_list', None)
+                            logger.debug(">>>>>>>>>>>>>> sg_status is: {}".format(sg_status))
+                            if sg_status in active_sg_status_list:
+                                entity_path = self._app.sgtk.paths_from_entity(entity_type, entity_id)
+                                logger.debug(">>>>>>>>>>>>>> current entity_path is: {}".format(entity_path))
+                                # self._app.sgtk.synchronize_filesystem_structure()
+                                # if not entity_path or len(entity_path) == 0 or not os.path.exists(entity_path[0]):
+                                msg = "\n <span style='color:#2C93E2'>Creating file system structure for entity: id:{}, name: {}, path:{} ...</span> \n".format(
+                                    entity_id, entity_name, entity_path)
+                                self._add_log(msg, 2)
+                                if entity_type and entity_id:
+                                    self._app.sgtk.create_filesystem_structure(entity_type, entity_id)
+                                    if entity_name:
+                                        self.update_entity_name(entity_type, entity_id, entity_name, "success")
+                                """
+                                entity_path = self._app.sgtk.paths_from_entity(entity_type, entity_id)
+                                if entity_path and len(entity_path) > 0:
+                                    entity_path = entity_path[-1]
+                                    msg = "\n <span style='color:#2C93E2'>Entity path: {}</span> \n".format(entity_path)
+                                    self._add_log(msg, 2)
+                                """
+
+                        except Exception as e:
+                            if entity_name:
+                                self.update_entity_name(entity_type, entity_id, entity_name, "failure")
+                            msg = "\n Unable to create file system structure for entity: {}, {} \n".format(
+                                entity_id, e)
+                            self._add_log(msg, 4)
+                            pass
+
+    def update_entity_name(self, entity_type, entity_id, entity_name, action):
+
+        try:
+            new_name = entity_name
+            if action == "failure" and "!" in entity_name:
+                new_name = entity_name.replace("!", "")
+            if action == "failure" and "!" not in entity_name:
+                # red_exclamation = "<span style='color:#ff0000'>!</span>"
+                red_exclamation = "!"
+                new_name = "{}{}".format(entity_name, red_exclamation)
+            if action == "success" and "!" in entity_name:
+                new_name = entity_name.replace("!", "")
+            logger.debug(">>>>>>>>>>>>>> new entity name is: {}".format(new_name))
+            # Update the entity name using sg.update()
+
+            self._app.shotgun.update(entity_type, entity_id, {'code': new_name})
+            logger.debug(">>>>>>>>>>>>>> Reloading entity presets: {}".format(new_name))
+            self._load_entity_presets()
+        except Exception as e:
+            # Handle any exceptions that may occur during the update
+            logger.debug(">>>>>>>>>>>>>> Unable to update entity name for {}: {}".format(entity_name, e))
+
+            pass
 
     def _on_treeview_item_selected(self):
         """
@@ -4432,22 +4436,12 @@ class AppDialog(QtGui.QWidget):
 
         logger.debug(">>>>>>>>>>1 In _on_treeview_item_selected entity_data is: {}".format(self._entity_data))
 
-
-        """
-        if self._details_pane_visible:
-            msg = "\n <span style='color:#2C93E2'>Loading entity parents and children ...</span> \n"
-            self._add_log(msg, 2)
-            # Set up the entity details panel
-            # self._setup_entity_details_panel(entity_data, item)
-            # Set up the entity parents and children
-            # self._setup_entity_parent_and_children(entity_data)
-        """
-
         self._entity_path, entity_id, entity_type = self._get_entity_info(self._entity_data)
 
+        # Create SG file system structure
+        self._create_filesystem_structure(self._entity_data)
+
         logger.debug(">>>>>>>>>>>>>>>>>> self._entity_path: {}".format(self._entity_path))
-        #entity_data = self._reload_treeview()
-        #model = self.ui.publish_view.model()
 
         model = self.ui.publish_view.model()
         logger.debug(">>>>>>>>>>2 In _on_treeview_item_selected model.rowCount() is {}".format(model.rowCount()))
@@ -4460,25 +4454,9 @@ class AppDialog(QtGui.QWidget):
         self._update_perforce_data()
         self.print_publish_data()
 
-        """
-        entity_type = entity_data.get('type', None)
-        if entity_type in ["Task"]:
-            logger.debug(">>> getting entity parents")
-            self._get_entity_parents(entity_data)
-            logger.debug(">>> preparing entity parents published files")
-            self._prepare_entity_parents_published_files()
-            logger.debug(">>> syncing entity parents published files")
-            self._sync_entity_parents_published_files()
-        """
-
-
         logger.debug(">>> main_view_mode is: {}".format(self.main_view_mode))
         if self.main_view_mode == self.MAIN_VIEW_SUBMITTED:
             self._populate_submitted_widget()
-
-        # publish_widget, self._submitted_publish_list = self._create_perforce_ui(self._fstat_dict, sorted=False)
-        #logger.debug(">>> self._fstat_dict is: {}".format(self._fstat_dict))
-
 
 
     def get_current_sg_data(self):
