@@ -4384,8 +4384,8 @@ class AppDialog(QtGui.QWidget):
                                 self._add_log(msg, 2)
                                 if entity_type and entity_id:
                                     self._app.sgtk.create_filesystem_structure(entity_type, entity_id)
-                                    if entity_name:
-                                        self.update_entity_name(entity_type, entity_id, entity_name, "success")
+                                    #if entity_name:
+                                    #    self.update_entity_name(entity_type, entity_id, entity_name, "success")
                                 """
                                 entity_path = self._app.sgtk.paths_from_entity(entity_type, entity_id)
                                 if entity_path and len(entity_path) > 0:
@@ -4395,8 +4395,8 @@ class AppDialog(QtGui.QWidget):
                                 """
 
                         except Exception as e:
-                            if entity_name:
-                                self.update_entity_name(entity_type, entity_id, entity_name, "failure")
+                            #if entity_name:
+                            #    self.update_entity_name(entity_type, entity_id, entity_name, "failure")
                             msg = "\n Unable to create file system structure for entity: {}, {} \n".format(
                                 entity_id, e)
                             self._add_log(msg, 4)
