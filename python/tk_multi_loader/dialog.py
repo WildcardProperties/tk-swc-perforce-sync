@@ -829,6 +829,10 @@ class AppDialog(QtGui.QWidget):
             "mp4": "Movie",
             "pdf": "PDF"
         }
+        ##########################################################################################
+        # Filesystem for cureent user tasks:
+        self._create_current_user_task_filesystem_structure()
+        ##########################################################################################
 
 
     # def _set_publish_list(self):
@@ -4352,6 +4356,60 @@ class AppDialog(QtGui.QWidget):
                 # self._add_log(msg, 2)
         return entity_path, entity_id, entity_type
 
+    def _create_current_user_task_filesystem_structure(self):
+        """ Create a folder structure for the current user's tasks """
+        # Get the current user's ID
+        try:
+            user = login.get_current_user(self._app.sgtk)
+            logger.debug("Current user is {}".format(user))
+            current_user_id = user.get("id", None)
+
+            if not current_user_id:
+                logger.debug("Could not get current user id")
+                return
+
+            #project = self._app.shotgun.find_one("Project", [["name", "is", sg_project_name]], ["id"])
+            project = self._app.context.project
+            if not project:
+                logger.debug("Could not get current project")
+                return
+
+            # Define the list of statuses you want to filter by
+            sg_status_list = ["ip", "rdy", "hld", "rev"]
+
+            # Find all tasks for the current user with the specified statuses
+            filters = [
+                ["project", "is", project],
+                ["task_assignees", "is", {"type": "HumanUser", "id": current_user_id}],
+                ["sg_status_list", "in", sg_status_list],
+            ]
+
+            fields = ["content", "entity", "entity.Shot", "entity.Asset"]
+
+            tasks = self._app.shotgun.find("Task", filters, fields)
+            logger.debug("Current user tasks are {}".format(tasks))
+            # Create folders for each entity associated with the tasks
+            for task in tasks:
+                entity = task.get("entity", None)
+                logger.debug("User task entity is: {}".format(entity))
+                if entity:
+                    entity_id = entity.get("id", None)
+                    entity_type = entity.get("type", None)
+                    if entity_type and entity_id:
+                        try:
+                            logger.debug("Creating folder structure for entity:{} ...".format(entity))
+                            self._app.sgtk.create_filesystem_structure(entity_type, entity_id)
+                        except Exception as e:
+                            msg = "\n Unable to create file system structure for entity: {}, {} \n".format(entity_id, e)
+                            logger.debug(msg)
+                            pass
+        except Exception as e:
+            msg = "\n Unable to create file system structure for entity\n"
+            logger.debug(msg)
+            pass
+
+
+
     def _create_filesystem_structure(self, entity_data):
         """
         Get entity path
@@ -4439,7 +4497,7 @@ class AppDialog(QtGui.QWidget):
         self._entity_path, entity_id, entity_type = self._get_entity_info(self._entity_data)
 
         # Create SG file system structure
-        self._create_filesystem_structure(self._entity_data)
+        # self._create_filesystem_structure(self._entity_data)
 
         logger.debug(">>>>>>>>>>>>>>>>>> self._entity_path: {}".format(self._entity_path))
 
