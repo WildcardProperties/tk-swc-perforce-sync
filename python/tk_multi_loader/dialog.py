@@ -40,6 +40,7 @@ from .delegate_publish_thumb import SgPublishThumbDelegate
 from .delegate_publish_list import SgPublishListDelegate
 from .model_publishhistory import SgPublishHistoryModel
 from .delegate_publish_history import SgPublishHistoryDelegate
+from .delegate_publish_perforce import PublishedFileSPerforce
 from .search_widget import SearchWidget
 from .banner import Banner
 from .loader_action_manager import LoaderActionManager
@@ -172,7 +173,7 @@ class AppDialog(QtGui.QWidget):
 
         self.ui.thumbnail_mode.clicked.connect(self._on_thumbnail_mode_clicked)
         self.ui.list_mode.clicked.connect(self._on_list_mode_clicked)
-        # self.ui.perforce_mode.clicked.connect(self._on_perforce_mode_clicked)
+        self.ui.perforce_mode.clicked.connect(self._on_perforce_mode_clicked)
         self.ui.submitted_mode.clicked.connect(self._on_submitted_mode_clicked)
         self.ui.pending_mode.clicked.connect(self._on_pending_mode_clicked)
         ###########################################
@@ -672,6 +673,10 @@ class AppDialog(QtGui.QWidget):
         self.ui.thumb_scale.valueChanged.connect(self._on_thumb_size_slider_change)
 
         #################################################
+        #Table view setup
+        self._setup_table_view()
+
+        #################################################
         # setup file_history
 
         self._file_history = []
@@ -827,7 +832,12 @@ class AppDialog(QtGui.QWidget):
             "jpg": "Image",
             "mov": "Movie",
             "mp4": "Movie",
-            "pdf": "PDF"
+            "pdf": "PDF",
+            "png": "Image File",
+            "spp": "PhotoPlus Image",
+            "ztl": "ZBrush Document",
+            "json": "JSON File",
+            "pkl": "Python Pickle",
         }
         ##########################################################################################
         # Filesystem for cureent user tasks:
@@ -1524,6 +1534,19 @@ class AppDialog(QtGui.QWidget):
             self._show_thumb_scale(True)
             self.main_view_mode = self.MAIN_VIEW_THUMB
 
+        elif mode == self.MAIN_VIEW_PERFORCE:
+            self._turn_all_modes_off()
+            self.ui.table_view.setVisible(True)
+            #self.ui.perforce_scroll.setVisible(True)
+            self.ui.perforce_mode.setIcon(
+                QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_card_active.png"))
+            )
+            self.ui.perforce_mode.setChecked(True)
+
+            self.main_view_mode = self.MAIN_VIEW_PERFORCE
+            self.ui.publish_view.setItemDelegate(self._publish_list_delegate)
+            self._populate_perforce_widget()
+
         elif mode == self.MAIN_VIEW_SUBMITTED:
             self._turn_all_modes_off()
             self.ui.submitted_scroll.setVisible(True)
@@ -1569,6 +1592,190 @@ class AppDialog(QtGui.QWidget):
 
         self.ui.publish_view.selectionModel().clear()
         self._settings_manager.store("main_view_mode", mode)
+
+
+    def _populate_perforce_widget(self):
+        #self._publish_model.hard_refresh()
+        self._setup_table_view()
+
+        perforce_sg_data = self._get_perforce_sg_data()
+        length = len(perforce_sg_data)
+        if not perforce_sg_data:
+            perforce_sg_data = self._sg_data
+        if perforce_sg_data and length > 0:
+            msg = "\n <span style='color:#2C93E2'>Populating the perforce view with {} files. Please wait...</span> \n".format(
+                length)
+            self._add_log(msg, 2)
+            self._populate_perforce_table(perforce_sg_data)
+            logger.debug(">>> Updating perforce_tree_view is complete")
+
+
+    def _get_perforce_sg_data(self):
+        perforce_sg_data = []
+
+        model = self.ui.publish_view.model()
+        if model.rowCount() > 0:
+            for row in range(model.rowCount()):
+                model_index = model.index(row, 0)
+                proxy_model = model_index.model()
+                source_index = proxy_model.mapToSource(model_index)
+                item = source_index.model().itemFromIndex(source_index)
+
+                is_folder = item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
+                if not is_folder:
+                    # Run default action.
+                    sg_item = shotgun_model.get_sg_data(model_index)
+                    if sg_item:
+                        perforce_sg_data.append(sg_item)
+        return perforce_sg_data
+
+    def _reset_perforce_widget(self):
+        self.ui.table_view = QtWidgets.QTableView()
+    
+    def _setup_table_view(self):
+        # Define the headers for the table
+        headers = ["Name", "Action", "Revision", "Size(MB)", "Extension", "Type",
+                   "User", "Task", "Status",
+                   "Destination Path", "Description"]
+        #headers = ["Name", "Action", "Revision", "Size(MB)", " Extension", "Type", "Step",
+        #           "Destination Path", "Description", "Entity Sub-Folder"]
+
+        # Create a table model and set headers
+        self.perforce_model = QtGui.QStandardItemModel(0, len(headers))
+        self.perforce_model.setHorizontalHeaderLabels(headers)
+
+        # Create a proxy model for sorting and grouping
+        self.perforce_proxy_model = QtGui.QSortFilterProxyModel()
+        self.perforce_proxy_model.setSourceModel(self.perforce_model)
+
+        self.ui.table_view.setModel(self.perforce_proxy_model)
+
+        # Set the header to be clickable for sorting
+        self.ui.table_view.horizontalHeader().setSectionsClickable(True)
+        self.ui.table_view.horizontalHeader().setSortIndicatorShown(True)
+
+        # Sort by the first column initially
+        self.ui.table_view.sortByColumn(0, QtCore.Qt.AscendingOrder)
+
+        # Grouping by "Entity Sub-Folder"
+        self.ui.table_view.setSortingEnabled(True)
+        #self.ui.table_view.sortByColumn(12, QtCore.Qt.AscendingOrder)
+
+        header = self.ui.table_view.horizontalHeader()
+        for col in range(len(headers)):
+            header.setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
+
+        # Set different column widths
+        #header = self.ui.table_view.horizontalHeader()
+        #header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)  # Auto size column 0
+        #header.setSectionResizeMode(1, QtWidgets.QHeaderView.Fixed)
+        #header.resizeSection(1, 300)  # Set width of column 1 to 300
+
+        #self.ui.table_view.setGroupByColumn(7)
+
+    def _populate_perforce_table(self, sg_data):
+        """ Populate the table with data"""
+        row = 0
+        for sg_item in sg_data:
+            if not sg_item:
+                continue
+            try:
+                # self._print_sg_item(sg_item)
+                # Extract relevant data from the Shotgun response
+                name = sg_item.get("name", "N/A")
+                action = sg_item.get("action") or sg_item.get("headAction") or "N/A"
+                revision = sg_item.get("revision", "N/A")
+                if revision != "N/A":
+                    revision = "#{}".format(revision)
+
+                # Todo: get the size
+
+                """
+                if "fileSize" in sg_item:
+                    size = sg_item.get("fileSize", "N/A")
+                    if size != "N/A":
+                        size = "{:.2f}".format(int(size) / 1024 / 1024)
+                        size = str(size)
+                """
+                local_path = "N/A"
+                if "path" in sg_item:
+                    path = sg_item.get("path", None)
+                    if path:
+                        local_path = path.get("local_path", "N/A")
+
+                file_extension = "N/A"
+                if local_path and local_path != "N/A":
+                    file_extension = local_path.split(".")[-1] or  "N/A"
+
+                type = "N/A"
+                if file_extension and file_extension != "N/A":
+                    type = self.settings.get(file_extension, "N/A")
+
+                size = 0
+                try:
+
+                    if local_path and local_path != "N/A":
+                        fstat_list = self._p4.run("fstat", "-T", "fileSize", "-Ol", local_path)
+                        if fstat_list and len(fstat_list) > 0:
+                            fstat = fstat_list[0]
+                            if fstat:
+                                size = fstat.get("fileSize", "N/A")
+                                if size != "N/A":
+                                    size = "{:.2f}".format(int(size) / 1024 / 1024)
+                                    size = float(size)
+                except Exception as e:
+                    logger.debug("Failed to get file size for %s, error: %s"% local_path, e)
+                    pass
+
+                # published_file_type = sg_item.get("published_file_type", {}).get("name", "N/A")
+                # Todo: get the step
+                #step = sg_item.get("step", {}).get("name", "N/A")
+                #step = sg_item.get("task.Task.step.Step.code", "N/A") if step == "N/A" else step
+
+                description = sg_item.get("description", "N/A")
+
+                task_name = "N/A"
+                if "task" in sg_item:
+                    task = sg_item.get("task", None)
+                    if task:
+                        task_name = task.get("name", "N/A")
+
+                task_status = sg_item.get("task.Task.sg_status_list", "N/A")
+
+                user_name = "N/A"
+                if "created_by" in sg_item:
+                    user = sg_item.get("created_by", None)
+                    if user:
+                        user_name = user.get("name", "N/A")
+
+
+
+
+                # entity_sub_folder = sg_item.get("entity.Sub-Folder", "N/A")
+
+                # Insert data into the table
+                self._insert_perforce_row(row, [name, action, revision, size, file_extension, type,
+                                                user_name, task_name, task_status,
+                                                local_path, description])
+            except Exception as e:
+                logger.debug("Failed to populate row %s, error: %s" % (row, e))
+                pass
+            row += 1
+
+
+    def _insert_perforce_row(self, row, data):
+        for col, value in enumerate(data):
+            item = QtGui.QStandardItem(str(value))
+            if col == 3:
+                item.setData(value, QtCore.Qt.DisplayRole)
+
+            self.perforce_model.setItem(row, col, item)
+
+
+    def _print_sg_item(self, sg_item):
+        for key, value in sg_item.items():
+            msg = "{}: {}".format(key, value)
+            logger.debug(msg)
 
     def _populate_submitted_widget(self):
 
@@ -1625,11 +1832,14 @@ class AppDialog(QtGui.QWidget):
 
     def _turn_all_modes_off(self):
         self.ui.publish_view.setVisible(False)
+        self.ui.table_view.setVisible(False)
+        self.ui.perforce_scroll.setVisible(False)
         self.ui.submitted_scroll.setVisible(False)
         self.ui.pending_scroll.setVisible(False)
 
         self.ui.thumbnail_mode.setChecked(False)
         self.ui.list_mode.setChecked(False)
+        self.ui.perforce_mode.setChecked(False)
         self.ui.submitted_mode.setChecked(False)
         self.ui.pending_mode.setChecked(False)
 
@@ -4513,6 +4723,8 @@ class AppDialog(QtGui.QWidget):
         self.print_publish_data()
 
         logger.debug(">>> main_view_mode is: {}".format(self.main_view_mode))
+        if self.main_view_mode == self.MAIN_VIEW_PERFORCE:
+            self._populate_perforce_widget()
         if self.main_view_mode == self.MAIN_VIEW_SUBMITTED:
             self._populate_submitted_widget()
 

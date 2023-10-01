@@ -231,7 +231,7 @@ class Ui_Dialog(object):
         self.perforce_mode.setCheckable(True)
         self.perforce_mode.setObjectName("perforce_mode")
         self.horizontalLayout_2.addWidget(self.perforce_mode)
-        self.perforce_mode.hide()
+        #self.perforce_mode.hide()
 
         self.submitted_mode = QtGui.QToolButton(self.middle_area_widget)
         self.submitted_mode.setMinimumSize(QtCore.QSize(26, 26))
@@ -277,6 +277,7 @@ class Ui_Dialog(object):
         self.horizontalLayout_7.setSpacing(1)
         self.horizontalLayout_7.setContentsMargins(1, 1, 1, 1)
         self.horizontalLayout_7.setObjectName("horizontalLayout_7")
+
         self.publish_view = QtGui.QListView(self.publish_frame)
         self.publish_view.setEditTriggers(QtGui.QAbstractItemView.NoEditTriggers)
         self.publish_view.setResizeMode(QtGui.QListView.Adjust)
@@ -285,6 +286,17 @@ class Ui_Dialog(object):
         self.publish_view.setUniformItemSizes(True)
         self.publish_view.setObjectName("publish_view")
         self.horizontalLayout_7.addWidget(self.publish_view)
+
+        self.table_view = QtWidgets.QTableView(self.publish_frame)
+        self.horizontalLayout_7.addWidget(self.table_view)
+        self.table_view.setVisible(False)
+
+        self.perforce_scroll = QtWidgets.QScrollArea(self.publish_frame)
+        self.perforce_scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        self.perforce_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        # self.verticalLayout.addWidget(self.perforce_scroll)
+        self.horizontalLayout_7.addWidget(self.perforce_scroll)
+        self.perforce_scroll.setVisible(False)
 
         self.submitted_scroll = QtWidgets.QScrollArea(self.publish_frame)
         self.submitted_scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
@@ -733,7 +745,7 @@ class Ui_Dialog(object):
         self.list_mode.setAccessibleName(QtGui.QApplication.translate("Dialog", "list_mode", None, QtGui.QApplication.UnicodeUTF8))
         self.list_mode.setText(QtGui.QApplication.translate("Dialog", "...", None, QtGui.QApplication.UnicodeUTF8))
         self.perforce_mode.setToolTip(QtGui.QApplication.translate("Dialog", "Perforce Mode", None, QtGui.QApplication.UnicodeUTF8))
-        self.perforce_mode.setAccessibleName(QtGui.QApplication.translate("Dialog", "list_mode", None, QtGui.QApplication.UnicodeUTF8))
+        self.perforce_mode.setAccessibleName(QtGui.QApplication.translate("Dialog", "perforce_mode", None, QtGui.QApplication.UnicodeUTF8))
         self.perforce_mode.setText(QtGui.QApplication.translate("Dialog", "...", None, QtGui.QApplication.UnicodeUTF8))
         self.pending_mode.setToolTip(QtGui.QApplication.translate("Dialog", "Pending Mode", None, QtGui.QApplication.UnicodeUTF8))
         self.pending_mode.setAccessibleName(QtGui.QApplication.translate("Dialog", "pending_mode", None, QtGui.QApplication.UnicodeUTF8))
