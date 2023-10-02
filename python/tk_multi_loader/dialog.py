@@ -96,7 +96,7 @@ class AppDialog(QtGui.QWidget):
     """
 
     # enum to control the mode of the main view
-    (MAIN_VIEW_LIST, MAIN_VIEW_THUMB, MAIN_VIEW_PERFORCE, MAIN_VIEW_SUBMITTED, MAIN_VIEW_PENDING) = range(5)
+    (MAIN_VIEW_LIST, MAIN_VIEW_THUMB, MAIN_VIEW_COLUMN, MAIN_VIEW_SUBMITTED, MAIN_VIEW_PENDING) = range(5)
 
     # signal emitted whenever the selected publish changes
     # in either the main view or the details file_history view
@@ -841,8 +841,45 @@ class AppDialog(QtGui.QWidget):
         }
         ##########################################################################################
         # Filesystem for cureent user tasks:
-        self._create_current_user_task_filesystem_structure()
+        # Create a QTimer with a single-shot connection
+        # Initialize a flag to track whether the function has been executed
+        try:
+            self._function_executed = False
+
+            # Create a QTimer
+            self.timer = QtCore.QTimer(self)
+            self.timer.timeout.connect(self._run_function_once)
+
+            # Delay the execution for 1 second (you can adjust the delay as needed)
+            self.timer.start(5000)
+        except Exception as e:
+            logger.debug(e)
+            pass
+        #self._create_current_user_task_filesystem_structure()
+        # Connect the showEvent to a slot (method)
+
+        # self.showEvent.connect(self.on_show_event)
         ##########################################################################################
+
+    def _run_function_once(self):
+        try:
+            # Check if the function has already been executed
+            if not self._function_executed:
+                # Call the function
+                self._create_current_user_task_filesystem_structure()
+
+                # Set the flag to True to indicate that the function has been executed
+                self._function_executed = True
+        except Exception as e:
+            logger.debug(e)
+            pass
+
+    def on_show_event(self, event):
+        # This method will be called when the widget is shown
+        self._create_current_user_task_filesystem_structure()
+
+        # call the base class implementation
+        super().showEvent(event)
 
 
     # def _set_publish_list(self):
@@ -1479,9 +1516,9 @@ class AppDialog(QtGui.QWidget):
 
     def _on_perforce_mode_clicked(self):
         """
-        Executed when someone clicks the perforce mode button
+        Executed when someone clicks the column mode button
         """
-        self._set_main_view_mode(self.MAIN_VIEW_PERFORCE)
+        self._set_main_view_mode(self.MAIN_VIEW_COLUMN)
 
     def _on_submitted_mode_clicked(self):
         """
@@ -1534,7 +1571,7 @@ class AppDialog(QtGui.QWidget):
             self._show_thumb_scale(True)
             self.main_view_mode = self.MAIN_VIEW_THUMB
 
-        elif mode == self.MAIN_VIEW_PERFORCE:
+        elif mode == self.MAIN_VIEW_COLUMN:
             self._turn_all_modes_off()
             self.ui.table_view.setVisible(True)
             #self.ui.perforce_scroll.setVisible(True)
@@ -1543,7 +1580,7 @@ class AppDialog(QtGui.QWidget):
             )
             self.ui.perforce_mode.setChecked(True)
 
-            self.main_view_mode = self.MAIN_VIEW_PERFORCE
+            self.main_view_mode = self.MAIN_VIEW_COLUMN
             self.ui.publish_view.setItemDelegate(self._publish_list_delegate)
             self._populate_perforce_widget()
 
@@ -1596,20 +1633,24 @@ class AppDialog(QtGui.QWidget):
 
     def _populate_perforce_widget(self):
         #self._publish_model.hard_refresh()
+        logger.debug(">>> Setting up Column View table ...")
         self._setup_table_view()
-
+        logger.debug(">>> Getting Perforce data...")
         perforce_sg_data = self._get_perforce_sg_data()
         length = len(perforce_sg_data)
         if not perforce_sg_data:
             perforce_sg_data = self._sg_data
         if perforce_sg_data and length > 0:
-            msg = "\n <span style='color:#2C93E2'>Populating the perforce view with {} files. Please wait...</span> \n".format(
+            msg = "\n <span style='color:#2C93E2'>Populating the Column View with {} files. Please wait...</span> \n".format(
                 length)
             self._add_log(msg, 2)
+            logger.debug(">>> Getting Perforce file size...")
+            perforce_sg_data = self._get_perforce_size(perforce_sg_data)
+            logger.debug(">>> Populating Column View table...")
             self._populate_perforce_table(perforce_sg_data)
-            logger.debug(">>> Updating perforce_tree_view is complete")
+            logger.debug(">>> Updating Column View is complete")
 
-
+        
     def _get_perforce_sg_data(self):
         perforce_sg_data = []
 
@@ -1672,6 +1713,60 @@ class AppDialog(QtGui.QWidget):
         #header.resizeSection(1, 300)  # Set width of column 1 to 300
 
         #self.ui.table_view.setGroupByColumn(7)
+        
+    def _get_perforce_size(self, sg_data):
+        """
+        Get Perforce file size.
+        """
+        try:
+            self._size_dict = {}
+            for key in self._item_path_dict:
+                if key:
+                    #logger.debug(">>>>>>>>>>  key is: {}".format(key))
+                    key = self._convert_local_to_depot(key).rstrip('/')
+                    # Get the file size from Perforce for all revisions
+                    #fstat_list = self._p4.run("fstat", "-T", "fileSize, clientFile, headRev", "-Of", "-Ol", key + '/...')
+                    # Get the file size from Perforce
+                    fstat_list = self._p4.run("fstat", "-T", "fileSize, clientFile", "-Ol", key + '/...')
+                    #logger.debug(">>>>>>>>>>  fstat_list is: {}".format(fstat_list))
+                    for fstat in fstat_list:
+                        #if isinstance(fstat, list) and len(fstat) == 1:
+                        #    fstat = fstat[0]
+                        # logger.debug(">>>>>>>>>>  fstat is: {}".format(fstat))
+                        if fstat:
+                            size = fstat.get("fileSize", "N/A")
+                            if size != "N/A":
+                                size = "{:.2f}".format(int(size) / 1024 / 1024)
+                                size = float(size)
+                                # logger.debug(">>>>>>>>>>  size is: {}".format(size))
+                            client_file = fstat.get('clientFile', None)
+
+                            if client_file:
+                                newkey = self._create_key(client_file)
+                                #head_rev = fstat.get('headRev', "0")
+                                #newkey = "{}#{}".format(newkey, head_rev)
+                                if newkey:
+                                    if newkey not in self._size_dict:
+                                        self._size_dict[newkey] = {}
+                                    self._size_dict[newkey]['fileSize'] = size
+                    # logger.debug(">>>>>>>>>>  self._size_dict is: {}".format(self._size_dict))
+
+                    for i, sg_item in enumerate(sg_data):
+
+                        if "path" in sg_item:
+                            if "local_path" in sg_item["path"]:
+                                local_path = sg_item["path"].get("local_path", None)
+                                modified_local_path = self._create_key(local_path)
+
+                                if modified_local_path and modified_local_path in self._size_dict:
+                                    if 'fileSize' in self._size_dict[modified_local_path]:
+                                        sg_item["fileSize"] = self._size_dict[modified_local_path].get('fileSize', None)
+                                # logger.debug(">>>>>>>>>>  sg_item is: {}".format(sg_item))
+            # logger.debug(">>>>>>>>>>  sg_data is: {}".format(sg_data))
+        except Exception as e:
+            logger.debug("Error getting Perforce file size: {}".format(e))
+            pass
+        return sg_data
 
     def _populate_perforce_table(self, sg_data):
         """ Populate the table with data"""
@@ -1680,6 +1775,7 @@ class AppDialog(QtGui.QWidget):
             if not sg_item:
                 continue
             try:
+                # logger.debug(">>> Getting row {} data".format(row))
                 # self._print_sg_item(sg_item)
                 # Extract relevant data from the Shotgun response
                 name = sg_item.get("name", "N/A")
@@ -1688,30 +1784,26 @@ class AppDialog(QtGui.QWidget):
                 if revision != "N/A":
                     revision = "#{}".format(revision)
 
-                # Todo: get the size
 
-                """
-                if "fileSize" in sg_item:
-                    size = sg_item.get("fileSize", "N/A")
-                    if size != "N/A":
-                        size = "{:.2f}".format(int(size) / 1024 / 1024)
-                        size = str(size)
-                """
                 local_path = "N/A"
+                difference_str = "N/A"
                 if "path" in sg_item:
                     path = sg_item.get("path", None)
                     if path:
                         local_path = path.get("local_path", "N/A")
+                        difference_str = self._path_difference(self._entity_path, local_path)
+
 
                 file_extension = "N/A"
                 if local_path and local_path != "N/A":
-                    file_extension = local_path.split(".")[-1] or  "N/A"
+                    file_extension = local_path.split(".")[-1] or "N/A"
 
                 type = "N/A"
                 if file_extension and file_extension != "N/A":
                     type = self.settings.get(file_extension, "N/A")
 
-                size = 0
+                size = sg_item.get("fileSize", 0)
+                """
                 try:
 
                     if local_path and local_path != "N/A":
@@ -1726,7 +1818,7 @@ class AppDialog(QtGui.QWidget):
                 except Exception as e:
                     logger.debug("Failed to get file size for %s, error: %s"% local_path, e)
                     pass
-
+                """
                 # published_file_type = sg_item.get("published_file_type", {}).get("name", "N/A")
                 # Todo: get the step
                 #step = sg_item.get("step", {}).get("name", "N/A")
@@ -1748,29 +1840,155 @@ class AppDialog(QtGui.QWidget):
                     if user:
                         user_name = user.get("name", "N/A")
 
-
-
-
                 # entity_sub_folder = sg_item.get("entity.Sub-Folder", "N/A")
 
                 # Insert data into the table
-                self._insert_perforce_row(row, [name, action, revision, size, file_extension, type,
+                # logger.debug(">>> Inserting row {} data".format(row))
+                item_data = [name, action, revision, size, file_extension, type,
                                                 user_name, task_name, task_status,
-                                                local_path, description])
+                                                difference_str, description]
+                self._insert_perforce_row(row, item_data, sg_item)
+                # logger.debug(">>> Done with  row {}".format(row))
             except Exception as e:
                 logger.debug("Failed to populate row %s, error: %s" % (row, e))
                 pass
             row += 1
 
 
-    def _insert_perforce_row(self, row, data):
+    def _insert_perforce_row(self, row, data, sg_item):
         for col, value in enumerate(data):
             item = QtGui.QStandardItem(str(value))
+            tooltip = self._get_tooltip(data, sg_item)
+            item.setToolTip(tooltip)
             if col == 3:
                 item.setData(value, QtCore.Qt.DisplayRole)
-
+            # if col == 9:
+            #    item.setToolTip(local_path)
             self.perforce_model.setItem(row, col, item)
 
+    def _get_tooltip(self, data, sg_item):
+        """
+        Gets a tooltip for this model item.
+
+        :param item: ShotgunStandardItem associated with the publish.
+        :param sg_item: Publish information from Shotgun.
+        """
+
+        # self._log_debug(">>>>>>>>>>>> _set_tooltip: sg_item: {}".format(sg_item))
+        tooltip = "<b>Name:</b> %s" % (sg_item.get("code") or "No name given.")
+
+        # Version 012 by John Smith at 2014-02-23 10:34
+
+        published_file_type = sg_item.get('type', None)
+        if published_file_type in ['PublishedFile'] and data and len(data) >= 10:
+            if sg_item.get("headAction"):
+                tooltip += "<br><br><b>Head action:</b> %s" % (
+                        sg_item.get("headAction") or "N/A"
+                )
+            if sg_item.get("action"):
+                tooltip += "<br><br><b>Action:</b> %s" % (
+                        sg_item.get("action") or "N/A"
+                )
+
+            tooltip += "<br><br><b>Revision:</b> #%s" % (
+                    sg_item.get("revision") or "N/A"
+            )
+
+            tooltip += "<br><br><b>Size:</b> %s MB" % (
+                (sg_item.get("fileSize") or "0")
+            )
+
+            tooltip += "<br><br><b>File Extension:</b> %s" % (
+                (data[4] or "N/A")
+            )
+            tooltip += "<br><br><b>File Type:</b> %s" % (
+                (data[5] or "N/A")
+            )
+
+            if not isinstance(sg_item.get("created_at"), datetime.datetime):
+                created_unixtime = sg_item.get("created_at") or 0
+                date_str = datetime.datetime.fromtimestamp(created_unixtime).strftime(
+                    "%Y-%m-%d %H:%M"
+                )
+            else:
+                date_str = sg_item.get("created_at").strftime("%Y-%m-%d %H:%M")
+
+            # created_by is set to None if the user has been deleted.
+            if sg_item.get("created_by") and sg_item["created_by"].get("name"):
+                author_str = sg_item["created_by"].get("name")
+            else:
+                author_str = "Unspecified User"
+
+            version = sg_item.get("version_number")
+            vers_str = "%03d" % version if version is not None else "N/A"
+
+            tooltip += "<br><br><b>Version:</b> %s by %s at %s" % (
+                vers_str,
+                author_str,
+                date_str,
+            )
+
+        tooltip += "<br><br><b>Task Name:</b> %s" % (
+            (data[7] or "N/A")
+        )
+
+        tooltip += "<br><br><b>Task Status:</b> %s" % (
+            (data[8] or "N/A")
+        )
+
+        tooltip += "<br><br><b>Path:</b> %s" % (
+            (sg_item.get("path") or {}).get("local_path")
+        )
+
+        tooltip += "<br><br><b>Description:</b> %s" % (
+            sg_item.get("description") or "No description given."
+        )
+
+
+        if sg_item.get("headChange"):
+            tooltip += "<br><br><b>Head change:</b> %s" % (
+                    sg_item.get("headChange") or "N/A"
+            )
+        if sg_item.get("change"):
+            tooltip += "<br><br><b>Change:</b> %s" % (
+                    sg_item.get("change") or "N/A"
+            )
+
+        if sg_item.get("entity"):
+            entity = sg_item.get("entity")
+            if entity:
+                entity_name = entity.get("name", "N/A")
+                tooltip += "<br><br><b>Entity:</b> %s" % entity_name
+                entity_id = entity.get("id", "N/A")
+                tooltip += "<br><br><b>Entity ID:</b> %s" % entity_id
+
+        return tooltip
+
+    def _path_difference(self, path1, path2):
+        # Normalize paths to use forward slashes and remove trailing slashes
+        path1 = os.path.normpath(path1)
+        path2 = os.path.normpath(path2)
+
+        # Split paths into components
+        components1 = path1.split(os.sep)
+        components2 = path2.split(os.sep)
+
+        # Find the common prefix
+        common_prefix = []
+        for component1, component2 in zip(components1, components2):
+            if component1 == component2:
+                common_prefix.append(component1)
+            else:
+                break
+
+        # Calculate the difference by removing the common prefix
+        #diff1 = components1[len(common_prefix):]
+        diff2 = components2[len(common_prefix):]
+
+        # Combine the difference components into a single path
+        difference = os.sep.join(diff2)
+
+        return difference
 
     def _print_sg_item(self, sg_item):
         for key, value in sg_item.items():
@@ -4723,7 +4941,7 @@ class AppDialog(QtGui.QWidget):
         self.print_publish_data()
 
         logger.debug(">>> main_view_mode is: {}".format(self.main_view_mode))
-        if self.main_view_mode == self.MAIN_VIEW_PERFORCE:
+        if self.main_view_mode == self.MAIN_VIEW_COLUMN:
             self._populate_perforce_widget()
         if self.main_view_mode == self.MAIN_VIEW_SUBMITTED:
             self._populate_submitted_widget()
@@ -5298,7 +5516,7 @@ class AppDialog(QtGui.QWidget):
         """
         Get large Perforce data
         """
-        item_path_dict = defaultdict(int)
+        self._item_path_dict = defaultdict(int)
         self._fstat_dict = {}
         self._submitted_changes = {}
         self._submitted_data_to_publish = []
@@ -5306,16 +5524,16 @@ class AppDialog(QtGui.QWidget):
         logger.debug("self._entity_path is: {}".format(self._entity_path))
 
         if self._entity_path:
-            item_path_dict[self._entity_path] += 1
+            self._item_path_dict[self._entity_path] += 1
         elif self._sg_data:
             for sg_item in self._sg_data:
                 if "path" in sg_item:
                     local_path = sg_item["path"].get("local_path")
                     if local_path:
                         item_path = os.path.dirname(local_path)
-                        item_path_dict[item_path] += 1
+                        self._item_path_dict[item_path] += 1
 
-        for key in item_path_dict:
+        for key in self._item_path_dict:
             if key:
                 logger.debug(">>>>>>>>>>  key is: {}".format(key))
                 key = self._convert_local_to_depot(key).rstrip('/')

@@ -744,7 +744,7 @@ class Ui_Dialog(object):
         self.list_mode.setToolTip(QtGui.QApplication.translate("Dialog", "List Mode", None, QtGui.QApplication.UnicodeUTF8))
         self.list_mode.setAccessibleName(QtGui.QApplication.translate("Dialog", "list_mode", None, QtGui.QApplication.UnicodeUTF8))
         self.list_mode.setText(QtGui.QApplication.translate("Dialog", "...", None, QtGui.QApplication.UnicodeUTF8))
-        self.perforce_mode.setToolTip(QtGui.QApplication.translate("Dialog", "Perforce Mode", None, QtGui.QApplication.UnicodeUTF8))
+        self.perforce_mode.setToolTip(QtGui.QApplication.translate("Dialog", "Column Mode", None, QtGui.QApplication.UnicodeUTF8))
         self.perforce_mode.setAccessibleName(QtGui.QApplication.translate("Dialog", "perforce_mode", None, QtGui.QApplication.UnicodeUTF8))
         self.perforce_mode.setText(QtGui.QApplication.translate("Dialog", "...", None, QtGui.QApplication.UnicodeUTF8))
         self.pending_mode.setToolTip(QtGui.QApplication.translate("Dialog", "Pending Mode", None, QtGui.QApplication.UnicodeUTF8))
