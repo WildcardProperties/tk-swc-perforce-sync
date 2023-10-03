@@ -173,7 +173,7 @@ class AppDialog(QtGui.QWidget):
 
         self.ui.thumbnail_mode.clicked.connect(self._on_thumbnail_mode_clicked)
         self.ui.list_mode.clicked.connect(self._on_list_mode_clicked)
-        self.ui.perforce_mode.clicked.connect(self._on_perforce_mode_clicked)
+        self.ui.column_mode.clicked.connect(self._on_column_mode_clicked)
         self.ui.submitted_mode.clicked.connect(self._on_submitted_mode_clicked)
         self.ui.pending_mode.clicked.connect(self._on_pending_mode_clicked)
         ###########################################
@@ -765,6 +765,12 @@ class AppDialog(QtGui.QWidget):
         self.repo_root = os.path.normpath(
             os.path.join(os.path.dirname(__file__), "..", "..")
         )
+        active_column_view_image_path = os.path.join(self.repo_root, "icons/mode_switch_column_active.png")
+        self.active_column_view_icon = QtGui.QIcon(QtGui.QPixmap(active_column_view_image_path))
+
+        inactive_column_view_image_path = os.path.join(self.repo_root, "icons/mode_switch_column_off.png")
+        self.inactive_column_view_icon = QtGui.QIcon(QtGui.QPixmap(inactive_column_view_image_path))
+
         submitted_image_path = os.path.join(self.repo_root, "icons/mode_switch_submitted_active.png")
         self.submitted_icon = QtGui.QIcon(QtGui.QPixmap(submitted_image_path))
 
@@ -1246,7 +1252,7 @@ class AppDialog(QtGui.QWidget):
         # self.ui.submitted_scroll.setWidget(publish_widget)
         #self.ui.submitted_scroll.setVisible(True)
 
-    def _setup_perforce_model(self, root):
+    def _setup_column_view_model(self, root):
         """
         Create the model and proxy model required by a Perforce .
 
@@ -1514,7 +1520,7 @@ class AppDialog(QtGui.QWidget):
         """
         self._set_main_view_mode(self.MAIN_VIEW_LIST)
 
-    def _on_perforce_mode_clicked(self):
+    def _on_column_mode_clicked(self):
         """
         Executed when someone clicks the column mode button
         """
@@ -1575,14 +1581,12 @@ class AppDialog(QtGui.QWidget):
             self._turn_all_modes_off()
             self.ui.table_view.setVisible(True)
             #self.ui.perforce_scroll.setVisible(True)
-            self.ui.perforce_mode.setIcon(
-                QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_card_active.png"))
-            )
-            self.ui.perforce_mode.setChecked(True)
+            self.ui.column_mode.setIcon(self.active_column_view_icon)
+            self.ui.column_mode.setChecked(True)
 
             self.main_view_mode = self.MAIN_VIEW_COLUMN
             self.ui.publish_view.setItemDelegate(self._publish_list_delegate)
-            self._populate_perforce_widget()
+            self._populate_column_view_widget()
 
         elif mode == self.MAIN_VIEW_SUBMITTED:
             self._turn_all_modes_off()
@@ -1631,7 +1635,7 @@ class AppDialog(QtGui.QWidget):
         self._settings_manager.store("main_view_mode", mode)
 
 
-    def _populate_perforce_widget(self):
+    def _populate_column_view_widget(self):
         #self._publish_model.hard_refresh()
         logger.debug(">>> Setting up Column View table ...")
         self._setup_table_view()
@@ -1675,19 +1679,19 @@ class AppDialog(QtGui.QWidget):
     
     def _setup_table_view(self):
         # Define the headers for the table
-        headers = ["Name", "Action", "Revision", "Size(MB)", "Extension", "Type",
+        headers = ["Folder", "Name", "Action", "Revision", "Size(MB)", "Extension", "Type",
                    "User", "Task", "Status",
-                   "Destination Path", "Description"]
+                   "Description"]
         #headers = ["Name", "Action", "Revision", "Size(MB)", " Extension", "Type", "Step",
         #           "Destination Path", "Description", "Entity Sub-Folder"]
 
         # Create a table model and set headers
-        self.perforce_model = QtGui.QStandardItemModel(0, len(headers))
-        self.perforce_model.setHorizontalHeaderLabels(headers)
+        self.column_view_model = QtGui.QStandardItemModel(0, len(headers))
+        self.column_view_model.setHorizontalHeaderLabels(headers)
 
         # Create a proxy model for sorting and grouping
         self.perforce_proxy_model = QtGui.QSortFilterProxyModel()
-        self.perforce_proxy_model.setSourceModel(self.perforce_model)
+        self.perforce_proxy_model.setSourceModel(self.column_view_model)
 
         self.ui.table_view.setModel(self.perforce_proxy_model)
 
@@ -1791,7 +1795,11 @@ class AppDialog(QtGui.QWidget):
                     path = sg_item.get("path", None)
                     if path:
                         local_path = path.get("local_path", "N/A")
-                        difference_str = self._path_difference(self._entity_path, local_path)
+                        if local_path and local_path != "N/A":
+                            local_directory = os.path.dirname(local_path)
+                            difference_str = self._path_difference(self._entity_path, local_directory)
+                            if difference_str:
+                                difference_str = "{}\\".format(difference_str)
 
 
                 file_extension = "N/A"
@@ -1844,9 +1852,9 @@ class AppDialog(QtGui.QWidget):
 
                 # Insert data into the table
                 # logger.debug(">>> Inserting row {} data".format(row))
-                item_data = [name, action, revision, size, file_extension, type,
+                item_data = [difference_str, name, action, revision, size, file_extension, type,
                                                 user_name, task_name, task_status,
-                                                difference_str, description]
+                                                description]
                 self._insert_perforce_row(row, item_data, sg_item)
                 # logger.debug(">>> Done with  row {}".format(row))
             except Exception as e:
@@ -1864,7 +1872,7 @@ class AppDialog(QtGui.QWidget):
                 item.setData(value, QtCore.Qt.DisplayRole)
             # if col == 9:
             #    item.setToolTip(local_path)
-            self.perforce_model.setItem(row, col, item)
+            self.column_view_model.setItem(row, col, item)
 
     def _get_tooltip(self, data, sg_item):
         """
@@ -1899,10 +1907,10 @@ class AppDialog(QtGui.QWidget):
             )
 
             tooltip += "<br><br><b>File Extension:</b> %s" % (
-                (data[4] or "N/A")
+                (data[5] or "N/A")
             )
             tooltip += "<br><br><b>File Type:</b> %s" % (
-                (data[5] or "N/A")
+                (data[6] or "N/A")
             )
 
             if not isinstance(sg_item.get("created_at"), datetime.datetime):
@@ -1929,11 +1937,11 @@ class AppDialog(QtGui.QWidget):
             )
 
         tooltip += "<br><br><b>Task Name:</b> %s" % (
-            (data[7] or "N/A")
+            (data[8] or "N/A")
         )
 
         tooltip += "<br><br><b>Task Status:</b> %s" % (
-            (data[8] or "N/A")
+            (data[9] or "N/A")
         )
 
         tooltip += "<br><br><b>Path:</b> %s" % (
@@ -2057,7 +2065,7 @@ class AppDialog(QtGui.QWidget):
 
         self.ui.thumbnail_mode.setChecked(False)
         self.ui.list_mode.setChecked(False)
-        self.ui.perforce_mode.setChecked(False)
+        self.ui.column_mode.setChecked(False)
         self.ui.submitted_mode.setChecked(False)
         self.ui.pending_mode.setChecked(False)
 
@@ -2067,8 +2075,8 @@ class AppDialog(QtGui.QWidget):
         self.ui.thumbnail_mode.setIcon(
             QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_thumb.png"))
         )
-        self.ui.perforce_mode.setIcon(
-            QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_card.png"))
+        self.ui.column_mode.setIcon(
+            QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_column.png"))
         )
         """
         self.ui.submitted_mode.setIcon(
@@ -2079,9 +2087,13 @@ class AppDialog(QtGui.QWidget):
         )
         """
 
+
         repo_root = os.path.normpath(
             os.path.join(os.path.dirname(__file__), "..", "..")
         )
+
+        inactive_column_view_image_path = os.path.join(repo_root, "icons/mode_switch_column_off.png")
+        inactive_column_view_icon = QtGui.QIcon(QtGui.QPixmap(inactive_column_view_image_path))
 
         inactive_submitted_image_path = os.path.join(repo_root, "icons/submitted_off.png")
         submitted_icon_inactive = QtGui.QIcon(QtGui.QPixmap(inactive_submitted_image_path))
@@ -2089,6 +2101,7 @@ class AppDialog(QtGui.QWidget):
         inactive_pending_image_path = os.path.join(repo_root, "icons/pending_off.png")
         pending_icon_inactive = QtGui.QIcon(QtGui.QPixmap(inactive_pending_image_path))
 
+        self.ui.column_mode.setIcon(inactive_column_view_icon)
         self.ui.submitted_mode.setIcon(submitted_icon_inactive)
         self.ui.pending_mode.setIcon(pending_icon_inactive)
         self._show_thumb_scale(False)
@@ -4942,7 +4955,7 @@ class AppDialog(QtGui.QWidget):
 
         logger.debug(">>> main_view_mode is: {}".format(self.main_view_mode))
         if self.main_view_mode == self.MAIN_VIEW_COLUMN:
-            self._populate_perforce_widget()
+            self._populate_column_view_widget()
         if self.main_view_mode == self.MAIN_VIEW_SUBMITTED:
             self._populate_submitted_widget()
 
