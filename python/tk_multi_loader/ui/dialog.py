@@ -288,12 +288,11 @@ class Ui_Dialog(object):
         self.horizontalLayout_7.addWidget(self.publish_view)
 
         self.column_view = QtWidgets.QTableView(self.publish_frame)
-        # Make the column view single selection
-        # self.column_view.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+
         # Set the selection behavior to select whole rows
         self.column_view.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         # Set the selection mode to single selection or multi-selection
-        self.column_view.setSelectionMode(QtWidgets.QAbstractItemView.MultiSelection)
+        #self.column_view.setSelectionMode(QtWidgets.QAbstractItemView.MultiSelection)
 
         self.horizontalLayout_7.addWidget(self.column_view)
         self.column_view.setVisible(False)
