@@ -5211,7 +5211,7 @@ class AppDialog(QtGui.QWidget):
         # Get the current user's ID
         try:
             user = login.get_current_user(self._app.sgtk)
-            logger.debug("Current user is {}".format(user))
+            # logger.debug("Current user is {}".format(user))
             current_user_id = user.get("id", None)
 
             if not current_user_id:
@@ -5247,8 +5247,21 @@ class AppDialog(QtGui.QWidget):
                     entity_type = entity.get("type", None)
                     if entity_type and entity_id:
                         try:
-                            logger.debug("Creating folder structure for entity:{} ...".format(entity))
-                            self._app.sgtk.create_filesystem_structure(entity_type, entity_id)
+                            paths_from_entity = self._app.sgtk.paths_from_entity(entity_type, entity_id)
+                            logger.debug("paths_from_entity is: {}".format(paths_from_entity))
+                            if paths_from_entity and len(paths_from_entity) > 0:
+                                result = self._check_paths_exist(paths_from_entity)
+                                if not result:
+                                    logger.debug("Paths do not exist for entity:{} on user system".format(entity))
+                                    logger.debug("Creating folder structure for entity:{} ...".format(entity))
+                                    self._app.sgtk.create_filesystem_structure(entity_type, entity_id)
+                                else:
+                                    logger.debug("Paths exist for entity:{} on user system".format(entity))
+                            else:
+                                logger.debug("No paths exist for entity:{} on SG".format(entity))
+                                logger.debug("Creating folder structure for entity:{} ...".format(entity))
+                                self._app.sgtk.create_filesystem_structure(entity_type, entity_id)
+
                         except Exception as e:
                             msg = "\n Unable to create file system structure for entity: {}, {} \n".format(entity_id, e)
                             logger.debug(msg)
@@ -5259,6 +5272,15 @@ class AppDialog(QtGui.QWidget):
             pass
 
 
+    def _check_paths_exist(self, paths):
+        """
+        Check if the paths exist on disk
+        """
+        result = True
+        for path in paths:
+            if not os.path.exists(path):
+                result = False
+        return result
 
     def _create_filesystem_structure(self, entity_data):
         """
