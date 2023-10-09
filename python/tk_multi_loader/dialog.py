@@ -2266,11 +2266,12 @@ class AppDialog(QtGui.QWidget):
             logger.debug("Detailed pan is not visible")
             return
 
+        selected_indexes = self.ui.column_view.selectionModel().selectedRows()
+        if selected_indexes and len(selected_indexes) > 1:
+            logger.debug("More than one row selected")
+            __clear_publish_file_history(self._multiple_publishes_pixmap)
+            return
 
-        #if len(items) == 0:
-        #    __clear_publish_file_history(self._no_selection_pixmap)
-        #elif len(items) > 1:
-        #    __clear_publish_file_history(self._multiple_publishes_pixmap)
         if id == 0:
             logger.debug("ID is 0")
             __clear_publish_file_history(self._no_selection_pixmap)
