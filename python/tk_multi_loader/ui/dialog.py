@@ -287,9 +287,11 @@ class Ui_Dialog(object):
         self.publish_view.setObjectName("publish_view")
         self.horizontalLayout_7.addWidget(self.publish_view)
 
-        self.table_view = QtWidgets.QTableView(self.publish_frame)
-        self.horizontalLayout_7.addWidget(self.table_view)
-        self.table_view.setVisible(False)
+        self.column_view = QtWidgets.QTableView(self.publish_frame)
+        # Make the column view single selection
+        self.column_view.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.horizontalLayout_7.addWidget(self.column_view)
+        self.column_view.setVisible(False)
 
         self.perforce_scroll = QtWidgets.QScrollArea(self.publish_frame)
         self.perforce_scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)

@@ -6,7 +6,7 @@ from .date_time import create_publish_timestamp
 import os
 import sgtk
 from sgtk.util import login
-from .perforce_change import add_to_change
+from .perforce_change import add_to_change, submit_change
 
 logger = sgtk.platform.get_logger(__name__)
 
@@ -66,22 +66,34 @@ class SWCTreeView(QtWidgets.QTreeView):
             target_data = target_index.data(QtCore.Qt.DisplayRole)
             logger.debug("<<<<<<<  New parent data (changelist number): {}".format(target_data))
             #change = target_index.data(QtCore.Qt.ToolTipRole)
-            change = target_index.data(QtCore.Qt.UserRole)
-            logger.debug("<<<<<<<  parent change is: {}".format(change))
+            target_changelist = target_index.data(QtCore.Qt.UserRole)
+            target_changelist = str(target_changelist)
+            logger.debug("<<<<<<<  parent change is: {}".format(target_changelist))
             #change = 19110
 
             # Retrieve the source item's data (depot file path)
             for source_index in self.selectedIndexes():
                 source_data = source_index.data(QtCore.Qt.DisplayRole)
+                source_changelist = source_index.data(QtCore.Qt.UserRole)
+                source_changelist = str(source_changelist)
 
                 if source_data:
                     dragged_file = source_data.split("#")[0]
+                    dragged_file = dragged_file.strip()
                     logger.debug("<<<<<<<  Source data (depot file): {}".format(dragged_file))
                     # Add the depot file to the new changelist
-                    res = add_to_change(self.p4, change, dragged_file)
+                    logger.debug("Adding dragged file: {} to changelist: {}".format(dragged_file, target_changelist))
 
-            # Add the depot file to the new changelist
-            # add_to_changelist(source_data, target_data)
+                    #res = add_to_change(self.p4, change, dragged_file)
+                    #reopen_res = self.p4.run_reopen('-c {} {}'.format(target_changelist, dragged_file + '@' + source_changelist))
+                    # reopen_res = self.p4.run_fetch("-c", str(target_changelist), dragged_file)
+                    reopen_res = self.p4.run_reopen("-c", target_changelist, dragged_file)
+                    logger.debug("<<<<<<<  Result of reopen: {}".format(reopen_res))
+                    # Submit the file to the target changelist
+                    #submit_res = self.p4.run_submit("-c", target_changelist, dragged_file)
+                    #logger.debug("<<<<<<<  Result of submit: {}".format(submit_res))
+
+
 
             # Call the base dropEvent implementation
             super().dropEvent(event)

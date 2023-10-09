@@ -16,7 +16,8 @@ Common utilities for working with Perforce changes
 from sgtk import TankError, LogManager
 
 log = LogManager.get_logger(__name__)
-
+import sgtk
+logger = sgtk.platform.get_logger(__name__)
 
 def create_change(p4, description):
     """
@@ -64,13 +65,25 @@ def add_to_change(p4, change, file_paths):
         add_res = p4.run_reopen("-c", str(change), file_paths)
         # add_res = p4.run_edit("-c", str(change), file_paths)
 
-    except:
-        msg = "Perforce: %s" % (p4.errors[0] if p4.errors else e)
-        log.debug(msg)
-    #except P4Exception as e:
-    #   raise TankError("Perforce: %s" % (p4.errors[0] if p4.errors else e))
+    except Exception as e:
+
+        msg = "Error adding files {} to changelist: {}, error: {}".format(file_paths, file_paths, e)
+        logger.debug(msg)
     return add_res
 
+def add_depotfiles_to_change(p4, change, depot_file_paths):
+    """
+    Add the specified depot files to the specified change
+    """
+    add_res = None
+    try:
+        # Use fetch command to add depot files to the changelist
+        add_res = p4.run_fetch("-c", str(change), depot_file_paths)
+
+    except Exception as e:
+        msg = "Error adding depot files {} to changelist: {}, error: {}".format(depot_file_paths, change, e)
+        logger.debug(msg)
+    return add_res
 
 def add_to_default_changelist(p4, file_paths):
     """

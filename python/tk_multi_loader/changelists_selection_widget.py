@@ -70,18 +70,22 @@ class ChangelistSelectionWidget(QtWidgets.QDialog):
         self.changelists_lst.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.changelists_lst.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         self.changelists_lst.setToolTip('Select a changelist')
+        # Set changelists_lst row height
+        self.changelists_lst.setStyleSheet("QListView::item { height: 30px; }")
 
 
         # changelists description
-        self.changelists_desc_label = QtWidgets.QLabel('Selected changelist description')
+        self.changelists_desc_label = QtWidgets.QLabel('Changelist description')
         self.changelists_description = QtWidgets.QLineEdit()
 
         
         # Load Shot Button
+        self.new_button = QtWidgets.QPushButton('New changelist')
+        self.new_button.setFixedWidth(220)
+        self.new_button.setFixedHeight(30)
         self.ok_button = QtWidgets.QPushButton('Add files to selected changelist')
         self.ok_button.setFixedWidth(220)
-        self.cancel_button = QtWidgets.QPushButton('Cancel')
-        self.cancel_button.setFixedWidth(220)
+        self.ok_button.setFixedHeight(30)
 
         # Setup Layouts
         self.load_changelists_layout.addWidget(self.load_changelists_frame)
@@ -90,12 +94,11 @@ class ChangelistSelectionWidget(QtWidgets.QDialog):
         self.load_changelists_widget_layout.addWidget(self.changelists_desc_label)
         self.load_changelists_widget_layout.addWidget(self.changelists_description)
 
-        # Load Options
-
 
         # Load Button
+        self.load_buttons_layout.addWidget(self.new_button, alignment=QtCore.Qt.AlignCenter)
         self. load_buttons_layout.addWidget(self.ok_button, alignment=QtCore.Qt.AlignCenter)
-        self. load_buttons_layout.addWidget(self.cancel_button, alignment=QtCore.Qt.AlignCenter)
+
 
        
         # ----------------------------------------------------------------------------------------------------

@@ -9,6 +9,7 @@ from tank.platform.qt5 import QtWidgets
 
 from .changelists_selection_widget import ChangelistSelectionWidget
 from .perform_actions import PerformActions
+from .perforce_change import create_change
 
 import sgtk
 logger = sgtk.platform.get_logger(__name__)
@@ -35,8 +36,6 @@ class ChangelistSelection(QtWidgets.QDialog):
         self.parent = parent
         self.change = None
 
-
-
         # Variables
         self.changelists_widget = ChangelistSelectionWidget()
         self.changelists_lst = self.changelists_widget.changelists_lst
@@ -58,11 +57,15 @@ class ChangelistSelection(QtWidgets.QDialog):
         self.main_layout.addWidget(self.changelists_widget)
         self.setLayout(self.main_layout)
         self.changelists_widget.ok_button.clicked.connect(self.set_changelist)
-        self.changelists_widget.cancel_button.clicked.connect(self.close_widget)
+        self.changelists_widget.new_button.clicked.connect(self.create_new_changelist)
+        #self.changelists_widget.cancel_button.clicked.connect(self.close_widget)
 
     def populate_changelists_lst(self):
 
         self.changelists_lst.clear()
+
+        # Add the "default" changelist
+        self.changelists_lst.addItem("default")
 
         client = self.p4.fetch_client()
         workspace = client.get("Client", None)
@@ -71,16 +74,13 @@ class ChangelistSelection(QtWidgets.QDialog):
             change_lists = self.p4.run_changes("-l", "-s", "pending", "-c", workspace)
             # logger.debug("<<<<<<<  change_lists: {}".format(change_lists))
 
+            # Get the pending changelists
             for change_list in change_lists:
                 change = change_list.get("change", None)
                 desc = change_list.get('desc', None)
                 item_str = "{} {}".format(change, desc)
                 self.changelists_lst.addItem(item_str)
 
-            #self.changelists_lst.addItem('')
-            #index = self.changelists_lst.findText('')
-
-            #self.changelists_lst.setCurrentIndex(index)
 
     def populate_changelists_description(self, item):
         """
@@ -98,6 +98,28 @@ class ChangelistSelection(QtWidgets.QDialog):
                 self.changelists_description.setText(desc)
         except Exception as e:
             logger.debug("Error populating changelist description: {}".format(e))
+
+
+    def create_new_changelist(self):
+        """
+        Create a new changelist
+        :return:
+        """
+        try:
+            description = self.changelists_widget.changelists_description.text()
+            description = description.strip()
+            # Create a new changelist using the current workspace and description desc
+            change = create_change(self.p4, description)
+            logger.debug(">>>> new changelist: {}".format(change))
+            # Add the new changelist to the list
+            self.changelists_lst.addItem("{} {}".format(change, description))
+            self.changelists_lst.setCurrentRow(self.changelists_lst.count() - 1)
+            # Select the new changelist
+
+            self.change = str(change)
+
+        except Exception as e:
+            logger.debug("Error creating new changelist: {}".format(e))
 
     def close_widget(self):
         self.close()

@@ -674,7 +674,7 @@ class AppDialog(QtGui.QWidget):
 
         #################################################
         #Table view setup
-        self._setup_table_view()
+        self._setup_column_view()
 
         #################################################
         # setup file_history
@@ -1579,7 +1579,7 @@ class AppDialog(QtGui.QWidget):
 
         elif mode == self.MAIN_VIEW_COLUMN:
             self._turn_all_modes_off()
-            self.ui.table_view.setVisible(True)
+            self.ui.column_view.setVisible(True)
             #self.ui.perforce_scroll.setVisible(True)
             self.ui.column_mode.setIcon(self.active_column_view_icon)
             self.ui.column_mode.setChecked(True)
@@ -1626,7 +1626,7 @@ class AppDialog(QtGui.QWidget):
             # Pending Scroll Area
             self.ui.pending_scroll.setWidget(publish_widget)
             # self._change_dict = {}
-            msg = "\n <span style='color:#2C93E2'>Select files in the Pending view then click <i>Submit Files</i>to publish them using the <i>Shotgrid Publisher</i>...</span> \n"
+            msg = "\n <span style='color:#2C93E2'>Choose the files you want to publish from the Pending view and then initiate the publishing process by clicking 'Submit Files' using the Shotgrid Publisher.</span> \n"
             self._add_log(msg, 2)
         else:
             raise TankError("Undefined view mode!")
@@ -1637,22 +1637,31 @@ class AppDialog(QtGui.QWidget):
 
     def _populate_column_view_widget(self):
         #self._publish_model.hard_refresh()
+        self.column_view_dict = {}
         logger.debug(">>> Setting up Column View table ...")
-        self._setup_table_view()
+        self._setup_column_view()
         logger.debug(">>> Getting Perforce data...")
-        perforce_sg_data = self._get_perforce_sg_data()
-        length = len(perforce_sg_data)
-        if not perforce_sg_data:
-            perforce_sg_data = self._sg_data
-        if perforce_sg_data and length > 0:
+        self._perforce_sg_data = self._get_perforce_sg_data()
+        length = len(self._perforce_sg_data)
+        if not self._perforce_sg_data:
+            self._perforce_sg_data = self._sg_data
+        if self._perforce_sg_data and length > 0:
             msg = "\n <span style='color:#2C93E2'>Populating the Column View with {} files. Please wait...</span> \n".format(
                 length)
             self._add_log(msg, 2)
             logger.debug(">>> Getting Perforce file size...")
-            perforce_sg_data = self._get_perforce_size(perforce_sg_data)
+            self._perforce_sg_data = self._get_perforce_size(self._perforce_sg_data)
             logger.debug(">>> Populating Column View table...")
-            self._populate_perforce_table(perforce_sg_data)
+            self._populate_column_view(self._perforce_sg_data)
             logger.debug(">>> Updating Column View is complete")
+            for sg_item in self._perforce_sg_data:
+                id = sg_item.get("id", 0)
+                self.column_view_dict[id] = sg_item
+            self._get_publish_icons()
+
+            #for key, value in self.column_view_dict.items():
+            #   logger.debug("key: {}, value: {}".format(key, value))
+
 
         
     def _get_perforce_sg_data(self):
@@ -1675,12 +1684,12 @@ class AppDialog(QtGui.QWidget):
         return perforce_sg_data
 
     def _reset_perforce_widget(self):
-        self.ui.table_view = QtWidgets.QTableView()
+        self.ui.column_view = QtWidgets.QTableView()
     
-    def _setup_table_view(self):
+    def _setup_column_view(self):
         # Define the headers for the table
         headers = ["Folder", "Name", "Action", "Revision", "Size(MB)", "Extension", "Type",
-                   "User", "Task", "Status",
+                   "User", "Task", "Status", "ID",
                    "Description"]
         #headers = ["Name", "Action", "Revision", "Size(MB)", " Extension", "Type", "Step",
         #           "Destination Path", "Description", "Entity Sub-Folder"]
@@ -1693,30 +1702,134 @@ class AppDialog(QtGui.QWidget):
         self.perforce_proxy_model = QtGui.QSortFilterProxyModel()
         self.perforce_proxy_model.setSourceModel(self.column_view_model)
 
-        self.ui.table_view.setModel(self.perforce_proxy_model)
+        self.ui.column_view.setModel(self.perforce_proxy_model)
 
         # Set the header to be clickable for sorting
-        self.ui.table_view.horizontalHeader().setSectionsClickable(True)
-        self.ui.table_view.horizontalHeader().setSortIndicatorShown(True)
+        self.ui.column_view.horizontalHeader().setSectionsClickable(True)
+        self.ui.column_view.horizontalHeader().setSortIndicatorShown(True)
 
         # Sort by the first column initially
-        self.ui.table_view.sortByColumn(0, QtCore.Qt.AscendingOrder)
+        self.ui.column_view.sortByColumn(0, QtCore.Qt.AscendingOrder)
 
         # Grouping by "Entity Sub-Folder"
-        self.ui.table_view.setSortingEnabled(True)
-        #self.ui.table_view.sortByColumn(12, QtCore.Qt.AscendingOrder)
+        self.ui.column_view.setSortingEnabled(True)
+        #self.ui.column_view.sortByColumn(12, QtCore.Qt.AscendingOrder)
 
-        header = self.ui.table_view.horizontalHeader()
+        header = self.ui.column_view.horizontalHeader()
         for col in range(len(headers)):
             header.setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
 
+        self.ui.column_view.clicked.connect(self.on_column_view_row_clicked)
+
+        self._create_column_view_context_menu()
         # Set different column widths
-        #header = self.ui.table_view.horizontalHeader()
+        #header = self.ui.column_view.horizontalHeader()
         #header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)  # Auto size column 0
         #header.setSectionResizeMode(1, QtWidgets.QHeaderView.Fixed)
         #header.resizeSection(1, 300)  # Set width of column 1 to 300
 
-        #self.ui.table_view.setGroupByColumn(7)
+        #self.ui.column_view.setGroupByColumn(7)
+
+    def _create_column_view_context_menu(self):
+        self._column_add_action = QtGui.QAction("Add", self.ui.column_view)
+        self._column_add_action.triggered.connect(lambda: self._on_column_model_action("add"))
+        self._column_edit_action = QtGui.QAction("Edit", self.ui.column_view)
+        self._column_edit_action.triggered.connect(lambda: self._on_column_model_action("edit"))
+        self._column_delete_action = QtGui.QAction("Delete", self.ui.column_view)
+        self._column_delete_action.triggered.connect(lambda: self._on_column_model_action("delete"))
+
+
+        self._column_revert_action = QtGui.QAction("Revert", self.ui.column_view)
+        self._column_revert_action.triggered.connect(lambda: self._on_column_model_action("revert"))
+
+        #self._column_refresh_action = QtGui.QAction("Refresh", self.ui.column_view)
+        #self._column_refresh_action.triggered.connect(self._publish_model.async_refresh)
+
+        self.ui.column_view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.ui.column_view.customContextMenuRequested.connect(
+            self._show_column_actions
+        )
+    def _show_column_actions(self, pos):
+        """
+               Shows the actions for the current publish selection.
+
+               :param pos: Local coordinates inside the viewport when the context menu was requested.
+        """
+
+        # Build a menu with all the actions.
+        menu = QtGui.QMenu(self)
+        actions = self._action_manager.get_actions_for_publishes(
+            self.selected_publishes, self._action_manager.UI_AREA_MAIN
+        )
+        menu.addActions(actions)
+
+        # Qt is our friend here. If there are no actions available, the separator won't be added, yay!
+        menu.addSeparator()
+        menu.addAction(self._column_add_action)
+        menu.addAction(self._column_edit_action)
+        menu.addAction(self._column_delete_action)
+        menu.addSeparator()
+        menu.addAction(self._column_revert_action)
+        menu.addSeparator()
+        #menu.addAction(self._column_refresh_action)
+
+        # Wait for the user to pick something.
+        menu.exec_(self.ui.column_view.mapToGlobal(pos))
+
+    def _create_column_view_context_menu_old(self):
+        self.context_menu = QtWidgets.QMenu(self)
+        self._column_add_action = self.context_menu.addAction("Add")
+        self._column_edit_action = self.context_menu.addAction("Edit")
+        self._column_delete_action = self.context_menu.addAction("Delete")
+        self.context_menu.addSeparator()
+        self._column_revert_action = self.context_menu.addAction("Revert")
+        self.context_menu.addSeparator()
+        #self._column_refresh_action = self.context_menu.addAction("Refresh")
+
+        # Connect the actions to their respective callbacks
+
+        self._column_add_action.triggered.connect(lambda: self._on_column_model_action("add"))
+        self._column_edit_action.triggered.connect(lambda: self._on_column_model_action("edit"))
+        self._column_delete_action.triggered.connect(lambda: self._on_column_model_action("delete"))
+        self._column_revert_action.triggered.connect(lambda: self._on_column_model_action("revert"))
+        #self._column_refresh_action.triggered.connect(lambda: self._on_column_model_action("refresh"))
+
+        # Connect the context menu to the table view
+        self.ui.column_view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.ui.column_view.customContextMenuRequested.connect(self.show_context_menu)
+
+    def show_context_menu(self, pos):
+        # Show the context menu at the cursor position
+        selected_index = self.ui.column_view.indexAt(pos)
+        if selected_index.isValid():
+            source_index = self.perforce_proxy_model.mapToSource(selected_index)
+            selected_row_data = self.get_row_data_from_source(source_index)
+            if selected_row_data:
+                self.context_menu.exec_(self.ui.column_view.mapToGlobal(pos))
+
+    def get_row_data_from_source(self, source_index):
+        # Get data from the source model using the source index
+        row_data = []
+        if source_index.isValid():
+            row_number = source_index.row()
+            for col in range(self.column_view_model.columnCount()):
+                item = source_index.model().item(row_number, col)
+                if item:
+                    row_data.append(item.text())
+        logger.debug("Row data: {}".format(row_data))
+        return row_data
+
+
+    def on_column_view_row_clicked(self, index):
+        source_index = self.perforce_proxy_model.mapToSource(index)
+        row_number = source_index.row()
+        item = self.column_view_model.item(row_number, 10)  # Assuming you want data from the first column
+        if item:
+            data = item.text()
+            # Perform actions with the data from the clicked row
+            logger.debug(f"Clicked Row {row_number}, Data: {data}")
+            id = int(data)
+            self._setup_column_details_panel(id)
         
     def _get_perforce_size(self, sg_data):
         """
@@ -1772,7 +1885,7 @@ class AppDialog(QtGui.QWidget):
             pass
         return sg_data
 
-    def _populate_perforce_table(self, sg_data):
+    def _populate_column_view(self, sg_data):
         """ Populate the table with data"""
         row = 0
         for sg_item in sg_data:
@@ -1811,22 +1924,7 @@ class AppDialog(QtGui.QWidget):
                     type = self.settings.get(file_extension, "N/A")
 
                 size = sg_item.get("fileSize", 0)
-                """
-                try:
 
-                    if local_path and local_path != "N/A":
-                        fstat_list = self._p4.run("fstat", "-T", "fileSize", "-Ol", local_path)
-                        if fstat_list and len(fstat_list) > 0:
-                            fstat = fstat_list[0]
-                            if fstat:
-                                size = fstat.get("fileSize", "N/A")
-                                if size != "N/A":
-                                    size = "{:.2f}".format(int(size) / 1024 / 1024)
-                                    size = float(size)
-                except Exception as e:
-                    logger.debug("Failed to get file size for %s, error: %s"% local_path, e)
-                    pass
-                """
                 # published_file_type = sg_item.get("published_file_type", {}).get("name", "N/A")
                 # Todo: get the step
                 #step = sg_item.get("step", {}).get("name", "N/A")
@@ -1848,12 +1946,17 @@ class AppDialog(QtGui.QWidget):
                     if user:
                         user_name = user.get("name", "N/A")
 
+                publish_id = 0
+                if "id" in sg_item:
+                    publish_id = sg_item.get("id", 0)
+
+
                 # entity_sub_folder = sg_item.get("entity.Sub-Folder", "N/A")
 
                 # Insert data into the table
                 # logger.debug(">>> Inserting row {} data".format(row))
                 item_data = [difference_str, name, action, revision, size, file_extension, type,
-                                                user_name, task_name, task_status,
+                                                user_name, task_name, task_status, publish_id,
                                                 description]
                 self._insert_perforce_row(row, item_data, sg_item)
                 # logger.debug(">>> Done with  row {}".format(row))
@@ -1870,10 +1973,98 @@ class AppDialog(QtGui.QWidget):
             item.setToolTip(tooltip)
             if col == 3:
                 item.setData(value, QtCore.Qt.DisplayRole)
-            # if col == 9:
-            #    item.setToolTip(local_path)
+
             self.column_view_model.setItem(row, col, item)
 
+    def print_selected_row(self):
+        # Get the selected indexes from the column view
+        selected_indexes = self.ui.column_view.selectionModel().selectedRows()
+
+        if selected_indexes:
+            for index in selected_indexes:
+                row_number = index.row()
+                print(f"Selected Row {row_number + 1}:")
+                # You can access the data in each column of the selected row like this:
+                for col in range(self.column_view_model.columnCount()):
+                    item = self.column_view_model.item(row_number, col)
+                    print(f"Column {col + 1}: {item.text()}")
+        else:
+            print("No rows selected.")
+
+    def _on_column_model_action(self, action):
+
+        logger.debug("Add clicked")
+        selected_index = self.ui.column_view.currentIndex()
+        source_index = self.perforce_proxy_model.mapToSource(selected_index)
+        selected_row_data = self.get_row_data_from_source(source_index)
+        id = 0
+        if (len(selected_row_data) >= 11):
+            id = selected_row_data[10]
+
+        sg_item = self.column_view_dict.get(int(id), None)
+        logger.debug("selected_row_data: {}".format(selected_row_data))
+        selected_actions = []
+        if "path" in sg_item:
+            if "local_path" in sg_item["path"]:
+                target_file = sg_item["path"].get("local_path", None)
+                depot_file = sg_item.get("depotFile", None)
+
+                if action in ["add", "move/add", "edit", "delete"]:
+                    sg_item_action = sg_item.get("action", None)
+                    if sg_item_action and sg_item_action == "delete":
+                        msg = "Cannot perform the action on the file {} as it has already been marked for deletion or is deleted.".format(
+                            depot_file)
+
+                        self._add_log(msg, 2)
+
+                    if action == "delete":
+                        msg = "Marking file {} for deletion ...".format(depot_file)
+                    else:
+                        msg = "{} file {}".format(action, depot_file)
+                    self._add_log(msg, 2)
+                    selected_actions.append((sg_item, action))
+
+                elif action == "revert":
+                    msg = "Revert file {} ...".format(target_file)
+                    self._add_log(msg, 3)
+                    # p4_result = self._p4.run("revert", "-v", target_file)
+                    p4_result = self._p4.run("revert", target_file)
+                    if p4_result:
+                        self.refresh_publish_data()
+
+        if selected_actions:
+            self.peform_changelist_selection(selected_actions)
+        # Clear the focus from the triggered action to make it not highlighted (not selected)
+        #sender_action = self.sender()
+        #if sender_action:
+        #    sender_action.clearFocus()
+        #self._column_edit_action.clearFocus()
+            # Hide the context menu to make it close after selecting a menu item
+        #self.context_menu.hide()
+
+    """
+    def _insert_perforce_row(self, row, data, sg_item):
+        # Create an empty dictionary to store the sg_item in the row
+        sg_item_dict = {}
+
+        for col, value in enumerate(data):
+            item = QtGui.QStandardItem(str(value))
+            tooltip = self._get_tooltip(data, sg_item)
+            item.setToolTip(tooltip)
+            if col == 3:
+                item.setData(value, QtCore.Qt.DisplayRole)
+
+            # Add sg_item to the dictionary with a key that identifies the item
+            if col == 1:  # Assuming the 'Name' column uniquely identifies the item
+                sg_item_dict[value] = sg_item
+
+            self.column_view_model.setItem(row, col, item)
+
+        # Store the sg_item dictionary in the data role of the row
+        item = QtGui.QStandardItem()
+        item.setData(sg_item_dict, QtCore.Qt.UserRole)
+        self.column_view_model.setItem(row, len(data), item)
+    """
     def _get_tooltip(self, data, sg_item):
         """
         Gets a tooltip for this model item.
@@ -2002,6 +2193,227 @@ class AppDialog(QtGui.QWidget):
         for key, value in sg_item.items():
             msg = "{}: {}".format(key, value)
             logger.debug(msg)
+    def _get_publish_icons(self):
+        """
+        Get the icons for the publish view.
+        """
+        total_file_count = 0
+        self._publish_icons = {}
+
+        model = self.ui.publish_view.model()
+        for row in range(model.rowCount()):
+            model_index = model.index(row, 0)
+            proxy_model = model_index.model()
+            source_index = proxy_model.mapToSource(model_index)
+            # now we have arrived at our model derived from StandardItemModel
+            # so let's retrieve the standarditem object associated with the index
+            item = source_index.model().itemFromIndex(source_index)
+
+            is_folder = item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
+            if not is_folder:
+                # Run default action.
+                total_file_count += 1
+                sg_item = shotgun_model.get_sg_data(model_index)
+                id = sg_item.get("id", None)
+                icon = item.icon()
+                if id and icon:
+                    id = int(id)
+                    self._publish_icons[id] = icon
+
+    def _setup_column_details_panel(self, id):
+        """
+        Sets up the file details panel with info for a given column view row.
+        """
+
+        def __make_table_row(left, right):
+            """
+            Helper method to make a detail table row
+            """
+            return (
+                "<tr><td><b style='color:#2C93E2'>%s</b>&nbsp;</td><td>%s</td></tr>"
+                % (left, right)
+            )
+
+        def __set_publish_ui_visibility(is_publish):
+            """
+            Helper method to enable disable publish specific details UI
+            """
+            # disable version file_history stuff
+            self.ui.version_file_history_label.setEnabled(is_publish)
+            self.ui.file_history_view.setEnabled(is_publish)
+
+            # hide actions and playback stuff
+            self.ui.file_detail_actions_btn.setVisible(is_publish)
+            self.ui.file_detail_playback_btn.setVisible(is_publish)
+
+
+        def __clear_publish_file_history(pixmap):
+            """
+            Helper method that clears the file_history view on the right hand side.
+
+            :param pixmap: image to set at the top of the file_history view.
+            """
+            self._publish_file_history_model.clear()
+            self.ui.file_details_header.setText("")
+            self.ui.file_details_image.setPixmap(pixmap)
+            __set_publish_ui_visibility(False)
+
+        # note - before the UI has been shown, querying isVisible on the actual
+        # widget doesn't work here so use member variable to track state instead
+        if not self._details_pane_visible:
+            logger.debug("Detailed pan is not visible")
+            return
+
+
+        #if len(items) == 0:
+        #    __clear_publish_file_history(self._no_selection_pixmap)
+        #elif len(items) > 1:
+        #    __clear_publish_file_history(self._multiple_publishes_pixmap)
+        if id == 0:
+            logger.debug("ID is 0")
+            __clear_publish_file_history(self._no_selection_pixmap)
+
+        else:
+            if id not in self.column_view_dict:
+                logger.debug("id is not available in the column view")
+                __clear_publish_file_history(self._no_selection_pixmap)
+                __set_publish_ui_visibility(False)
+                return
+            else:
+
+                sg_item = self.column_view_dict[id]
+                if not sg_item:
+                    logger.debug("sg_item is empty")
+                    __clear_publish_file_history(self._no_selection_pixmap)
+                    __set_publish_ui_visibility(False)
+                    return
+
+                __set_publish_ui_visibility(True)
+                """
+                import urllib.request
+
+                image_data = sg_item.get('image', None)
+                
+                if image_data:
+                    # Define the local path to save the image
+                    local_image_path = "/temp/path_to_save_local_image.png"  # Replace with the desired local path
+
+                    # Save the downloaded image data to the local file
+                    with open(local_image_path, "wb") as local_image_file:
+                        local_image_file.write(image_data)
+
+                self.ui.file_details_image.setPixmap(QtGui.QPixmap(local_image_path))
+                """
+
+                if self._publish_icons and id in self._publish_icons:
+                    thumb_pixmap = self._publish_icons[id].pixmap(512)
+                    self.ui.file_details_image.setPixmap(thumb_pixmap)
+
+                # thumb_pixmap = item.icon().pixmap(512)
+                # self.ui.file_details_image.setPixmap(thumb_pixmap)
+
+
+                # sort out the actions button
+                actions = self._action_manager.get_actions_for_publish(
+                    sg_item, self._action_manager.UI_AREA_DETAILS
+                )
+                if len(actions) == 0:
+                    self.ui.file_detail_actions_btn.setVisible(False)
+                else:
+                    self.ui.file_detail_playback_btn.setVisible(True)
+                    self._file_details_action_menu.clear()
+                    for a in actions:
+                        self._dynamic_widgets.append(a)
+                        self._file_details_action_menu.addAction(a)
+
+                # if there is an associated version, show the play button
+                if sg_item.get("version"):
+                    sg_url = sgtk.platform.current_bundle().shotgun.base_url
+                    url = "%s/page/media_center?type=Version&id=%d" % (
+                        sg_url,
+                        sg_item["version"]["id"],
+                    )
+
+                    self.ui.file_detail_playback_btn.setVisible(True)
+                    self._current_version_detail_playback_url = url
+                else:
+                    self.ui.file_detail_playback_btn.setVisible(False)
+                    self._current_version_detail_playback_url = None
+
+                if sg_item.get("name") is None:
+                    name_str = "No Name"
+                else:
+                    name_str = sg_item.get("name")
+
+                #type_str = shotgun_model.get_sanitized_data(
+                #    item, SgLatestPublishModel.PUBLISH_TYPE_NAME_ROLE
+                #)
+                type_str = sg_item.get("type")
+                msg = ""
+                msg += __make_table_row("Name", name_str)
+                msg += __make_table_row("Type", type_str)
+
+                version = sg_item.get("version_number")
+                vers_str = "%03d" % version if version is not None else "N/A"
+
+                msg += __make_table_row("Version", "%s" % vers_str)
+
+                if sg_item.get("entity"):
+                    display_name = shotgun_globals.get_type_display_name(
+                        sg_item.get("entity").get("type")
+                    )
+                    entity_str = "<b>%s</b> %s" % (
+                        display_name,
+                        sg_item.get("entity").get("name"),
+                    )
+                    msg += __make_table_row("Link", entity_str)
+
+                # sort out the task label
+                if sg_item.get("task"):
+
+                    if sg_item.get("task.Task.content") is None:
+                        task_name_str = "Unnamed"
+                    else:
+                        task_name_str = sg_item.get("task.Task.content")
+
+                    if sg_item.get("task.Task.sg_status_list") is None:
+                        task_status_str = "No Status"
+                    else:
+                        task_status_code = sg_item.get("task.Task.sg_status_list")
+                        task_status_str = self._status_model.get_long_name(
+                            task_status_code
+                        )
+
+                    msg += __make_table_row(
+                        "Task", "%s (%s)" % (task_name_str, task_status_str)
+                    )
+
+                # if there is a version associated, get the status for this
+                if sg_item.get("version.Version.sg_status_list"):
+                    task_status_code = sg_item.get("version.Version.sg_status_list")
+                    task_status_str = self._status_model.get_long_name(task_status_code)
+                    msg += __make_table_row("Review", task_status_str)
+
+                if sg_item.get("revision"):
+                    revision = sg_item.get("revision")
+                    msg += __make_table_row("Revision#", revision)
+
+                if sg_item.get("action"):
+                    action = sg_item.get("action")
+                    msg += __make_table_row("Action", action)
+                else:
+                    if sg_item.get("headAction"):
+                        head_action = sg_item.get("headAction", "N/A")
+                        msg += __make_table_row("Action", head_action)
+
+
+                self.ui.file_details_header.setText("<table>%s</table>" % msg)
+
+                # tell details pane to load stuff
+                self._publish_file_history_model.load_data(sg_item)
+
+            self.ui.file_details_header.updateGeometry()
+    #############################################################################################################
 
     def _populate_submitted_widget(self):
 
@@ -2058,7 +2470,7 @@ class AppDialog(QtGui.QWidget):
 
     def _turn_all_modes_off(self):
         self.ui.publish_view.setVisible(False)
-        self.ui.table_view.setVisible(False)
+        self.ui.column_view.setVisible(False)
         self.ui.perforce_scroll.setVisible(False)
         self.ui.submitted_scroll.setVisible(False)
         self.ui.pending_scroll.setVisible(False)
@@ -2733,14 +3145,11 @@ class AppDialog(QtGui.QWidget):
             # disable version file_history stuff
             self.ui.version_file_history_label.setEnabled(is_publish)
             self.ui.file_history_view.setEnabled(is_publish)
-            #self.ui.entity_parents_view.setEnabled(is_publish)
-            #self.ui.entity_children_view.setEnabled(is_publish)
 
             # hide actions and playback stuff
             self.ui.file_detail_actions_btn.setVisible(is_publish)
             self.ui.file_detail_playback_btn.setVisible(is_publish)
 
-            #self.ui.entity_detail_actions_btn.setVisible(is_publish)
 
         def __clear_publish_file_history(pixmap):
             """
@@ -3153,7 +3562,7 @@ class AppDialog(QtGui.QWidget):
         Slot triggered when someone changes the selection in the main publish area
         """
         selected_indexes = self.ui.publish_view.selectionModel().selectedIndexes()
-
+        #logger.debug(">>>>>>>>>>> selected_indexes:{}".format(selected_indexes))
         if len(selected_indexes) == 0:
             self._setup_file_details_panel([])
         else:
@@ -5206,8 +5615,6 @@ class AppDialog(QtGui.QWidget):
                             self._add_log(msg, 2)
                             selected_actions.append((sg_item, action))
 
-
-
                         elif action == "revert":
                             msg = "Revert file {} ...".format(target_file)
                             self._add_log(msg, 3)
@@ -5218,8 +5625,6 @@ class AppDialog(QtGui.QWidget):
 
         if selected_actions:
             self.peform_changelist_selection(selected_actions)
-
-
 
 
     def peform_changelist_selection(self, selected_actions):
