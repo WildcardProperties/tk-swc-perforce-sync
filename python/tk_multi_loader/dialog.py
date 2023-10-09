@@ -1993,44 +1993,46 @@ class AppDialog(QtGui.QWidget):
 
     def _on_column_model_action(self, action):
 
-        logger.debug("Add clicked")
-        selected_index = self.ui.column_view.currentIndex()
-        source_index = self.perforce_proxy_model.mapToSource(selected_index)
-        selected_row_data = self.get_row_data_from_source(source_index)
-        id = 0
-        if (len(selected_row_data) >= 11):
-            id = selected_row_data[10]
-
-        sg_item = self.column_view_dict.get(int(id), None)
-        logger.debug("selected_row_data: {}".format(selected_row_data))
         selected_actions = []
-        if "path" in sg_item:
-            if "local_path" in sg_item["path"]:
-                target_file = sg_item["path"].get("local_path", None)
-                depot_file = sg_item.get("depotFile", None)
+        selected_indexes = self.ui.column_view.selectionModel().selectedRows()
+        for selected_index in selected_indexes:
 
-                if action in ["add", "move/add", "edit", "delete"]:
-                    sg_item_action = sg_item.get("action", None)
-                    if sg_item_action and sg_item_action == "delete":
-                        msg = "Cannot perform the action on the file {} as it has already been marked for deletion or is deleted.".format(
-                            depot_file)
+            source_index = self.perforce_proxy_model.mapToSource(selected_index)
+            selected_row_data = self.get_row_data_from_source(source_index)
+            id = 0
+            if (len(selected_row_data) >= 11):
+                id = selected_row_data[10]
 
+            sg_item = self.column_view_dict.get(int(id), None)
+            logger.debug("selected_row_data: {}".format(selected_row_data))
+
+            if "path" in sg_item:
+                if "local_path" in sg_item["path"]:
+                    target_file = sg_item["path"].get("local_path", None)
+                    depot_file = sg_item.get("depotFile", None)
+
+                    if action in ["add", "move/add", "edit", "delete"]:
+                        sg_item_action = sg_item.get("action", None)
+                        if sg_item_action and sg_item_action == "delete":
+                            msg = "Cannot perform the action on the file {} as it has already been marked for deletion or is deleted.".format(
+                                depot_file)
+
+                            self._add_log(msg, 2)
+
+                        if action == "delete":
+                            msg = "Marking file {} for deletion ...".format(depot_file)
+                        else:
+                            msg = "{} file {}".format(action, depot_file)
                         self._add_log(msg, 2)
+                        selected_actions.append((sg_item, action))
 
-                    if action == "delete":
-                        msg = "Marking file {} for deletion ...".format(depot_file)
-                    else:
-                        msg = "{} file {}".format(action, depot_file)
-                    self._add_log(msg, 2)
-                    selected_actions.append((sg_item, action))
-
-                elif action == "revert":
-                    msg = "Revert file {} ...".format(target_file)
-                    self._add_log(msg, 3)
-                    # p4_result = self._p4.run("revert", "-v", target_file)
-                    p4_result = self._p4.run("revert", target_file)
-                    if p4_result:
-                        self.refresh_publish_data()
+                    elif action == "revert":
+                        msg = "Revert file {} ...".format(target_file)
+                        self._add_log(msg, 3)
+                        # p4_result = self._p4.run("revert", "-v", target_file)
+                        p4_result = self._p4.run("revert", target_file)
+                        if p4_result:
+                            self.refresh_publish_data()
 
         if selected_actions:
             self.peform_changelist_selection(selected_actions)
