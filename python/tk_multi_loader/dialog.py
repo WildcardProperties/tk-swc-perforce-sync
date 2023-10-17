@@ -13,17 +13,16 @@ import sgtk
 from sgtk.util import login
 from sgtk import TankError
 from sgtk.platform.qt import QtCore, QtGui
-#from QtCore import QRunnable, QThreadPool, pyqtSignal
-import tank
+
 from tank.platform.qt5 import QtWidgets
 import threading
 from .threads import SyncThread, FileSyncThread
 import concurrent.futures
 import subprocess
 import queue
-import time
+
 import concurrent.futures
-#from .threads import SyncThread, SyncRunnable
+
 
 import datetime
 from .date_time import create_publish_timestamp
@@ -40,23 +39,21 @@ from .delegate_publish_thumb import SgPublishThumbDelegate
 from .delegate_publish_list import SgPublishListDelegate
 from .model_publishhistory import SgPublishHistoryModel
 from .delegate_publish_history import SgPublishHistoryDelegate
-from .delegate_publish_perforce import PublishedFileSPerforce
+
 from .search_widget import SearchWidget
 from .banner import Banner
 from .loader_action_manager import LoaderActionManager
 from .utils import resolve_filters
-#from .handle_perforce_data import PerforceData
+
 
 from . import constants
 from . import model_item_data
 
 from .ui.dialog import Ui_Dialog
 from .publish_item import PublishItem
-from .perform_actions import PerformActions
+
 from .publish_files_ui import PublishFilesUI
-#from .publisher.api.manager import PublishManager
-#from .publish_app import P4SGPUBLISHER
-from .publish_app import MultiPublish2
+
 from .perforce_change import create_change, add_to_change, submit_change
 from .treeview_widget import TreeViewWidget, SWCTreeView
 from .changelist_selection_operation import ChangelistSelection
@@ -111,7 +108,6 @@ class AppDialog(QtGui.QWidget):
         :param parent:          The parent QWidget for this control
         """
         QtGui.QWidget.__init__(self, parent)
-        # self.app = QtWidgets.QApplication.instance()
 
 
         self._action_manager = action_manager
@@ -233,30 +229,8 @@ class AppDialog(QtGui.QWidget):
         # if an item in the list is double clicked the default action is run
         self.ui.file_history_view.doubleClicked.connect(self._on_file_history_double_clicked)
         ###########################################
-        # SG Retriever
-        """
-        # set up the shotgun data retriever
-        self._shotgun_data = self._app.import_module("shotgun_data")
-
-        # set up data retriever and start work:
-        self._sg_data_retriever = self._shotgun_data.ShotgunDataRetriever(
-            parent=self, bg_task_manager=bg_task_manager
-        )
-        self.__thumb_map = {}
-        #self._sg_data_retriever.work_completed.connect(
-        #    self.__on_data_retriever_work_completed
-        #)
-        #self._sg_data_retriever.work_failure.connect(
-        #    self.__on_data_retriever_work_failure
-        #)
-        self._sg_data_retriever.start()
-        """
-        ###########################################
         # Entity Parents publish model
-        # self._temp_dir = tempfile.mkdtemp(prefix="asset_image_")
         self._temp_dir = tempfile.mkdtemp()
-        #self._entity_details_action_menu = QtGui.QMenu()
-        #self.ui.entity_detail_actions_btn.setMenu(self._entity_details_action_menu)
 
         # load and initialize cached publish type model
         self._entity_parents_type_model = SgPublishTypeModel(
@@ -272,84 +246,13 @@ class AppDialog(QtGui.QWidget):
             self, self._entity_parents_type_model, self._task_manager
         )
 
-        #self._parents_main_overlay = ShotgunModelOverlayWidget(
-        #    self._entity_parents_model, self.ui.entity_parents_view
-        #)
-
         # set up a proxy model to cull results based on type selection
         self._entity_parents_proxy_model = SgLatestPublishProxyModel(self)
         self._entity_parents_proxy_model.setSourceModel(self._entity_parents_model)
 
-        # whenever the number of columns change in the proxy model
-        # check if we should display the "sorry, no entity_parentses found" overlay
-        #self._entity_parents_model.cache_loaded.connect(self._on_entity_parents_content_change)
-        #self._entity_parents_model.data_refreshed.connect(self._on_entity_parents_content_change)
-        #self._entity_parents_proxy_model.filter_changed.connect(
-        #    self._on_entity_parents_content_change
-        #)
-        """
-        # hook up view -> proxy model -> model
-        self.ui.entity_parents_view.setModel(self._entity_parents_proxy_model)
-
-        # set up custom delegates to use when drawing the main area
-        self._entity_parents_thumb_delegate = SgPublishThumbDelegate(
-            self.ui.entity_parents_view, self._action_manager
-        )
-
-        self._entity_parents_list_delegate = SgPublishListDelegate(
-            self.ui.entity_parents_view, self._action_manager
-        )
-        """
-        # recall which the most recently mode used was and set that
-        #main_view_mode = self._settings_manager.retrieve(
-        #    "main_view_mode", self.MAIN_VIEW_THUMB
-        #)
-        # self._set_main_view_mode(main_view_mode)
-        #self._set_main_view_mode(self.MAIN_VIEW_THUMB)
-
-        # whenever the type list is checked, update the entity_parents filters
-        #self._entity_parents_type_model.itemChanged.connect(
-        #    self._apply_type_filters_on_publishes
-        #)
-
-        # if an item in the table is double clicked the default action is run
-        #self.ui.entity_parentsentity_parents_view.doubleClicked.connect(self._on_entity_parents_double_clicked)
-
-        # event handler for when the selection in the publish view is changing
-        # note! Because of some GC issues (maya 2012 Pyside), need to first establish
-        # a direct reference to the selection model before we can set up any signal/slots
-        # against it
-        #self.ui.entity_parents_view.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
-        #self._entity_parents_view_selection_model = self.ui.entity_parents_view.selectionModel()
-        #self._entity_parents_view_selection_model.selectionChanged.connect(
-        #    self._on_entity_parents_selection
-        #)
-
-        # set up right click menu for the main publish view
-
-        # self._add_action = QtGui.QAction("Add", self.ui.entity_parents_view)
-        # self._add_action.triggered.connect(lambda: self._on_entity_parents_model_action("add"))
-        # self._edit_action = QtGui.QAction("Edit", self.ui.entity_parents_view)
-        # self._edit_action.triggered.connect(lambda: self._on_entity_parents_model_action("edit"))
-        # self._delete_action = QtGui.QAction("Delete", self.ui.entity_parents_view)
-        # self._delete_action.triggered.connect(lambda: self._on_entity_parents_model_action("delete"))
-        # self._revert_action = QtGui.QAction("Revert", self.ui.entity_parents_view)
-        # self._revert_action.triggered.connect(lambda: self._on_entity_parents_model_action("revert"))
-
-        # self._refresh_action = QtGui.QAction("Refresh", self.ui.entity_parents_view)
-        # self._refresh_action.triggered.connect(self._entity_parents_model.async_refresh)
-
-        #self.ui.entity_parents_view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        # self.ui.entity_parents_view.customContextMenuRequested.connect(
-        #     self._show_entity_parents_actions
-        # )
-
         # Entity Parents History
         self._publish_entity_parents_model = SgPublishHistoryModel(self, self._task_manager)
 
-        #self._publish_entity_parents_model_overlay = ShotgunModelOverlayWidget(
-        #    self._publish_entity_parents_model, self.ui.entity_parents_view
-        #)
 
         self._publish_entity_parents_proxy = QtGui.QSortFilterProxyModel(self)
         self._publish_entity_parents_proxy.setSourceModel(self._publish_entity_parents_model)
@@ -364,176 +267,6 @@ class AppDialog(QtGui.QWidget):
         # (we only have one column in our models) and descending order.
         self._publish_entity_parents_proxy.setDynamicSortFilter(True)
         self._publish_entity_parents_proxy.sort(0, QtCore.Qt.DescendingOrder)
-
-        #self.ui.entity_parents_view.setModel(self._publish_entity_parents_proxy)
-        #self._entity_parents_delegate = SgPublishHistoryDelegate(
-        #    self.ui.entity_parents_view, self._status_model, self._action_manager
-        #)
-        #self.ui.entity_parents_view.setItemDelegate(self._entity_parents_delegate)
-
-        # event handler for when the selection in the entity_parents view is changing
-        # note! Because of some GC issues (maya 2012 Pyside), need to first establish
-        # a direct reference to the selection model before we can set up any signal/slots
-        # against it
-        #self._entity_parents_view_selection_model = self.ui.entity_parents_view.selectionModel()
-
-        """
-        
-        self._entity_parents_view_selection_model.selectionChanged.connect(
-            self._on_entity_parents_selection
-        )
-        # set up right click menu for the main publish view
-        self._refresh_entity_parents_action = QtGui.QAction("Refresh", self.ui.entity_parents_view)
-        self._refresh_entity_parents_action.triggered.connect(
-            self._publish_entity_parents_model.async_refresh
-        )
-        self.ui.entity_parents_view.addAction(self._refresh_entity_parents_action)
-        self.ui.entity_parents_view.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
-
-        # if an item in the list is double clicked the default action is run
-        self.ui.entity_parents_view.doubleClicked.connect(self._on_entity_parents_double_clicked)
-        """
-        ###########################################
-        # Entity Children publish model
-        """
-        # load and initialize cached publish type model
-        self._entity_children_type_model = SgPublishTypeModel(
-            self, self._action_manager, self._settings_manager, self._task_manager
-        )
-        self.ui.publish_type_list.setModel(self._entity_children_type_model)
-
-        self._entity_children_type_overlay = ShotgunModelOverlayWidget(
-            self._entity_children_type_model, self.ui.publish_type_list
-        )
-
-        self._entity_children_model = SgEntityPublishModel(
-            self, self._entity_children_type_model, self._task_manager
-        )
-
-        self._children_main_overlay = ShotgunModelOverlayWidget(
-            self._entity_children_model, self.ui.entity_children_view
-        )
-
-        # set up a proxy model to cull results based on type selection
-        self._entity_children_proxy_model = SgLatestPublishProxyModel(self)
-        self._entity_children_proxy_model.setSourceModel(self._entity_children_model)
-
-        # whenever the number of columns change in the proxy model
-        # check if we should display the "sorry, no entity_childrenes found" overlay
-        #self._entity_children_model.cache_loaded.connect(self._on_entity_children_content_change)
-        #self._entity_children_model.data_refreshed.connect(self._on_entity_children_content_change)
-        #self._entity_children_proxy_model.filter_changed.connect(
-        #    self._on_entity_children_content_change
-        #)
-
-        # hook up view -> proxy model -> model
-        self.ui.entity_children_view.setModel(self._entity_children_proxy_model)
-
-        # set up custom delegates to use when drawing the main area
-        self._entity_children_thumb_delegate = SgPublishThumbDelegate(
-            self.ui.entity_children_view, self._action_manager
-        )
-
-        self._entity_children_list_delegate = SgPublishListDelegate(
-            self.ui.entity_children_view, self._action_manager
-        )
-
-        # recall which the most recently mode used was and set that
-        main_view_mode = self._settings_manager.retrieve(
-            "main_view_mode", self.MAIN_VIEW_THUMB
-        )
-        # self._set_main_view_mode(main_view_mode)
-        #self._set_main_view_mode(self.MAIN_VIEW_THUMB)
-
-        # whenever the type list is checked, update the entity_children filters
-        # self._entity_children_type_model.itemChanged.connect(
-        #    self._apply_type_filters_on_publishes
-        # )
-
-        # if an item in the table is double clicked the default action is run
-        # self.ui.entity_childrenentity_children_view.doubleClicked.connect(self._on_entity_children_double_clicked)
-
-        # event handler for when the selection in the publish view is changing
-        # note! Because of some GC issues (maya 2012 Pyside), need to first establish
-        # a direct reference to the selection model before we can set up any signal/slots
-        # against it
-        self.ui.entity_children_view.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
-        self._entity_children_view_selection_model = self.ui.entity_children_view.selectionModel()
-        #self._entity_children_view_selection_model.selectionChanged.connect(
-        #    self._on_entity_children_selection
-        #)
-
-        # set up right click menu for the main publish view
-
-        # self._add_action = QtGui.QAction("Add", self.ui.entity_parents_view)
-        # self._add_action.triggered.connect(lambda: self._on_entity_parents_model_action("add"))
-        # self._edit_action = QtGui.QAction("Edit", self.ui.entity_parents_view)
-        # self._edit_action.triggered.connect(lambda: self._on_entity_parents_model_action("edit"))
-        # self._delete_action = QtGui.QAction("Delete", self.ui.entity_parents_view)
-        # self._delete_action.triggered.connect(lambda: self._on_entity_parents_model_action("delete"))
-        # self._revert_action = QtGui.QAction("Revert", self.ui.entity_parents_view)
-        # self._revert_action.triggered.connect(lambda: self._on_entity_parents_model_action("revert"))
-
-        # self._refresh_action = QtGui.QAction("Refresh", self.ui.entity_parents_view)
-        # self._refresh_action.triggered.connect(self._entity_parents_model.async_refresh)
-
-        self.ui.entity_parents_view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        # self.ui.entity_parents_view.customContextMenuRequested.connect(
-        #     self._show_entity_parents_actions
-        # )
-        """
-        # Entity Children History
-        """
-        self._publish_entity_children_model = SgPublishHistoryModel(self, self._task_manager)
-
-        self._publish_entity_children_model_overlay = ShotgunModelOverlayWidget(
-            self._publish_entity_children_model, self.ui.entity_children_view
-        )
-
-        self._publish_entity_children_proxy = QtGui.QSortFilterProxyModel(self)
-        self._publish_entity_children_proxy.setSourceModel(self._publish_entity_children_model)
-
-        # now use the proxy model to sort the data to ensure
-        # higher version numbers appear earlier in the list
-        # the entity_children model is set up so that the default display
-        # role contains the version number field in shotgun.
-        # This field is what the proxy model sorts by default
-        # We set the dynamic filter to true, meaning QT will keep
-        # continously sorting. And then tell it to use column 0
-        # (we only have one column in our models) and descending order.
-        self._publish_entity_children_proxy.setDynamicSortFilter(True)
-        self._publish_entity_children_proxy.sort(0, QtCore.Qt.DescendingOrder)
-
-        self.ui.entity_children_view.setModel(self._publish_entity_children_proxy)
-        self._entity_children_delegate = SgPublishHistoryDelegate(
-            self.ui.entity_children_view, self._status_model, self._action_manager
-        )
-        self.ui.entity_children_view.setItemDelegate(self._entity_children_delegate)
-
-        # event handler for when the selection in the entity_children view is changing
-        # note! Because of some GC issues (maya 2012 Pyside), need to first establish
-        # a direct reference to the selection model before we can set up any signal/slots
-        # against it
-        self._entity_children_view_selection_model = self.ui.entity_children_view.selectionModel()
-
-        """
-        """
-        self._entity_children_view_selection_model.selectionChanged.connect(
-            self._on_entity_children_selection
-        )
-        # set up right click menu for the main publish view
-        self._refresh_entity_children_action = QtGui.QAction("Refresh", self.ui.entity_children_view)
-        self._refresh_entity_children_action.triggered.connect(
-            self._publish_entity_children_model.async_refresh
-        )
-        self.ui.entity_children_view.addAction(self._refresh_entity_children_action)
-        self.ui.entity_children_view.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
-
-        # if an item in the list is double clicked the default action is run
-        self.ui.entity_children_view.doubleClicked.connect(self._on_entity_children_double_clicked)
-        """
-        """
-        """
 
         #################################################
         # load and initialize cached publish type model
@@ -581,9 +314,9 @@ class AppDialog(QtGui.QWidget):
         )
 
         # recall which the most recently mode used was and set that
-        main_view_mode = self._settings_manager.retrieve(
-            "main_view_mode", self.MAIN_VIEW_THUMB
-        )
+        #main_view_mode = self._settings_manager.retrieve(
+        #    "main_view_mode", self.MAIN_VIEW_THUMB
+        #)
         # self._set_main_view_mode(main_view_mode)
         self._set_main_view_mode(self.MAIN_VIEW_THUMB)
 
@@ -674,6 +407,9 @@ class AppDialog(QtGui.QWidget):
 
         #################################################
         #Table view setup
+        self._headers = ["", "Folder", "Name", "Action", "Revision", "Size(MB)", "Extension", "Type",
+                         "User", "Task", "Status", "ID",
+                         "Description"]
         self._setup_column_view()
 
         #################################################
@@ -697,9 +433,7 @@ class AppDialog(QtGui.QWidget):
         # current navigation operation is happen as a part of a
         # back/forward operation and not part of a user's click
         self._entity_parents_navigation_mode = False
-        #self.ui.navigation_home.clicked.connect(self._on_home_clicked)
-        #self.ui.navigation_prev.clicked.connect(self._on_back_clicked)
-        #self.ui.navigation_next.clicked.connect(self._on_forward_clicked)
+
         #################################################
         # setup entity children
 
@@ -709,9 +443,7 @@ class AppDialog(QtGui.QWidget):
         # current navigation operation is happen as a part of a
         # back/forward operation and not part of a user's click
         self._entity_children_navigation_mode = False
-        # self.ui.navigation_home.clicked.connect(self._on_home_clicked)
-        # self.ui.navigation_prev.clicked.connect(self._on_back_clicked)
-        # self.ui.navigation_next.clicked.connect(self._on_forward_clicked)
+
 
         #################################################
         # set up cog button actions
@@ -775,7 +507,6 @@ class AppDialog(QtGui.QWidget):
         self.submitted_icon = QtGui.QIcon(QtGui.QPixmap(submitted_image_path))
 
         inactive_submitted_image_path = os.path.join(self.repo_root, "submitted_off.png")
-        #self.inactive_submitted_icon = QtGui.QIcon(QtGui.QPixmap(inactive_submitted_image_path))
         self.submitted_icon_inactive = QtGui.QIcon(QtGui.QPixmap(inactive_submitted_image_path))
 
         pending_image_path = os.path.join(self.repo_root, "icons/mode_switch_pending_active.png")
@@ -792,7 +523,6 @@ class AppDialog(QtGui.QWidget):
             self._drive = self._root_path[0:2]
 
         # "delete" change
-        # self._del_change = create_change(self._p4, "Deleting files")
         self.default_changelist = self._p4.fetch_change()
         # self.default_changelist = "0"
         self._actions_change = self.default_changelist.get("Change")
@@ -861,10 +591,7 @@ class AppDialog(QtGui.QWidget):
         except Exception as e:
             logger.debug(e)
             pass
-        #self._create_current_user_task_filesystem_structure()
-        # Connect the showEvent to a slot (method)
 
-        # self.showEvent.connect(self.on_show_event)
         ##########################################################################################
 
     def _run_function_once(self):
@@ -888,8 +615,7 @@ class AppDialog(QtGui.QWidget):
         super().showEvent(event)
 
 
-    # def _set_publish_list(self):
-    #    self._submitted_publish_list = self.publish_files_ui.publish_list
+
 
     def _show_publish_actions(self, pos):
         """
@@ -1586,7 +1312,7 @@ class AppDialog(QtGui.QWidget):
 
             self.main_view_mode = self.MAIN_VIEW_COLUMN
             self.ui.publish_view.setItemDelegate(self._publish_list_delegate)
-            self._populate_column_view_widget()
+            self._populate_column_view_no_groups_widget()
 
         elif mode == self.MAIN_VIEW_SUBMITTED:
             self._turn_all_modes_off()
@@ -1635,7 +1361,7 @@ class AppDialog(QtGui.QWidget):
         self._settings_manager.store("main_view_mode", mode)
 
 
-    def _populate_column_view_widget(self):
+    def _populate_column_view_no_groups_widget(self):
         #self._publish_model.hard_refresh()
         self.column_view_dict = {}
         logger.debug(">>> Setting up Column View table ...")
@@ -1652,17 +1378,119 @@ class AppDialog(QtGui.QWidget):
             logger.debug(">>> Getting Perforce file size...")
             self._perforce_sg_data = self._get_perforce_size(self._perforce_sg_data)
             logger.debug(">>> Populating Column View table...")
-            self._populate_column_view(self._perforce_sg_data)
+
             logger.debug(">>> Updating Column View is complete")
             for sg_item in self._perforce_sg_data:
                 id = sg_item.get("id", 0)
-                self.column_view_dict[id] = sg_item
+                new_sg_item = self._get_column_data(sg_item)
+                #logger.debug(">>> original sg_item: {}".format(sg_item))
+                #logger.debug(">>> new sg_item: {}".format(new_sg_item))
+                self.column_view_dict[id] = new_sg_item
+            self._populate_column_view_no_groups()
+            self._get_grouped_column_view_data()
             self._get_publish_icons()
 
             #for key, value in self.column_view_dict.items():
             #   logger.debug("key: {}, value: {}".format(key, value))
 
+    def _get_grouped_column_view_data(self):
 
+        self._folder_dict = self._get_column_dict("folder")
+        self._action_dict = self._get_column_dict("action")
+        self._revision_dict = self._get_column_dict("revision")
+        self._file_extension_dict = self._get_column_dict("file_extension")
+        self._type_dict = self._get_column_dict("type")
+        self._task_name_dict = self._get_column_dict("task_name")
+        self._task_status_dict = self._get_column_dict("task_status")
+        self._user_dict = self._get_column_dict("user")
+
+    def _get_column_dict(self, key):
+        column_dict = {}
+        if self.column_view_dict:
+            for id, sg_item in self.column_view_dict.items():
+                if sg_item:
+                    value = sg_item.get(key, None)
+                    if value:
+                        if value not in column_dict:
+                            column_dict[value] = []
+                        column_dict[value].append(sg_item)
+        return column_dict
+
+    def _get_column_data(self, sg_item):
+        new_sg_item = sg_item
+        if not sg_item:
+            return new_sg_item
+        try:
+            # logger.debug(">>> Getting row {} data".format(row))
+            # self._print_sg_item(sg_item)
+            # Extract relevant data from the Shotgun response
+            name = sg_item.get("name", "N/A")
+            new_sg_item["name"] = name
+            action = sg_item.get("action") or sg_item.get("headAction") or "N/A"
+            new_sg_item["action"] = action
+            revision = sg_item.get("revision", "N/A")
+            if revision != "N/A":
+                revision = "#{}".format(revision)
+                new_sg_item["revision"] = revision
+
+            local_path = "N/A"
+            difference_str = "N/A"
+            if "path" in sg_item:
+                path = sg_item.get("path", None)
+                if path:
+                    local_path = path.get("local_path", "N/A")
+                    if local_path and local_path != "N/A":
+                        local_directory = os.path.dirname(local_path)
+                        difference_str = self._path_difference(self._entity_path, local_directory)
+                        if difference_str:
+                            difference_str = "{}\\".format(difference_str)
+                            new_sg_item["folder"] = difference_str
+
+            file_extension = "N/A"
+            if local_path and local_path != "N/A":
+                file_extension = local_path.split(".")[-1] or "N/A"
+                new_sg_item["file_extension"] = file_extension
+
+            type = "N/A"
+            if file_extension and file_extension != "N/A":
+                type = self.settings.get(file_extension, "N/A")
+                new_sg_item["type"] = type
+
+            size = sg_item.get("fileSize", 0)
+            new_sg_item["size"] = size
+
+            # published_file_type = sg_item.get("published_file_type", {}).get("name", "N/A")
+            # Todo: get the step
+            # step = sg_item.get("step", {}).get("name", "N/A")
+            # step = sg_item.get("task.Task.step.Step.code", "N/A") if step == "N/A" else step
+
+            description = sg_item.get("description", "N/A")
+            new_sg_item["description"] = description
+            task_name = "N/A"
+            if "task" in sg_item:
+                task = sg_item.get("task", None)
+                if task:
+                    task_name = task.get("name", "N/A")
+                    new_sg_item["task_name"] = task_name
+
+            task_status = sg_item.get("task.Task.sg_status_list", "N/A")
+            new_sg_item["task_status"] = task_status
+
+            user_name = "N/A"
+            if "created_by" in sg_item:
+                user = sg_item.get("created_by", None)
+                if user:
+                    user_name = user.get("name", "N/A")
+                    new_sg_item["user"] = user_name
+
+            publish_id = 0
+            if "id" in sg_item:
+                publish_id = sg_item.get("id", 0)
+                new_sg_item["publish_id"] = publish_id
+        except Exception as e:
+            logger.debug(">>> Error getting column data for sg_item: {}, error {}".format(sg_item, e))
+            pass
+        return new_sg_item
         
     def _get_perforce_sg_data(self):
         perforce_sg_data = []
@@ -1688,15 +1516,11 @@ class AppDialog(QtGui.QWidget):
     
     def _setup_column_view(self):
         # Define the headers for the table
-        headers = ["Folder", "Name", "Action", "Revision", "Size(MB)", "Extension", "Type",
-                   "User", "Task", "Status", "ID",
-                   "Description"]
-        #headers = ["Name", "Action", "Revision", "Size(MB)", " Extension", "Type", "Step",
-        #           "Destination Path", "Description", "Entity Sub-Folder"]
+
 
         # Create a table model and set headers
-        self.column_view_model = QtGui.QStandardItemModel(0, len(headers))
-        self.column_view_model.setHorizontalHeaderLabels(headers)
+        self.column_view_model = QtGui.QStandardItemModel(0, len(self._headers))
+        self.column_view_model.setHorizontalHeaderLabels(self._headers)
 
         # Create a proxy model for sorting and grouping
         self.perforce_proxy_model = QtGui.QSortFilterProxyModel()
@@ -1704,9 +1528,8 @@ class AppDialog(QtGui.QWidget):
 
         self.ui.column_view.setModel(self.perforce_proxy_model)
 
-        # Set the header to be clickable for sorting
-        self.ui.column_view.horizontalHeader().setSectionsClickable(True)
-        self.ui.column_view.horizontalHeader().setSortIndicatorShown(True)
+        # Set the header to be clickable for sorting        self.ui.column_view.header().setSectionsClickable(True)
+        self.ui.column_view.header().setSortIndicatorShown(True)
 
         # Sort by the first column initially
         self.ui.column_view.sortByColumn(0, QtCore.Qt.AscendingOrder)
@@ -1715,13 +1538,15 @@ class AppDialog(QtGui.QWidget):
         self.ui.column_view.setSortingEnabled(True)
         #self.ui.column_view.sortByColumn(12, QtCore.Qt.AscendingOrder)
 
-        header = self.ui.column_view.horizontalHeader()
-        for col in range(len(headers)):
+        header = self.ui.column_view.header()
+        for col in range(len(self._headers)):
             header.setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
 
         self.ui.column_view.clicked.connect(self.on_column_view_row_clicked)
 
         self._create_column_view_context_menu()
+        # Create the context menu for the header
+        self._create_column_view_header_context_menu()
         # Set different column widths
         #header = self.ui.column_view.horizontalHeader()
         #header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)  # Auto size column 0
@@ -1729,6 +1554,192 @@ class AppDialog(QtGui.QWidget):
         #header.resizeSection(1, 300)  # Set width of column 1 to 300
 
         #self.ui.column_view.setGroupByColumn(7)
+
+    def _create_column_view_header_context_menu(self):
+        header = self.ui.column_view.header()
+        header.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        header.customContextMenuRequested.connect(self._show_column_header_context_menu)
+
+    def _show_column_header_context_menu(self, pos):
+        header = self.ui.column_view.header()
+        menu = QtWidgets.QMenu(self.ui.column_view)
+
+        self._no_groups_action = QtWidgets.QAction("No groups", self.ui.column_view)
+        self._no_groups_action.triggered.connect(self._no_groups)
+        menu.addAction(self._no_groups_action)
+
+        menu.addSeparator()
+
+        # Add the "Group by folder" menu item
+        self._group_by_folder_action = QtWidgets.QAction("Group by folder", self.ui.column_view)
+        self._group_by_folder_action.triggered.connect(self._group_by_folder)
+        menu.addAction(self._group_by_folder_action)
+
+        # Add the "Group by action" menu item
+        self._group_by_action_action = QtWidgets.QAction("Group by action", self.ui.column_view)
+        self._group_by_action_action.triggered.connect(self._group_by_action)
+        menu.addAction(self._group_by_action_action)
+
+        # Add grouping options for revision, file extension, type, task name, and task status
+        self._group_by_revision_action = QtWidgets.QAction("Group by Revision", self.ui.column_view)
+        self._group_by_revision_action.triggered.connect(self._group_by_revision)
+        menu.addAction(self._group_by_revision_action)
+
+        self._group_by_file_extension_action = QtWidgets.QAction("Group by File Extension", self.ui.column_view)
+        self._group_by_file_extension_action.triggered.connect(self._group_by_file_extension)
+        menu.addAction(self._group_by_file_extension_action)
+
+        self._group_by_type_action = QtWidgets.QAction("Group by Type", self.ui.column_view)
+        self._group_by_type_action.triggered.connect(self._group_by_type)
+        menu.addAction(self._group_by_type_action)
+
+        # Add the "Group by user" menu item
+        self._group_by_user_action = QtWidgets.QAction("Group by user", self.ui.column_view)
+        self._group_by_user_action.triggered.connect(self._group_by_user)
+        menu.addAction(self._group_by_user_action)
+
+        self._group_by_task_name_action = QtWidgets.QAction("Group by Task Name", self.ui.column_view)
+        self._group_by_task_name_action.triggered.connect(self._group_by_task_name)
+        menu.addAction(self._group_by_task_name_action)
+
+        self._group_by_task_status_action = QtWidgets.QAction("Group by Task Status", self.ui.column_view)
+        self._group_by_task_status_action.triggered.connect(self._group_by_task_status)
+        menu.addAction(self._group_by_task_status_action)
+
+        menu.addSeparator()
+
+        # Add "Expand All" action
+        self._expand_all_action = QtWidgets.QAction("Expand All", self.ui.column_view)
+        self._expand_all_action.triggered.connect(self._expand_all)
+        menu.addAction(self._expand_all_action)
+
+        # Add "Collapse All" action
+        self._collapse_all_action = QtWidgets.QAction("Collapse All", self.ui.column_view)
+        self._collapse_all_action.triggered.connect(self._collapse_all)
+        menu.addAction(self._collapse_all_action)
+
+        # Calculate the global position of the menu
+        global_pos = header.mapToGlobal(pos)
+
+        # Execute the menu using a QEventLoop to block until an action is triggered
+        event_loop = QtCore.QEventLoop()
+        menu.aboutToHide.connect(event_loop.quit)
+        menu.exec_(global_pos)
+        event_loop.exec_()
+
+    def _expand_all(self):
+        self.ui.column_view.expandAll()
+
+    def _collapse_all(self):
+        # Collapse all items
+        self.ui.column_view.collapseAll()
+
+    def _get_sg_item_list(self, sg_item):
+        if not sg_item:
+            return []
+        folder = sg_item.get("folder")
+        name = sg_item.get("name")
+        action = sg_item.get("action")
+        revision = sg_item.get("revision")
+        size = sg_item.get("fileSize")
+        file_extension = sg_item.get("file_extension")
+        type = sg_item.get("type")
+        user = sg_item.get("user")
+        task_name = sg_item.get("task_name")
+        task_status = sg_item.get("task_status")
+        publish_id = sg_item.get("publish_id")
+        description = sg_item.get("description")
+        # Get descrption from the begining until the first line break
+        if description:
+            description = description.split("\n")[0]
+        # Create a list of QStandardItems for each column
+        sg_list = ["", folder, name, action, revision, size, file_extension, type, user, task_name, task_status, publish_id,
+                   description]
+        return sg_list
+
+    def _create_groups(self, group_dict):
+        # Clear all rows from the model
+        self.column_view_model.clear()
+        # Set up the column view
+        self._setup_column_view()
+        # Add items to the model
+        for category, sg_data in group_dict.items():
+            category_item = QtGui.QStandardItem(category)
+            self.column_view_model.appendRow(category_item)
+            for sg_item in sg_data:
+                sg_list = self._get_sg_item_list(sg_item)
+                item = [QtGui.QStandardItem(str(data)) for data in sg_list]
+                category_item.appendRow(item)
+    """
+
+    def _create_groups(self, group_dict):
+        # Clear all rows from the model
+        self.column_view_model.clear()
+        # Set up the column view
+        self._setup_column_view()
+
+        # Define the column order to map data attributes
+        column_order = ["", "folder", "name", "action", "revision", "size", "file_extension", "type", "user",
+                        "task_name", "task_status", "publish_id", "description"]
+
+        for category, sg_data in group_dict.items():
+            category_item = QtGui.QStandardItem(category)
+            self.column_view_model.appendRow(category_item)
+            items = []
+
+            for sg_item in sg_data:
+                sg_list = self._get_sg_item_list(sg_item, column_order)
+                items.append([QtGui.QStandardItem(str(data)) for data in sg_list])
+
+            category_item.appendRows(items)
+    """
+    def _get_sg_item_list_by_column_order(self, sg_item):
+        if not sg_item:
+            return [""]  # Fill the first column with an empty item
+        column_order = ["", "folder", "name", "action", "revision", "size", "file_extension", "type", "user",
+                        "task_name", "task_status", "publish_id", "description"]
+
+        sg_list = []
+        for attribute in column_order:
+            value = sg_item.get(attribute, "")
+            if attribute == "description" and value:
+                # Get description from the beginning until the first line break
+                value = value.split("\n")[0]
+            sg_list.append(value)
+
+        return sg_list
+
+    def _no_groups(self):
+        # Clear all rows from the model
+        self.column_view_model.clear()
+        # Set up the column view
+        self._setup_column_view()
+        # Add items to the model
+        self._populate_column_view_no_groups()
+        
+    def _group_by_folder(self):
+        self._create_groups(self._folder_dict)
+
+    def _group_by_action(self):
+        self._create_groups(self._action_dict)
+
+    def _group_by_revision(self):
+        self._create_groups(self._revision_dict)
+
+    def _group_by_file_extension(self):
+        self._create_groups(self._file_extension_dict)
+
+    def _group_by_type(self):
+        self._create_groups(self._type_dict)
+
+    def _group_by_user(self):
+        self._create_groups(self._user_dict)
+
+    def _group_by_task_name(self):
+        self._create_groups(self._task_name_dict)
+
+    def _group_by_task_status(self):
+        self._create_groups(self._task_status_dict)
 
     def _create_column_view_context_menu(self):
         self._column_add_action = QtGui.QAction("Add", self.ui.column_view)
@@ -1773,8 +1784,15 @@ class AppDialog(QtGui.QWidget):
         menu.addSeparator()
         #menu.addAction(self._column_refresh_action)
 
-        # Wait for the user to pick something.
-        menu.exec_(self.ui.column_view.mapToGlobal(pos))
+
+        # Calculate the global position of the menu
+        global_pos = self.ui.column_view.mapToGlobal(pos)
+
+        # Execute the menu using a QEventLoop to block until an action is triggered
+        event_loop = QtCore.QEventLoop()
+        menu.aboutToHide.connect(event_loop.quit)
+        menu.exec_(global_pos)
+        event_loop.exec_()
 
     def _create_column_view_context_menu_old(self):
         self.context_menu = QtWidgets.QMenu(self)
@@ -1823,14 +1841,14 @@ class AppDialog(QtGui.QWidget):
     def on_column_view_row_clicked(self, index):
         source_index = self.perforce_proxy_model.mapToSource(index)
         row_number = source_index.row()
-        item = self.column_view_model.item(row_number, 10)  # Assuming you want data from the first column
+        item = self.column_view_model.item(row_number, 11)  # Assuming you want data from the first column
         if item:
             data = item.text()
             # Perform actions with the data from the clicked row
             logger.debug(f"Clicked Row {row_number}, Data: {data}")
             id = int(data)
             self._setup_column_details_panel(id)
-        
+
     def _get_perforce_size(self, sg_data):
         """
         Get Perforce file size.
@@ -1885,93 +1903,24 @@ class AppDialog(QtGui.QWidget):
             pass
         return sg_data
 
-    def _populate_column_view(self, sg_data):
+    def _populate_column_view_no_groups(self):
         """ Populate the table with data"""
         row = 0
-        for sg_item in sg_data:
+        for sg_item in self.column_view_dict.values():
             if not sg_item:
                 continue
-            try:
-                # logger.debug(">>> Getting row {} data".format(row))
-                # self._print_sg_item(sg_item)
-                # Extract relevant data from the Shotgun response
-                name = sg_item.get("name", "N/A")
-                action = sg_item.get("action") or sg_item.get("headAction") or "N/A"
-                revision = sg_item.get("revision", "N/A")
-                if revision != "N/A":
-                    revision = "#{}".format(revision)
-
-
-                local_path = "N/A"
-                difference_str = "N/A"
-                if "path" in sg_item:
-                    path = sg_item.get("path", None)
-                    if path:
-                        local_path = path.get("local_path", "N/A")
-                        if local_path and local_path != "N/A":
-                            local_directory = os.path.dirname(local_path)
-                            difference_str = self._path_difference(self._entity_path, local_directory)
-                            if difference_str:
-                                difference_str = "{}\\".format(difference_str)
-
-
-                file_extension = "N/A"
-                if local_path and local_path != "N/A":
-                    file_extension = local_path.split(".")[-1] or "N/A"
-
-                type = "N/A"
-                if file_extension and file_extension != "N/A":
-                    type = self.settings.get(file_extension, "N/A")
-
-                size = sg_item.get("fileSize", 0)
-
-                # published_file_type = sg_item.get("published_file_type", {}).get("name", "N/A")
-                # Todo: get the step
-                #step = sg_item.get("step", {}).get("name", "N/A")
-                #step = sg_item.get("task.Task.step.Step.code", "N/A") if step == "N/A" else step
-
-                description = sg_item.get("description", "N/A")
-
-                task_name = "N/A"
-                if "task" in sg_item:
-                    task = sg_item.get("task", None)
-                    if task:
-                        task_name = task.get("name", "N/A")
-
-                task_status = sg_item.get("task.Task.sg_status_list", "N/A")
-
-                user_name = "N/A"
-                if "created_by" in sg_item:
-                    user = sg_item.get("created_by", None)
-                    if user:
-                        user_name = user.get("name", "N/A")
-
-                publish_id = 0
-                if "id" in sg_item:
-                    publish_id = sg_item.get("id", 0)
-
-
-                # entity_sub_folder = sg_item.get("entity.Sub-Folder", "N/A")
-
-                # Insert data into the table
-                # logger.debug(">>> Inserting row {} data".format(row))
-                item_data = [difference_str, name, action, revision, size, file_extension, type,
-                                                user_name, task_name, task_status, publish_id,
-                                                description]
-                self._insert_perforce_row(row, item_data, sg_item)
-                # logger.debug(">>> Done with  row {}".format(row))
-            except Exception as e:
-                logger.debug("Failed to populate row %s, error: %s" % (row, e))
-                pass
+            column_order = ["", "folder", "name", "action", "revision", "size", "file_extension", "type", "user",
+                            "task_name", "task_status", "publish_id", "description"]
+            item_data = self._get_sg_item_list(sg_item)
+            self._insert_perforce_row(row, item_data, sg_item)
             row += 1
-
 
     def _insert_perforce_row(self, row, data, sg_item):
         for col, value in enumerate(data):
             item = QtGui.QStandardItem(str(value))
             tooltip = self._get_tooltip(data, sg_item)
             item.setToolTip(tooltip)
-            if col == 3:
+            if col == 4:
                 item.setData(value, QtCore.Qt.DisplayRole)
 
             self.column_view_model.setItem(row, col, item)
@@ -2000,8 +1949,8 @@ class AppDialog(QtGui.QWidget):
             source_index = self.perforce_proxy_model.mapToSource(selected_index)
             selected_row_data = self.get_row_data_from_source(source_index)
             id = 0
-            if (len(selected_row_data) >= 11):
-                id = selected_row_data[10]
+            if (len(selected_row_data) >= 12):
+                id = selected_row_data[11]
 
             sg_item = self.column_view_dict.get(int(id), None)
             logger.debug("selected_row_data: {}".format(selected_row_data))
@@ -2036,37 +1985,7 @@ class AppDialog(QtGui.QWidget):
 
         if selected_actions:
             self.peform_changelist_selection(selected_actions)
-        # Clear the focus from the triggered action to make it not highlighted (not selected)
-        #sender_action = self.sender()
-        #if sender_action:
-        #    sender_action.clearFocus()
-        #self._column_edit_action.clearFocus()
-            # Hide the context menu to make it close after selecting a menu item
-        #self.context_menu.hide()
 
-    """
-    def _insert_perforce_row(self, row, data, sg_item):
-        # Create an empty dictionary to store the sg_item in the row
-        sg_item_dict = {}
-
-        for col, value in enumerate(data):
-            item = QtGui.QStandardItem(str(value))
-            tooltip = self._get_tooltip(data, sg_item)
-            item.setToolTip(tooltip)
-            if col == 3:
-                item.setData(value, QtCore.Qt.DisplayRole)
-
-            # Add sg_item to the dictionary with a key that identifies the item
-            if col == 1:  # Assuming the 'Name' column uniquely identifies the item
-                sg_item_dict[value] = sg_item
-
-            self.column_view_model.setItem(row, col, item)
-
-        # Store the sg_item dictionary in the data role of the row
-        item = QtGui.QStandardItem()
-        item.setData(sg_item_dict, QtCore.Qt.UserRole)
-        self.column_view_model.setItem(row, len(data), item)
-    """
     def _get_tooltip(self, data, sg_item):
         """
         Gets a tooltip for this model item.
@@ -2081,7 +2000,7 @@ class AppDialog(QtGui.QWidget):
         # Version 012 by John Smith at 2014-02-23 10:34
 
         published_file_type = sg_item.get('type', None)
-        if published_file_type in ['PublishedFile'] and data and len(data) >= 10:
+        if published_file_type in ['PublishedFile'] and data and len(data) >= 12:
             if sg_item.get("headAction"):
                 tooltip += "<br><br><b>Head action:</b> %s" % (
                         sg_item.get("headAction") or "N/A"
@@ -2100,10 +2019,10 @@ class AppDialog(QtGui.QWidget):
             )
 
             tooltip += "<br><br><b>File Extension:</b> %s" % (
-                (data[5] or "N/A")
+                (data[6] or "N/A")
             )
             tooltip += "<br><br><b>File Type:</b> %s" % (
-                (data[6] or "N/A")
+                (data[7] or "N/A")
             )
 
             if not isinstance(sg_item.get("created_at"), datetime.datetime):
@@ -2130,11 +2049,11 @@ class AppDialog(QtGui.QWidget):
             )
 
         tooltip += "<br><br><b>Task Name:</b> %s" % (
-            (data[8] or "N/A")
+            (data[9] or "N/A")
         )
 
         tooltip += "<br><br><b>Task Status:</b> %s" % (
-            (data[9] or "N/A")
+            (data[10] or "N/A")
         )
 
         tooltip += "<br><br><b>Path:</b> %s" % (
@@ -5389,7 +5308,7 @@ class AppDialog(QtGui.QWidget):
 
         logger.debug(">>> main_view_mode is: {}".format(self.main_view_mode))
         if self.main_view_mode == self.MAIN_VIEW_COLUMN:
-            self._populate_column_view_widget()
+            self._populate_column_view_no_groups_widget()
         if self.main_view_mode == self.MAIN_VIEW_SUBMITTED:
             self._populate_submitted_widget()
 

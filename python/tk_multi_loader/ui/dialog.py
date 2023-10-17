@@ -287,7 +287,8 @@ class Ui_Dialog(object):
         self.publish_view.setObjectName("publish_view")
         self.horizontalLayout_7.addWidget(self.publish_view)
 
-        self.column_view = QtWidgets.QTableView(self.publish_frame)
+        #self.column_view = QtWidgets.QTableView(self.publish_frame)
+        self.column_view = QtWidgets.QTreeView(self.publish_frame)
 
         # Set the selection behavior to select whole rows
         self.column_view.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
