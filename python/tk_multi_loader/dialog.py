@@ -1755,6 +1755,7 @@ class AppDialog(QtGui.QWidget):
         # Clear all rows from the model
         # self.column_view_model.clear()
         # Set up the column view
+        self._setup_file_details_panel([])
         self._setup_column_view()
 
         # Add items to the model
@@ -1831,7 +1832,7 @@ class AppDialog(QtGui.QWidget):
         self._populate_column_view_no_groups()
 
     def _group_by_folder(self):
-        self._group_by_folder_action.setCheckable(True)
+        # self._group_by_folder_action.setCheckable(True)
         self._create_groups(self._folder_dict)
 
     def _group_by_action(self):
