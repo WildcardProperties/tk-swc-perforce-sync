@@ -1602,7 +1602,9 @@ class AppDialog(QtGui.QWidget):
 
         # Grouping by "Entity Sub-Folder"
         self.ui.column_view.setSortingEnabled(True)
-        self.ui.column_view.setSelectionMode(self.selectionMode().ExtendedSelection)
+
+        self.ui.column_view.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
+
         #self.ui.column_view.sortByColumn(12, QtCore.Qt.AscendingOrder)
 
         header = self.ui.column_view.header()
