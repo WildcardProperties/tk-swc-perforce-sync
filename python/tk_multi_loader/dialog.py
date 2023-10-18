@@ -407,7 +407,7 @@ class AppDialog(QtGui.QWidget):
 
         #################################################
         #Table view setup
-        self._headers = ["", "Folder", "Name", "Action", "Revision", "Size(MB)", "Extension", "Type",
+        self._headers = ["", "Folder", "Name", "Action", "Revision#", "Size(MB)", "Extension", "Type",
                          "User", "Task", "Status", "ID",
                          "Description"]
         self._setup_column_view()
@@ -1363,7 +1363,9 @@ class AppDialog(QtGui.QWidget):
 
     def _populate_column_view_no_groups_widget(self):
         #self._publish_model.hard_refresh()
-        self.column_view_dict = {}
+        self._column_view_dict = {}
+        self._standard_item_dict = {}
+        
         logger.debug(">>> Setting up Column View table ...")
         self._setup_column_view()
         logger.debug(">>> Getting Perforce data...")
@@ -1382,20 +1384,70 @@ class AppDialog(QtGui.QWidget):
             logger.debug(">>> Updating Column View is complete")
             for sg_item in self._perforce_sg_data:
                 id = sg_item.get("id", 0)
-                new_sg_item = self._get_column_data(sg_item)
+                new_sg_item, sg_list = self._get_column_data(sg_item)
                 #logger.debug(">>> original sg_item: {}".format(sg_item))
                 #logger.debug(">>> new sg_item: {}".format(new_sg_item))
-                self.column_view_dict[id] = new_sg_item
+                if id not in self._column_view_dict and new_sg_item:
+                    self._column_view_dict[id] = new_sg_item
+                #logger.debug(">>> sg_list: {}".format(sg_list))
+                if sg_list:
+
+                    #item = [QtGui.QStandardItem(str(data)) for data in sg_list]
+                    self._standard_item_dict[id] = sg_list
+            #logger.debug(">>> self._column_view_dict: {}".format(self._column_view_dict))
+            #logger.debug(">>> self._standard_item_dict: {}".format(self._standard_item_dict))
             self._populate_column_view_no_groups()
             self._get_grouped_column_view_data()
             self._get_publish_icons()
 
-            #for key, value in self.column_view_dict.items():
+            #for key, value in self._column_view_dict.items():
             #   logger.debug("key: {}, value: {}".format(key, value))
+
+    def _populate_column_view_no_groups_widget_old(self):
+        self._column_view_dict = {}
+        self._standard_item_dict = {}
+
+        logger.debug(">>> Setting up Column View table ...")
+        self._setup_column_view()
+        logger.debug(">>> Getting Perforce data...")
+        self._perforce_sg_data = self._get_perforce_sg_data()
+
+        length = len(self._perforce_sg_data)
+        if not self._perforce_sg_data:
+            self._perforce_sg_data = self._sg_data
+
+        if self._perforce_sg_data and length > 0:
+            msg = "\n <span style='color:#2C93E2'>Populating the Column View with {} files. Please wait...</span> \n".format(
+                length)
+            self._add_log(msg, 2)
+            logger.debug(">>> Getting Perforce file size...")
+            self._perforce_sg_data = self._get_perforce_size(self._perforce_sg_data)
+            logger.debug(">>> Populating Column View table...")
+
+            logger.debug(">>> Updating Column View is complete")
+            for sg_item in self._perforce_sg_data:
+                id = sg_item.get("id", 0)
+                new_sg_item, sg_list = self._get_column_data(sg_item)
+                logger.debug(f"Processing sg_item: {sg_item}")
+                logger.debug(f"new_sg_item: {new_sg_item}")
+                logger.debug(f"sg_list: {sg_list}")
+
+                if id not in self._column_view_dict and new_sg_item:
+                    self._column_view_dict[id] = new_sg_item
+                if sg_list:
+                    item = [QtGui.QStandardItem(str(data)) for data in sg_list]
+                    self._standard_item_dict[id] = item
+
+            logger.debug(f"self._standard_item_dict: {self._standard_item_dict}")
+
+            self._populate_column_view_no_groups()
+            self._get_grouped_column_view_data()
+            self._get_publish_icons()
 
     def _get_grouped_column_view_data(self):
 
         self._folder_dict = self._get_column_dict("folder")
+        #logger.debug(">>> self._folder_dict: {}".format(self._folder_dict))
         self._action_dict = self._get_column_dict("action")
         self._revision_dict = self._get_column_dict("revision")
         self._file_extension_dict = self._get_column_dict("file_extension")
@@ -1406,20 +1458,26 @@ class AppDialog(QtGui.QWidget):
 
     def _get_column_dict(self, key):
         column_dict = {}
-        if self.column_view_dict:
-            for id, sg_item in self.column_view_dict.items():
+        if self._column_view_dict:
+            for id, sg_item in self._column_view_dict.items():
+                #logger.debug(">>> id: {}, sg_item: {}".format(id, sg_item))
                 if sg_item:
                     value = sg_item.get(key, None)
+                    #logger.debug(">>> value: {}".format(value))
                     if value:
                         if value not in column_dict:
                             column_dict[value] = []
-                        column_dict[value].append(sg_item)
+                        if id in self._standard_item_dict:
+                            #logger.debug(">>> id: {}, self._standard_item_dict[id]: {}".format(id, self._standard_item_dict[id]))
+                            column_dict[value].append(self._standard_item_dict[id])
         return column_dict
+
 
     def _get_column_data(self, sg_item):
         new_sg_item = sg_item
+        sg_list = []
         if not sg_item:
-            return new_sg_item
+            return new_sg_item, sg_list
         try:
             # logger.debug(">>> Getting row {} data".format(row))
             # self._print_sg_item(sg_item)
@@ -1430,11 +1488,11 @@ class AppDialog(QtGui.QWidget):
             new_sg_item["action"] = action
             revision = sg_item.get("revision", "N/A")
             if revision != "N/A":
-                revision = "#{}".format(revision)
+                #revision = "#{}".format(revision)
                 new_sg_item["revision"] = revision
 
             local_path = "N/A"
-            difference_str = "N/A"
+            folder = "N/A"
             if "path" in sg_item:
                 path = sg_item.get("path", None)
                 if path:
@@ -1443,8 +1501,8 @@ class AppDialog(QtGui.QWidget):
                         local_directory = os.path.dirname(local_path)
                         difference_str = self._path_difference(self._entity_path, local_directory)
                         if difference_str:
-                            difference_str = "{}\\".format(difference_str)
-                            new_sg_item["folder"] = difference_str
+                            folder = "{}\\".format(difference_str)
+                            new_sg_item["folder"] = folder
 
             file_extension = "N/A"
             if local_path and local_path != "N/A":
@@ -1454,7 +1512,7 @@ class AppDialog(QtGui.QWidget):
             type = "N/A"
             if file_extension and file_extension != "N/A":
                 type = self.settings.get(file_extension, "N/A")
-                new_sg_item["type"] = type
+                new_sg_item["file_type"] = type
 
             size = sg_item.get("fileSize", 0)
             new_sg_item["size"] = size
@@ -1465,7 +1523,11 @@ class AppDialog(QtGui.QWidget):
             # step = sg_item.get("task.Task.step.Step.code", "N/A") if step == "N/A" else step
 
             description = sg_item.get("description", "N/A")
-            new_sg_item["description"] = description
+            #new_sg_item["description"] = description
+            if description:
+                description = description.split("\n")[0]
+            
+            
             task_name = "N/A"
             if "task" in sg_item:
                 task = sg_item.get("task", None)
@@ -1476,21 +1538,27 @@ class AppDialog(QtGui.QWidget):
             task_status = sg_item.get("task.Task.sg_status_list", "N/A")
             new_sg_item["task_status"] = task_status
 
-            user_name = "N/A"
+            user = "N/A"
             if "created_by" in sg_item:
                 user = sg_item.get("created_by", None)
                 if user:
-                    user_name = user.get("name", "N/A")
-                    new_sg_item["user"] = user_name
+                    user = user.get("name", "N/A")
+                    new_sg_item["user"] = user
 
             publish_id = 0
             if "id" in sg_item:
                 publish_id = sg_item.get("id", 0)
                 new_sg_item["publish_id"] = publish_id
+
+            # Create a list of QStandardItems for each column
+            sg_list = ["", folder, name, action, revision, size, file_extension, type, user, task_name, task_status,
+                       publish_id,
+                       description]
+                
         except Exception as e:
             logger.debug(">>> Error getting column data for sg_item: {}, error {}".format(sg_item, e))
             pass
-        return new_sg_item
+        return new_sg_item, sg_list
         
     def _get_perforce_sg_data(self):
         perforce_sg_data = []
@@ -1515,8 +1583,6 @@ class AppDialog(QtGui.QWidget):
         self.ui.column_view = QtWidgets.QTableView()
     
     def _setup_column_view(self):
-        # Define the headers for the table
-
 
         # Create a table model and set headers
         self.column_view_model = QtGui.QStandardItemModel(0, len(self._headers))
@@ -1547,13 +1613,7 @@ class AppDialog(QtGui.QWidget):
         self._create_column_view_context_menu()
         # Create the context menu for the header
         self._create_column_view_header_context_menu()
-        # Set different column widths
-        #header = self.ui.column_view.horizontalHeader()
-        #header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)  # Auto size column 0
-        #header.setSectionResizeMode(1, QtWidgets.QHeaderView.Fixed)
-        #header.resizeSection(1, 300)  # Set width of column 1 to 300
 
-        #self.ui.column_view.setGroupByColumn(7)
 
     def _create_column_view_header_context_menu(self):
         header = self.ui.column_view.header()
@@ -1572,6 +1632,7 @@ class AppDialog(QtGui.QWidget):
 
         # Add the "Group by folder" menu item
         self._group_by_folder_action = QtWidgets.QAction("Group by folder", self.ui.column_view)
+
         self._group_by_folder_action.triggered.connect(self._group_by_folder)
         menu.addAction(self._group_by_folder_action)
 
@@ -1637,6 +1698,7 @@ class AppDialog(QtGui.QWidget):
     def _get_sg_item_list(self, sg_item):
         if not sg_item:
             return []
+        # logger.debug(">>> sg_item {} data".format(sg_item))
         folder = sg_item.get("folder")
         name = sg_item.get("name")
         action = sg_item.get("action")
@@ -1657,42 +1719,81 @@ class AppDialog(QtGui.QWidget):
                    description]
         return sg_list
 
-    def _create_groups(self, group_dict):
+
+
+    def _create_groups_old(self, group_dict):
         # Clear all rows from the model
-        self.column_view_model.clear()
+        #self.column_view_model.clear()
         # Set up the column view
         self._setup_column_view()
+
         # Add items to the model
         for category, sg_data in group_dict.items():
+            # logger.debug(">>> category: {}, sg_data: {}".format(category, sg_data))
             category_item = QtGui.QStandardItem(category)
             self.column_view_model.appendRow(category_item)
-            for sg_item in sg_data:
-                sg_list = self._get_sg_item_list(sg_item)
-                item = [QtGui.QStandardItem(str(data)) for data in sg_list]
-                category_item.appendRow(item)
-    """
+            for sg_list in sg_data:
+                # logger.debug(">>> sg_list: {}".format(sg_list))
+                tooltip = ""
+                if sg_list and len(sg_list) >= 12:
+                    id = sg_list[11]
+                    sg_item = self._column_view_dict.get(id, None)
+                    tooltip = self._get_tooltip(sg_list, sg_item)
+                item_list = []
+                for col, value in enumerate(sg_list):
+                    item = QtGui.QStandardItem(str(value))
+                    item.setToolTip(tooltip)
+                    if col == 4 or col == 5:
+                        item.setData(value, QtCore.Qt.DisplayRole)
+                    item_list.append(item)
+                #item = [QtGui.QStandardItem(str(data)) for data in sg_list]
+
+                category_item.appendRow(item_list)
+        self.ui.column_view.expandAll()
 
     def _create_groups(self, group_dict):
         # Clear all rows from the model
-        self.column_view_model.clear()
+        # self.column_view_model.clear()
         # Set up the column view
         self._setup_column_view()
 
-        # Define the column order to map data attributes
-        column_order = ["", "folder", "name", "action", "revision", "size", "file_extension", "type", "user",
-                        "task_name", "task_status", "publish_id", "description"]
-
+        # Add items to the model
         for category, sg_data in group_dict.items():
+            # logger.debug(">>> category: {}, sg_data: {}".format(category, sg_data))
             category_item = QtGui.QStandardItem(category)
             self.column_view_model.appendRow(category_item)
-            items = []
+            for sg_list in sg_data:
+                # logger.debug(">>> sg_list: {}".format(sg_list))
+                tooltip = ""
+                if sg_list and len(sg_list) >= 12:
+                    id = sg_list[11]
+                    sg_item = self._column_view_dict.get(id, None)
+                    tooltip = self._get_tooltip(sg_list, sg_item)
+                item_list = []
+                for col, value in enumerate(sg_list):
+                    item = QtGui.QStandardItem(str(value))
+                    item.setToolTip(tooltip)
+                    if col == 5:
+                        item.setData(value, QtCore.Qt.DisplayRole)
+                    item_list.append(item)
 
-            for sg_item in sg_data:
-                sg_list = self._get_sg_item_list(sg_item, column_order)
-                items.append([QtGui.QStandardItem(str(data)) for data in sg_list])
+                category_item.appendRow(item_list)
 
-            category_item.appendRows(items)
-    """
+        # Add a callback when someone clicks on an item in the view
+        #self.ui.column_view.clicked.connect(self.on_column_view_item_clicked)
+
+        self.ui.column_view.expandAll()
+
+    def on_column_view_item_clicked(self, index):
+        # Handle the item click here
+        item = self.column_view_model.itemFromIndex(index)
+        if item:
+            sg_list = [item.text() for _ in range(item.rowCount())]
+            logger.debug("Item clicked - sg_list:", sg_list)
+        else:
+            logger.debug("No item found for the clicked index")
+
+
     def _get_sg_item_list_by_column_order(self, sg_item):
         if not sg_item:
             return [""]  # Fill the first column with an empty item
@@ -1709,15 +1810,28 @@ class AppDialog(QtGui.QWidget):
 
         return sg_list
 
+
+    def _populate_column_view_no_groups(self):
+        """ Populate the table with data"""
+        row = 0
+        for id, sg_item in self._column_view_dict.items():
+            if not sg_item:
+                continue
+            if id in self._standard_item_dict:
+                item_data = self._standard_item_dict[id]
+                self._insert_perforce_row(row, item_data, sg_item)
+                row += 1
+
     def _no_groups(self):
         # Clear all rows from the model
-        self.column_view_model.clear()
+        #self.column_view_model.clear()
         # Set up the column view
         self._setup_column_view()
         # Add items to the model
         self._populate_column_view_no_groups()
-        
+
     def _group_by_folder(self):
+        self._group_by_folder_action.setCheckable(True)
         self._create_groups(self._folder_dict)
 
     def _group_by_action(self):
@@ -1794,27 +1908,7 @@ class AppDialog(QtGui.QWidget):
         menu.exec_(global_pos)
         event_loop.exec_()
 
-    def _create_column_view_context_menu_old(self):
-        self.context_menu = QtWidgets.QMenu(self)
-        self._column_add_action = self.context_menu.addAction("Add")
-        self._column_edit_action = self.context_menu.addAction("Edit")
-        self._column_delete_action = self.context_menu.addAction("Delete")
-        self.context_menu.addSeparator()
-        self._column_revert_action = self.context_menu.addAction("Revert")
-        self.context_menu.addSeparator()
-        #self._column_refresh_action = self.context_menu.addAction("Refresh")
 
-        # Connect the actions to their respective callbacks
-
-        self._column_add_action.triggered.connect(lambda: self._on_column_model_action("add"))
-        self._column_edit_action.triggered.connect(lambda: self._on_column_model_action("edit"))
-        self._column_delete_action.triggered.connect(lambda: self._on_column_model_action("delete"))
-        self._column_revert_action.triggered.connect(lambda: self._on_column_model_action("revert"))
-        #self._column_refresh_action.triggered.connect(lambda: self._on_column_model_action("refresh"))
-
-        # Connect the context menu to the table view
-        self.ui.column_view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        self.ui.column_view.customContextMenuRequested.connect(self.show_context_menu)
 
     def show_context_menu(self, pos):
         # Show the context menu at the cursor position
@@ -1841,7 +1935,8 @@ class AppDialog(QtGui.QWidget):
     def on_column_view_row_clicked(self, index):
         source_index = self.perforce_proxy_model.mapToSource(index)
         row_number = source_index.row()
-        item = self.column_view_model.item(row_number, 11)  # Assuming you want data from the first column
+        logger.debug(f"Clicked Row {row_number}")
+        item = self.column_view_model.item(row_number, 11)  # Get the publish id from the 11th column
         if item:
             data = item.text()
             # Perform actions with the data from the clicked row
@@ -1903,24 +1998,14 @@ class AppDialog(QtGui.QWidget):
             pass
         return sg_data
 
-    def _populate_column_view_no_groups(self):
-        """ Populate the table with data"""
-        row = 0
-        for sg_item in self.column_view_dict.values():
-            if not sg_item:
-                continue
-            column_order = ["", "folder", "name", "action", "revision", "size", "file_extension", "type", "user",
-                            "task_name", "task_status", "publish_id", "description"]
-            item_data = self._get_sg_item_list(sg_item)
-            self._insert_perforce_row(row, item_data, sg_item)
-            row += 1
+
 
     def _insert_perforce_row(self, row, data, sg_item):
+        tooltip = self._get_tooltip(data, sg_item)
         for col, value in enumerate(data):
             item = QtGui.QStandardItem(str(value))
-            tooltip = self._get_tooltip(data, sg_item)
             item.setToolTip(tooltip)
-            if col == 4:
+            if col == 5:
                 item.setData(value, QtCore.Qt.DisplayRole)
 
             self.column_view_model.setItem(row, col, item)
@@ -1952,7 +2037,7 @@ class AppDialog(QtGui.QWidget):
             if (len(selected_row_data) >= 12):
                 id = selected_row_data[11]
 
-            sg_item = self.column_view_dict.get(int(id), None)
+            sg_item = self._column_view_dict.get(int(id), None)
             logger.debug("selected_row_data: {}".format(selected_row_data))
 
             if "path" in sg_item:
@@ -1993,8 +2078,8 @@ class AppDialog(QtGui.QWidget):
         :param item: ShotgunStandardItem associated with the publish.
         :param sg_item: Publish information from Shotgun.
         """
-
-        # self._log_debug(">>>>>>>>>>>> _set_tooltip: sg_item: {}".format(sg_item))
+        #logger.debug(">>>>>>>>>>>> _set_tooltip: data: {}".format(data))
+        #logger.debug(">>>>>>>>>>>> _set_tooltip: sg_item: {}".format(sg_item))
         tooltip = "<b>Name:</b> %s" % (sg_item.get("code") or "No name given.")
 
         # Version 012 by John Smith at 2014-02-23 10:34
@@ -2059,7 +2144,9 @@ class AppDialog(QtGui.QWidget):
         tooltip += "<br><br><b>Path:</b> %s" % (
             (sg_item.get("path") or {}).get("local_path")
         )
-
+        tooltip += "<br><br><b>Publish ID:</b> %s" % (
+                sg_item.get("id") or "0"
+        )
         tooltip += "<br><br><b>Description:</b> %s" % (
             sg_item.get("description") or "No description given."
         )
@@ -2196,14 +2283,14 @@ class AppDialog(QtGui.QWidget):
             __clear_publish_file_history(self._no_selection_pixmap)
 
         else:
-            if id not in self.column_view_dict:
+            if id not in self._column_view_dict:
                 logger.debug("id is not available in the column view")
                 __clear_publish_file_history(self._no_selection_pixmap)
                 __set_publish_ui_visibility(False)
                 return
             else:
 
-                sg_item = self.column_view_dict[id]
+                sg_item = self._column_view_dict[id]
                 if not sg_item:
                     logger.debug("sg_item is empty")
                     __clear_publish_file_history(self._no_selection_pixmap)
