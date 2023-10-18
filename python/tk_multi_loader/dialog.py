@@ -1499,9 +1499,9 @@ class AppDialog(QtGui.QWidget):
                     local_path = path.get("local_path", "N/A")
                     if local_path and local_path != "N/A":
                         local_directory = os.path.dirname(local_path)
-                        difference_str = self._path_difference(self._entity_path, local_directory)
-                        if difference_str:
-                            folder = "{}\\".format(difference_str)
+                        folder = self._path_difference(self._entity_path, local_directory)
+                        if folder and folder != "N/A":
+                            #folder = "{}\\".format(difference_str)
                             new_sg_item["folder"] = folder
 
             file_extension = "N/A"
