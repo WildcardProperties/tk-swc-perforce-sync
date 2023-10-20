@@ -289,9 +289,14 @@ class Ui_Dialog(object):
 
         #self.column_view = QtWidgets.QTableView(self.publish_frame)
         self.column_view = QtWidgets.QTreeView(self.publish_frame)
-
         # Set the selection behavior to select whole rows
         self.column_view.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        # Set the header to be clickable for sorting        self.ui.column_view.header().setSectionsClickable(True)
+        self.column_view.header().setSortIndicatorShown(True)
+        # Sort by the first column initially
+        self.column_view.sortByColumn(0, QtCore.Qt.AscendingOrder)
+        self.column_view.setSortingEnabled(True)
+        self.column_view.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
         # Set the selection mode to single selection or multi-selection
         #self.column_view.setSelectionMode(QtWidgets.QAbstractItemView.MultiSelection)
 

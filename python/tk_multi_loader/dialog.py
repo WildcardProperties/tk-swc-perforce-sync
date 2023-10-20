@@ -1440,6 +1440,7 @@ class AppDialog(QtGui.QWidget):
 
             logger.debug(f"self._standard_item_dict: {self._standard_item_dict}")
 
+
             self._populate_column_view_no_groups()
             self._get_grouped_column_view_data()
             self._get_publish_icons()
@@ -1595,15 +1596,15 @@ class AppDialog(QtGui.QWidget):
         self.ui.column_view.setModel(self.perforce_proxy_model)
 
         # Set the header to be clickable for sorting        self.ui.column_view.header().setSectionsClickable(True)
-        self.ui.column_view.header().setSortIndicatorShown(True)
+        #self.ui.column_view.header().setSortIndicatorShown(True)
 
         # Sort by the first column initially
-        self.ui.column_view.sortByColumn(0, QtCore.Qt.AscendingOrder)
+        #self.ui.column_view.sortByColumn(0, QtCore.Qt.AscendingOrder)
 
         # Grouping by "Entity Sub-Folder"
-        self.ui.column_view.setSortingEnabled(True)
+        #self.ui.column_view.setSortingEnabled(True)
 
-        self.ui.column_view.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
+        #self.ui.column_view.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
 
         #self.ui.column_view.sortByColumn(12, QtCore.Qt.AscendingOrder)
 
@@ -1769,6 +1770,7 @@ class AppDialog(QtGui.QWidget):
             for sg_list in sg_data:
                 # logger.debug(">>> sg_list: {}".format(sg_list))
                 tooltip = ""
+                id = 0
                 if sg_list and len(sg_list) >= 12:
                     id = sg_list[11]
                     sg_item = self._column_view_dict.get(id, None)
@@ -1779,6 +1781,7 @@ class AppDialog(QtGui.QWidget):
                     item.setToolTip(tooltip)
                     if col == 5:
                         item.setData(value, QtCore.Qt.DisplayRole)
+                    item.setData(str(id), QtCore.Qt.UserRole + 1)
                     item_list.append(item)
 
                 category_item.appendRow(item_list)
@@ -1788,6 +1791,8 @@ class AppDialog(QtGui.QWidget):
 
         self.ui.column_view.expandAll()
 
+
+    """
     def on_column_view_item_clicked(self, index):
         # Handle the item click here
         item = self.column_view_model.itemFromIndex(index)
@@ -1796,6 +1801,7 @@ class AppDialog(QtGui.QWidget):
             logger.debug("Item clicked - sg_list:", sg_list)
         else:
             logger.debug("No item found for the clicked index")
+    """
 
 
     def _get_sg_item_list_by_column_order(self, sg_item):
@@ -1818,6 +1824,7 @@ class AppDialog(QtGui.QWidget):
     def _populate_column_view_no_groups(self):
         """ Populate the table with data"""
         row = 0
+        self._set_groups = False
         for id, sg_item in self._column_view_dict.items():
             if not sg_item:
                 continue
@@ -1836,27 +1843,35 @@ class AppDialog(QtGui.QWidget):
 
     def _group_by_folder(self):
         # self._group_by_folder_action.setCheckable(True)
+        self._set_groups = True
         self._create_groups(self._folder_dict)
 
     def _group_by_action(self):
+        self._set_groups = True
         self._create_groups(self._action_dict)
 
     def _group_by_revision(self):
+        self._set_groups = True
         self._create_groups(self._revision_dict)
 
     def _group_by_file_extension(self):
+        self._set_groups = True
         self._create_groups(self._file_extension_dict)
 
     def _group_by_type(self):
+        self._set_groups = True
         self._create_groups(self._type_dict)
 
     def _group_by_user(self):
+        self._set_groups = True
         self._create_groups(self._user_dict)
 
     def _group_by_task_name(self):
+        self._set_groups = True
         self._create_groups(self._task_name_dict)
 
     def _group_by_task_status(self):
+        self._set_groups = True
         self._create_groups(self._task_status_dict)
 
     def _create_column_view_context_menu(self):
@@ -1937,16 +1952,38 @@ class AppDialog(QtGui.QWidget):
 
 
     def on_column_view_row_clicked(self, index):
+        if self._set_groups:
+            self.on_column_view_row_clicked_group(index)
+        else:
+            self.on_column_view_row_clicked_no_groups(index)
+
+    def on_column_view_row_clicked_no_groups(self, index):
         source_index = self.perforce_proxy_model.mapToSource(index)
         row_number = source_index.row()
-        logger.debug(f"Clicked Row {row_number}")
+        # logger.debug(f"Clicked Row {row_number}")
         item = self.column_view_model.item(row_number, 11)  # Get the publish id from the 11th column
         if item:
             data = item.text()
             # Perform actions with the data from the clicked row
-            logger.debug(f"Clicked Row {row_number}, Data: {data}")
+            # logger.debug(f"Clicked Row {row_number}, Data: {data}")
             id = int(data)
             self._setup_column_details_panel(id)
+
+    def on_column_view_row_clicked_group(self, index):
+        id_role = QtCore.Qt.UserRole + 1  # Custom role for "id"
+
+        # Get the clicked item's index
+        source_index = self.perforce_proxy_model.mapToSource(index)
+        if source_index.isValid():
+            # Get the "id" data from the custom role
+            id = source_index.data(id_role)
+            if id:
+                id = int(id)
+                # logger.debug(">>>>>>>>>>  id is: {}".format(id))
+                # Perform actions using the retrieved "id"
+                self._setup_column_details_panel(id)
+
+
 
     def _get_perforce_size(self, sg_data):
         """
@@ -2030,6 +2067,12 @@ class AppDialog(QtGui.QWidget):
             print("No rows selected.")
 
     def _on_column_model_action(self, action):
+        if self._set_groups:
+            self._on_column_model_action_groups(action)
+        else:
+            self._on_column_model_action_no_groups(action)
+
+    def _on_column_model_action_no_groups(self, action):
 
         selected_actions = []
         selected_indexes = self.ui.column_view.selectionModel().selectedRows()
@@ -2042,7 +2085,7 @@ class AppDialog(QtGui.QWidget):
                 id = selected_row_data[11]
 
             sg_item = self._column_view_dict.get(int(id), None)
-            logger.debug("selected_row_data: {}".format(selected_row_data))
+            # logger.debug("selected_row_data: {}".format(selected_row_data))
 
             if "path" in sg_item:
                 if "local_path" in sg_item["path"]:
@@ -2073,7 +2116,56 @@ class AppDialog(QtGui.QWidget):
                             self.refresh_publish_data()
 
         if selected_actions:
-            self.peform_changelist_selection(selected_actions)
+            self.perform_changelist_selection(selected_actions)
+
+    def _on_column_model_action_groups(self, action):
+        selected_actions = []
+        selected_indexes = self.ui.column_view.selectionModel().selectedRows()
+
+        # Define the custom role for "id"
+        id_role = QtCore.Qt.UserRole + 1
+
+        for selected_index in selected_indexes:
+            source_index = self.perforce_proxy_model.mapToSource(selected_index)
+            if source_index.isValid():
+                # Get the "id" data from the custom role
+                id = source_index.data(id_role)
+                if id is not None:
+                    id = int(id)
+
+                    sg_item = self._column_view_dict.get(id, None)
+                    # logger.debug("Selected item's id: {}".format(id))
+
+                    if "path" in sg_item:
+                        if "local_path" in sg_item["path"]:
+                            target_file = sg_item["path"].get("local_path", None)
+                            depot_file = sg_item.get("depotFile", None)
+
+                            if action in ["add", "move/add", "edit", "delete"]:
+                                sg_item_action = sg_item.get("action", None)
+                                if sg_item_action and sg_item_action == "delete":
+                                    msg = "Cannot perform the action on the file {} as it has already been marked for deletion or is deleted.".format(
+                                        depot_file)
+                                    self._add_log(msg, 2)
+
+                                if action == "delete":
+                                    msg = "Marking file {} for deletion ...".format(depot_file)
+                                else:
+                                    msg = "{} file {}".format(action, depot_file)
+                                self._add_log(msg, 2)
+                                selected_actions.append((sg_item, action))
+
+                            elif action == "revert":
+                                msg = "Revert file {} ...".format(target_file)
+                                self._add_log(msg, 3)
+                                # p4_result = self._p4.run("revert", "-v", target_file)
+                                p4_result = self._p4.run("revert", target_file)
+                                if p4_result:
+                                    self.refresh_publish_data()
+
+        if selected_actions:
+            self.perform_changelist_selection(selected_actions)
+
 
     def _get_tooltip(self, data, sg_item):
         """
@@ -5659,10 +5751,10 @@ class AppDialog(QtGui.QWidget):
                                 self.refresh_publish_data()
 
         if selected_actions:
-            self.peform_changelist_selection(selected_actions)
+            self.perform_changelist_selection(selected_actions)
 
 
-    def peform_changelist_selection(self, selected_actions):
+    def perform_changelist_selection(self, selected_actions):
         perform_action = ChangelistSelection(self._p4, selected_actions=selected_actions, parent=self)
         perform_action.show()
 
