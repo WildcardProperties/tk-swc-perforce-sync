@@ -117,6 +117,9 @@ class ChangelistSelection(QtWidgets.QDialog):
             # Select the new changelist
 
             self.change = str(change)
+            if self.change:
+                self.set_changelist()
+
 
         except Exception as e:
             logger.debug("Error creating new changelist: {}".format(e))

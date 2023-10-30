@@ -80,10 +80,13 @@ class ChangelistSelectionWidget(QtWidgets.QDialog):
 
         
         # Load Shot Button
-        self.new_button = QtWidgets.QPushButton('New changelist')
+        self.new_button = QtWidgets.QPushButton('Add files to a new changelist')
         self.new_button.setFixedWidth(220)
         self.new_button.setFixedHeight(30)
-        self.ok_button = QtWidgets.QPushButton('Add files to selected changelist')
+        # Set tooltip for new_button
+        self.new_button.setToolTip('Based on the given description, create a new changelist and incorporate the files.')
+        self.ok_button = QtWidgets.QPushButton('Add files to the selected changelist')
+        self.ok_button.setToolTip('Add the files to the selected changelist')
         self.ok_button.setFixedWidth(220)
         self.ok_button.setFixedHeight(30)
 

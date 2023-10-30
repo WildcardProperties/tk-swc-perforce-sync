@@ -171,7 +171,9 @@ class TreeViewWidget(QtWidgets.QWidget):
 
         self.tree_view = SWCTreeView(myp4=self.p4)
         self.model = QtGui.QStandardItemModel()
-        self.tree_view.setModel(self.model)
+        self.proxymodel = QtGui.QSortFilterProxyModel()
+        self.proxymodel.setSourceModel(self.model)
+        self.tree_view.setModel(self.proxymodel)
 
         #self.tree_view = QtWidgets.QTreeView()
         #self.model = QtGui.QStandardItemModel()

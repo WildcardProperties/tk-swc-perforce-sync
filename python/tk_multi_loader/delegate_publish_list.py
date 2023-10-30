@@ -25,6 +25,7 @@ shotgun_view = sgtk.platform.import_framework("tk-framework-qtwidgets", "views")
 from .ui.widget_publish_list import Ui_PublishListWidget
 from .delegate_publish import PublishWidget, PublishDelegate
 from . import model_item_data
+from .utils import Icons, get_action_icon
 
 logger = sgtk.platform.get_logger(__name__)
 
@@ -65,7 +66,6 @@ class SgPublishListDelegate(PublishDelegate):
     """
     Delegate which 'glues up' the List widget with a QT View.
     """
-
     def _create_widget(self, parent):
         """
         Widget factory as required by base class. The base class will call this
@@ -190,7 +190,20 @@ class SgPublishListDelegate(PublishDelegate):
         sg_data = shotgun_model.get_sg_data(model_index)
         published_file_type = sg_data.get('type', None)
         # logger.debug(">>>>>>>>>>>> _format_publish: sg_data: {}".format(sg_data))
-        main_text = "<b>%s</b>" % (sg_data.get("name") or "Unnamed")
+        main_text = ""
+        action = sg_data.get("action") or sg_data.get("headAction") or None
+        #logger.debug(">>>>>>>>>>>> _format_publish: action: {}".format(action))
+        if action:
+            self.actions_icons = Icons()
+            icon_path = self.actions_icons.get_icon_path(action)
+            #action_icon, icon_path = get_action_icon(action)
+            #action_icon, icon_path = get_action_icon(action)
+            #logger.debug(">>>>>>>>>>>> _format_publish: icon_path: {}".format(icon_path))
+            icon_html = '<img src="%s" />' % icon_path
+            #logger.debug(">>>>>>>>>>>> _format_publish: icon_html: {}".format(icon_html))
+            main_text += "%s " % icon_html
+
+        main_text += "<b>%s</b>" % (sg_data.get("name") or "Unnamed")
 
         """
         if published_file_type in ['PublishedFile']:

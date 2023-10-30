@@ -9,10 +9,12 @@
 # not expressly granted therein are reserved by Shotgun Software Inc.
 
 import sgtk
-import datetime
+#import datetime
 from sgtk.platform.qt import QtCore, QtGui
 from .model_latestpublish import SgLatestPublishModel
-from .utils import ResizeEventFilter
+#from .utils import ResizeEventFilter
+# from .utils import get_action_icon
+from .utils import Icons
 
 # import the shotgun_model and view modules from the shotgun utils framework
 shotgun_model = sgtk.platform.import_framework(
@@ -27,6 +29,7 @@ from .ui.widget_publish_thumb import Ui_PublishThumbWidget
 from .delegate_publish import PublishWidget, PublishDelegate
 from . import model_item_data
 
+logger = sgtk.platform.get_logger(__name__)
 
 class PublishThumbWidget(PublishWidget):
     """
@@ -183,9 +186,17 @@ class SgPublishThumbDelegate(PublishDelegate):
         #  'version_number': 2}
 
         # get the name (lighting v3)
-        name_str = "Unnamed"
+        name_str = ""
+        action = sg_data.get("action") or sg_data.get("headAction") or None
+        if action:
+            self.actions_icons = Icons()
+            icon_path = self.actions_icons.get_icon_path(action)
+            #action_icon, icon_path = get_action_icon(action)
+            # logger.debug("icon_path: %s" % icon_path)
+            icon_html = '<img src="%s" />' % icon_path
+            name_str = "%s " % icon_html
         if sg_data.get("name"):
-            name_str = sg_data.get("name")
+            name_str += sg_data.get("name")
 
         #if sg_data.get("version_number"):
         #    name_str += " v%s" % sg_data.get("version_number")

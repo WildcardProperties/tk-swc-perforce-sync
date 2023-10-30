@@ -10,6 +10,7 @@
 
 import sgtk
 from sgtk.platform.qt import QtCore, QtGui
+import os
 
 
 class ResizeEventFilter(QtCore.QObject):
@@ -23,17 +24,17 @@ class ResizeEventFilter(QtCore.QObject):
 
     # create the filter object. Typically, it's
     # it's easiest to parent it to the object that is
-    # being monitored (in this case self.ui.thumbnail)
-    filter = ResizeEventFilter(self.ui.thumbnail)
+    # being monitored (in this case ui.thumbnail)
+    filter = ResizeEventFilter(ui.thumbnail)
 
     # now set up a signal/slot connection so that the
     # __on_thumb_resized slot gets called every time
     # the widget is resized
-    filter.resized.connect(self.__on_thumb_resized)
+    filter.resized.connect(__on_thumb_resized)
 
     # finally, install the event filter into the QT
     # event system
-    self.ui.thumbnail.installEventFilter(filter)
+    ui.thumbnail.installEventFilter(filter)
     """
 
     resized = QtCore.Signal()
@@ -59,6 +60,39 @@ class ResizeEventFilter(QtCore.QObject):
         # pass it on!
         return False
 
+class Icons(object):
+    def __init__(self):
+        self.repo_root = os.path.normpath(
+            os.path.join(os.path.dirname(__file__), "..", "..")
+        )
+        self.p4_file_add_path = os.path.join(self.repo_root, "icons/p4_file_add.png")
+        self.p4_file_add_icon = QtGui.QIcon(QtGui.QPixmap(self.p4_file_add_path))
+
+        self.p4_file_edit_path = os.path.join(self.repo_root, "icons/p4_file_edit.png")
+        self.p4_file_edit_icon = QtGui.QIcon(QtGui.QPixmap(self.p4_file_edit_path))
+
+        self.p4_file_delete_path = os.path.join(self.repo_root, "icons/p4_file_delete.png")
+        self.p4_file_delete_icon = QtGui.QIcon(QtGui.QPixmap(self.p4_file_delete_path))
+
+    def get_icon_path(self, action):
+        if action in ["add", "edit", "delete", "move/add"]:
+            if action == "edit":
+                return self.p4_file_edit_path
+            elif action == "delete":
+                return self.p4_file_delete_path
+            else:
+                return self.p4_file_add_path
+        return None
+
+    def get_icon_pixmap(self, action):
+        if action in ["add", "edit", "delete", "move/add"]:
+            if action == "edit":
+                return self.p4_file_edit_icon
+            elif action == "delete":
+                return self.p4_file_delete_icon
+            else:
+                return self.p4_file_add_icon
+        return None
 
 def create_overlayed_user_publish_thumbnail(publish_pixmap, user_pixmap):
     """
@@ -328,3 +362,27 @@ def resolve_filters(filters):
                 resolved_filter.append(field)
         resolved_filters.append(resolved_filter)
     return resolved_filters
+
+def get_action_icon(action):
+    """ Get the icon for the action
+    """
+    repo_root = os.path.normpath(
+        os.path.join(os.path.dirname(__file__), "..", "..")
+    )
+    p4_file_add_path = os.path.join(repo_root, "icons/p4_file_add.png")
+    p4_file_add_icon = QtGui.QIcon(QtGui.QPixmap(p4_file_add_path))
+
+    p4_file_edit_path = os.path.join(repo_root, "icons/p4_file_edit.png")
+    p4_file_edit_icon = QtGui.QIcon(QtGui.QPixmap(p4_file_edit_path))
+
+    p4_file_delete_path = os.path.join(repo_root, "icons/p4_file_delete.png")
+    p4_file_delete_icon = QtGui.QIcon(QtGui.QPixmap(p4_file_delete_path))
+
+    if action in ["add", "edit", "delete", "move/add"]:
+        if action == "edit":
+            return p4_file_edit_icon, p4_file_edit_path
+        elif action == "delete":
+            return p4_file_delete_icon, p4_file_delete_path
+        else:
+            return p4_file_add_icon, p4_file_add_path
+    return None, None

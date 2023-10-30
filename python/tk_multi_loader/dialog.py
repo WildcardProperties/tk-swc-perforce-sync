@@ -43,7 +43,8 @@ from .delegate_publish_history import SgPublishHistoryDelegate
 from .search_widget import SearchWidget
 from .banner import Banner
 from .loader_action_manager import LoaderActionManager
-from .utils import resolve_filters
+from .utils import resolve_filters, get_action_icon
+from .utils import Icons
 
 
 from . import constants
@@ -152,7 +153,9 @@ class AppDialog(QtGui.QWidget):
         # maintain a special flag so that we can switch profile
         # tabs without triggering events
         self._disable_tab_event_handler = False
-
+        #################################################
+        # Icons:
+        self.actions_icons = Icons()
         #################################################
         # hook a helper model tracking status codes so we
         # can use those in the UI
@@ -407,7 +410,7 @@ class AppDialog(QtGui.QWidget):
 
         #################################################
         #Table view setup
-        self._headers = ["", "Folder", "Name", "Action", "Revision#", "Size(MB)", "Extension", "Type",
+        self._headers = ["", "Folder", "Action", "Name", "Revision#", "Size(MB)", "Extension", "Type",
                          "User", "Task", "Status", "ID",
                          "Description"]
         self._setup_column_view()
@@ -820,7 +823,7 @@ class AppDialog(QtGui.QWidget):
         workspace = client.get("Client", None)
         # Get the pending changelists
         change_lists = self._p4.run_changes("-l", "-s", "pending", "-c", workspace)
-        logger.debug("<<<<<<<  change_lists: {}".format(change_lists))
+        # logger.debug("<<<<<<<  change_lists: {}".format(change_lists))
 
         for change_list in change_lists:
             key = change_list.get("change", None)
@@ -1328,38 +1331,163 @@ class AppDialog(QtGui.QWidget):
             self._populate_submitted_widget()
 
         elif mode == self.MAIN_VIEW_PENDING:
-            msg = "\n <span style='color:#2C93E2'>Populating the pending view. Please wait...</span> \n"
-            self._add_log(msg, 2)
-            self._turn_all_modes_off()
-            self.ui.pending_scroll.setVisible(True)
-            self.ui.pending_mode.setIcon(self.pending_icon)
-            #self.ui.pending_mode.setIcon(
-            #    QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_card_active.png"))
-            #)
-            self.ui.pending_mode.setChecked(True)
-
-            self.main_view_mode = self.MAIN_VIEW_PENDING
-
-            self._change_dict = {}
-            self._get_default_changelists()
-            self._get_pending_changelists()
-
-            # publish_widget, self._pending_publish_list = self._create_perforce_ui(self._change_dict, sorted=True)
-            self.pending_tree_view = TreeViewWidget(data_dict=self._change_dict, sorted=True, mode="pending", p4=self._p4)
-            self.pending_tree_view.populate_treeview_widget_pending()
-            publish_widget = self.pending_tree_view.get_treeview_widget()
-
-            # Pending Scroll Area
-            self.ui.pending_scroll.setWidget(publish_widget)
-            # self._change_dict = {}
-            msg = "\n <span style='color:#2C93E2'>Choose the files you want to publish from the Pending view and then initiate the publishing process by clicking 'Submit Files' using the Shotgrid Publisher.</span> \n"
-            self._add_log(msg, 2)
+            self._populate_pending_widget()
         else:
             raise TankError("Undefined view mode!")
 
         self.ui.publish_view.selectionModel().clear()
         self._settings_manager.store("main_view_mode", mode)
 
+    def _populate_pending_widget(self):
+        msg = "\n <span style='color:#2C93E2'>Populating the pending view. Please wait...</span> \n"
+        self._add_log(msg, 2)
+        self._turn_all_modes_off()
+        self.ui.pending_scroll.setVisible(True)
+        self.ui.pending_mode.setIcon(self.pending_icon)
+        # self.ui.pending_mode.setIcon(
+        #    QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_card_active.png"))
+        # )
+        self.ui.pending_mode.setChecked(True)
+
+        self.main_view_mode = self.MAIN_VIEW_PENDING
+
+        self._change_dict = {}
+        self._get_default_changelists()
+        self._get_pending_changelists()
+
+        # publish_widget, self._pending_publish_list = self._create_perforce_ui(self._change_dict, sorted=True)
+        self.pending_tree_view = TreeViewWidget(data_dict=self._change_dict, sorted=True, mode="pending", p4=self._p4)
+        self.pending_tree_view.populate_treeview_widget_pending()
+        self._pending_view_widget = self.pending_tree_view.get_treeview_widget()
+
+        # Pending Scroll Area
+        self.ui.pending_scroll.setWidget(self._pending_view_widget)
+        self._pending_view_model = self.pending_tree_view.proxymodel
+        self._create_pending_view_context_menu()
+
+        # self._change_dict = {}
+        msg = "\n <span style='color:#2C93E2'>Choose the files you want to publish from the Pending view and then initiate the publishing process using the Shotgrid Publisher by clicking 'Submit Files'.</span> \n"
+        self._add_log(msg, 2)
+
+
+    def _create_pending_view_context_menu(self):
+
+        self._pending_view_revert_action = QtGui.QAction("Revert", self._pending_view_widget)
+        self._pending_view_revert_action.triggered.connect(lambda: self._on_pending_view_model_action("revert"))
+
+        self._pending_view_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self._pending_view_widget.customContextMenuRequested.connect(
+            self._show_pending_view_actions
+        )
+
+    def _show_pending_view_actions(self, pos):
+        """
+               Shows the actions for the current pending view selection.
+
+               :param pos: Local coordinates inside the viewport when the context menu was requested.
+        """
+
+        # Build a menu with all the actions.
+        menu = QtGui.QMenu(self)
+
+        menu.addAction(self._pending_view_revert_action)
+        menu.addSeparator()
+        # menu.addAction(self._column_refresh_action)
+
+        # Calculate the global position of the menu
+        global_pos = self._pending_view_widget.mapToGlobal(pos)
+
+        # Execute the menu using a QEventLoop to block until an action is triggered
+        event_loop = QtCore.QEventLoop()
+        menu.aboutToHide.connect(event_loop.quit)
+        menu.exec_(global_pos)
+        event_loop.exec_()
+
+    def _on_pending_view_model_action_old(self, action):
+
+        selected_indexes = self._pending_view_widget.selectionModel().selectedRows()
+        for selected_index in selected_indexes:
+            target_file = None
+            try:
+                source_index = self._pending_view_model.mapToSource(selected_index)
+                #source_index = selected_index
+                selected_row_data = self._get_pending_data_from_source(source_index)
+                #item = self._pending_view_model.itemFromIndex(selected_index)
+                #selected_row_data = item.data()
+                logger.debug("selected_row_data: {}".format(selected_row_data))
+                if selected_row_data:
+                    if "#" in selected_row_data:
+                        target_file = selected_row_data.split("#")[0]
+                        target_file = target_file.strip()
+                        logger.debug("target_file: {}".format(target_file))
+                        if target_file:
+                            if action == "revert":
+                                msg = "Revert file {} ...".format(target_file)
+                                self._add_log(msg, 3)
+                                # p4_result = self._p4.run("revert", "-v", target_file)
+                                p4_result = self._p4.run("revert", target_file)
+                                logger.debug("p4_result: {}".format(p4_result))
+                                if p4_result:
+                                    self._populate_pending_widget()
+                                    # self.refresh_publish_data()
+            except Exception as e:
+                logger.debug("Unable to revert file: {}, Error: {}".format(target_file, e))
+
+
+    def _on_pending_view_model_action(self, action):
+        selected_files_to_revert = []
+
+        # First, gather all the files that are to be reverted
+        selected_indexes = self._pending_view_widget.selectionModel().selectedRows()
+        for selected_index in selected_indexes:
+            try:
+                source_index = self._pending_view_model.mapToSource(selected_index)
+                selected_row_data = self._get_pending_data_from_source(source_index)
+                if selected_row_data and "#" in selected_row_data:
+                    target_file = selected_row_data.split("#")[0]
+                    target_file = target_file.strip()
+                    selected_files_to_revert.append(target_file)
+            except Exception as e:
+                logger.debug("Error processing selection: {}".format(e))
+
+        # If there are files to revert and the action is revert, then proceed
+        if action == "revert" and selected_files_to_revert:
+            # Convert list of files into a string, to show in the confirmation dialog
+            files_str = "\n".join(selected_files_to_revert)
+
+            # Show confirmation dialog
+            reply = QtGui.QMessageBox.question(self, 'Confirmation',
+                                         f"Are you sure you want to revert the following files?\n\n{files_str}",
+                                         QtGui.QMessageBox.Yes | QtGui.QMessageBox.No, QtGui.QMessageBox.No)
+
+            if reply == QtGui.QMessageBox.Yes:
+                for target_file in selected_files_to_revert:
+                    try:
+                        msg = f"Reverting file {target_file} ..."
+                        self._add_log(msg, 3)
+                        p4_result = self._p4.run("revert", target_file)
+                        logger.debug("p4_result for {target_file}: {p4_result}")
+                    except Exception as e:
+                        logger.debug("Unable to revert file: {}, Error: {}".format(target_file, e))
+
+                self._populate_pending_widget()
+
+
+    def _get_pending_data_from_source(self, source_index):
+        # Get data from the source model using the source index
+        if source_index.isValid():
+            parent_item = source_index.model().itemFromIndex(source_index.parent())
+
+            # If the parent item exists, fetch the child item.
+            # Otherwise, just fetch the item at the top level (as you did before)
+            if parent_item:
+                child_item = parent_item.child(source_index.row(), 0)
+            else:
+                child_item = source_index.model().item(source_index.row(), 0)
+
+            if child_item:
+                return child_item.text()
+        return None
 
     def _populate_column_view_no_groups_widget(self):
         #self._publish_model.hard_refresh()
@@ -1552,7 +1680,7 @@ class AppDialog(QtGui.QWidget):
                 new_sg_item["publish_id"] = publish_id
 
             # Create a list of QStandardItems for each column
-            sg_list = ["", folder, name, action, revision, size, file_extension, type, user, task_name, task_status,
+            sg_list = ["", folder, action, name, revision, size, file_extension, type, user, task_name, task_status,
                        publish_id,
                        description]
                 
@@ -1628,7 +1756,7 @@ class AppDialog(QtGui.QWidget):
         header = self.ui.column_view.header()
         menu = QtWidgets.QMenu(self.ui.column_view)
 
-        self._no_groups_action = QtWidgets.QAction("No groups", self.ui.column_view)
+        self._no_groups_action = QtWidgets.QAction("Ungroup", self.ui.column_view)
         self._no_groups_action.triggered.connect(self._no_groups)
         menu.addAction(self._no_groups_action)
 
@@ -1719,10 +1847,9 @@ class AppDialog(QtGui.QWidget):
         if description:
             description = description.split("\n")[0]
         # Create a list of QStandardItems for each column
-        sg_list = ["", folder, name, action, revision, size, file_extension, type, user, task_name, task_status, publish_id,
+        sg_list = ["", folder, action, name, revision, size, file_extension, type, user, task_name, task_status, publish_id,
                    description]
         return sg_list
-
 
 
     def _create_groups_old(self, group_dict):
@@ -1781,6 +1908,12 @@ class AppDialog(QtGui.QWidget):
                     item.setToolTip(tooltip)
                     if col == 5:
                         item.setData(value, QtCore.Qt.DisplayRole)
+                    if col == 2:
+                        action = sg_list[2]
+                        # action_icon, icon_path = get_action_icon(action)
+                        action_icon = self.actions_icons.get_icon_pixmap(action)
+                        if action_icon:
+                            item.setIcon(action_icon)
                     item.setData(str(id), QtCore.Qt.UserRole + 1)
                     item_list.append(item)
 
@@ -1807,7 +1940,7 @@ class AppDialog(QtGui.QWidget):
     def _get_sg_item_list_by_column_order(self, sg_item):
         if not sg_item:
             return [""]  # Fill the first column with an empty item
-        column_order = ["", "folder", "name", "action", "revision", "size", "file_extension", "type", "user",
+        column_order = ["", "folder", "action", "name", "revision", "size", "file_extension", "type", "user",
                         "task_name", "task_status", "publish_id", "description"]
 
         sg_list = []
@@ -2048,8 +2181,15 @@ class AppDialog(QtGui.QWidget):
             item.setToolTip(tooltip)
             if col == 5:
                 item.setData(value, QtCore.Qt.DisplayRole)
+            if col == 2:
+                action = data[2]
+                # action_icon, icon_path = get_action_icon(action)
+                action_icon = self.actions_icons.get_icon_pixmap(action)
+                if action_icon:
+                    item.setIcon(action_icon)
 
             self.column_view_model.setItem(row, col, item)
+
 
     def print_selected_row(self):
         # Get the selected indexes from the column view
@@ -3436,7 +3576,6 @@ class AppDialog(QtGui.QWidget):
                 if sg_item.get("revision"):
                     revision = sg_item.get("revision")
                     msg += __make_table_row("Revision#", revision)
-
 
 
                 if sg_item.get("action"):
