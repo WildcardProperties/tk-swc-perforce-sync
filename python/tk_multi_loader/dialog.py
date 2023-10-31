@@ -95,6 +95,10 @@ class AppDialog(QtGui.QWidget):
 
     # enum to control the mode of the main view
     (MAIN_VIEW_LIST, MAIN_VIEW_THUMB, MAIN_VIEW_COLUMN, MAIN_VIEW_SUBMITTED, MAIN_VIEW_PENDING) = range(5)
+    # enum to control the grouping of the column view
+    (COLUMN_VIEW_UNGROUP, COLUMN_VIEW_GROUP_BY_FOLDER, COLUMN_VIEW_GROUP_BY_ACTION, COLUMN_VIEW_GROUP_BY_REVISION,
+     COLUMN_VIEW_GROUP_BY_EXTENSION, COLUMN_VIEW_GROUP_BY_TYPE, COLUMN_VIEW_GROUP_BY_USER, COLUMN_VIEW_GROUP_BY_TASK,
+     COLUMN_VIEW_GROUP_BY_STATUS) = range(9)
 
     # signal emitted whenever the selected publish changes
     # in either the main view or the details file_history view
@@ -414,6 +418,7 @@ class AppDialog(QtGui.QWidget):
                          "User", "Task", "Status", "ID",
                          "Description"]
         self._setup_column_view()
+        self._current_column_view_grouping = self.COLUMN_VIEW_UNGROUP
 
         #################################################
         # setup file_history
@@ -1315,7 +1320,7 @@ class AppDialog(QtGui.QWidget):
 
             self.main_view_mode = self.MAIN_VIEW_COLUMN
             self.ui.publish_view.setItemDelegate(self._publish_list_delegate)
-            self._populate_column_view_no_groups_widget()
+            self._populate_column_view_widget()
 
         elif mode == self.MAIN_VIEW_SUBMITTED:
             self._turn_all_modes_off()
@@ -1403,36 +1408,6 @@ class AppDialog(QtGui.QWidget):
         menu.exec_(global_pos)
         event_loop.exec_()
 
-    def _on_pending_view_model_action_old(self, action):
-
-        selected_indexes = self._pending_view_widget.selectionModel().selectedRows()
-        for selected_index in selected_indexes:
-            target_file = None
-            try:
-                source_index = self._pending_view_model.mapToSource(selected_index)
-                #source_index = selected_index
-                selected_row_data = self._get_pending_data_from_source(source_index)
-                #item = self._pending_view_model.itemFromIndex(selected_index)
-                #selected_row_data = item.data()
-                logger.debug("selected_row_data: {}".format(selected_row_data))
-                if selected_row_data:
-                    if "#" in selected_row_data:
-                        target_file = selected_row_data.split("#")[0]
-                        target_file = target_file.strip()
-                        logger.debug("target_file: {}".format(target_file))
-                        if target_file:
-                            if action == "revert":
-                                msg = "Revert file {} ...".format(target_file)
-                                self._add_log(msg, 3)
-                                # p4_result = self._p4.run("revert", "-v", target_file)
-                                p4_result = self._p4.run("revert", target_file)
-                                logger.debug("p4_result: {}".format(p4_result))
-                                if p4_result:
-                                    self._populate_pending_widget()
-                                    # self.refresh_publish_data()
-            except Exception as e:
-                logger.debug("Unable to revert file: {}, Error: {}".format(target_file, e))
-
 
     def _on_pending_view_model_action(self, action):
         selected_files_to_revert = []
@@ -1489,7 +1464,7 @@ class AppDialog(QtGui.QWidget):
                 return child_item.text()
         return None
 
-    def _populate_column_view_no_groups_widget(self):
+    def _populate_column_view_widget(self):
         #self._publish_model.hard_refresh()
         self._column_view_dict = {}
         self._standard_item_dict = {}
@@ -1524,54 +1499,32 @@ class AppDialog(QtGui.QWidget):
                     self._standard_item_dict[id] = sg_list
             #logger.debug(">>> self._column_view_dict: {}".format(self._column_view_dict))
             #logger.debug(">>> self._standard_item_dict: {}".format(self._standard_item_dict))
-            self._populate_column_view_no_groups()
+            #self._populate_column_view_no_groups()
+            self._set_column_group()
             self._get_grouped_column_view_data()
             self._get_publish_icons()
 
-            #for key, value in self._column_view_dict.items():
-            #   logger.debug("key: {}, value: {}".format(key, value))
-
-    def _populate_column_view_no_groups_widget_old(self):
-        self._column_view_dict = {}
-        self._standard_item_dict = {}
-
-        logger.debug(">>> Setting up Column View table ...")
-        self._setup_column_view()
-        logger.debug(">>> Getting Perforce data...")
-        self._perforce_sg_data = self._get_perforce_sg_data()
-
-        length = len(self._perforce_sg_data)
-        if not self._perforce_sg_data:
-            self._perforce_sg_data = self._sg_data
-
-        if self._perforce_sg_data and length > 0:
-            msg = "\n <span style='color:#2C93E2'>Populating the Column View with {} files. Please wait...</span> \n".format(
-                length)
-            self._add_log(msg, 2)
-            logger.debug(">>> Getting Perforce file size...")
-            self._perforce_sg_data = self._get_perforce_size(self._perforce_sg_data)
-            logger.debug(">>> Populating Column View table...")
-
-            logger.debug(">>> Updating Column View is complete")
-            for sg_item in self._perforce_sg_data:
-                id = sg_item.get("id", 0)
-                new_sg_item, sg_list = self._get_column_data(sg_item)
-                logger.debug(f"Processing sg_item: {sg_item}")
-                logger.debug(f"new_sg_item: {new_sg_item}")
-                logger.debug(f"sg_list: {sg_list}")
-
-                if id not in self._column_view_dict and new_sg_item:
-                    self._column_view_dict[id] = new_sg_item
-                if sg_list:
-                    item = [QtGui.QStandardItem(str(data)) for data in sg_list]
-                    self._standard_item_dict[id] = item
-
-            logger.debug(f"self._standard_item_dict: {self._standard_item_dict}")
-
-
-            self._populate_column_view_no_groups()
-            self._get_grouped_column_view_data()
-            self._get_publish_icons()
+    def _set_column_group(self):
+        if self._current_column_view_grouping == self.COLUMN_VIEW_UNGROUP:
+            self._no_groups()
+        elif self._current_column_view_grouping == self.COLUMN_VIEW_GROUP_BY_FOLDER:
+            self._group_by_folder()
+        elif self._current_column_view_grouping == self.COLUMN_VIEW_GROUP_BY_ACTION:
+            self._group_by_action()
+        elif self._current_column_view_grouping == self.COLUMN_VIEW_GROUP_BY_REVISION:
+            self._group_by_revision()
+        elif self._current_column_view_grouping == self.COLUMN_VIEW_GROUP_BY_EXTENSION:
+            self._group_by_file_extension()
+        elif self._current_column_view_grouping == self.COLUMN_VIEW_GROUP_BY_TYPE:
+            self._group_by_type()
+        elif self._current_column_view_grouping == self.COLUMN_VIEW_GROUP_BY_USER:
+            self._group_by_user()
+        elif self._current_column_view_grouping == self.COLUMN_VIEW_GROUP_BY_TASK:
+            self._group_by_task_name()
+        elif self._current_column_view_grouping == self.COLUMN_VIEW_GROUP_BY_STATUS:
+            self._group_by_task_status()
+        else:
+            raise ValueError("Invalid column view grouping specified!")
 
     def _get_grouped_column_view_data(self):
 
@@ -1580,7 +1533,7 @@ class AppDialog(QtGui.QWidget):
         self._action_dict = self._get_column_dict("action")
         self._revision_dict = self._get_column_dict("revision")
         self._file_extension_dict = self._get_column_dict("file_extension")
-        self._type_dict = self._get_column_dict("type")
+        self._type_dict = self._get_column_dict("file_type")
         self._task_name_dict = self._get_column_dict("task_name")
         self._task_status_dict = self._get_column_dict("task_status")
         self._user_dict = self._get_column_dict("user")
@@ -1723,19 +1676,6 @@ class AppDialog(QtGui.QWidget):
 
         self.ui.column_view.setModel(self.perforce_proxy_model)
 
-        # Set the header to be clickable for sorting        self.ui.column_view.header().setSectionsClickable(True)
-        #self.ui.column_view.header().setSortIndicatorShown(True)
-
-        # Sort by the first column initially
-        #self.ui.column_view.sortByColumn(0, QtCore.Qt.AscendingOrder)
-
-        # Grouping by "Entity Sub-Folder"
-        #self.ui.column_view.setSortingEnabled(True)
-
-        #self.ui.column_view.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
-
-        #self.ui.column_view.sortByColumn(12, QtCore.Qt.AscendingOrder)
-
         header = self.ui.column_view.header()
         for col in range(len(self._headers)):
             header.setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
@@ -1754,62 +1694,80 @@ class AppDialog(QtGui.QWidget):
 
     def _show_column_header_context_menu(self, pos):
         header = self.ui.column_view.header()
+        col_idx = header.logicalIndexAt(pos)
+        col_name = self.column_view_model.horizontalHeaderItem(col_idx).text()
+
         menu = QtWidgets.QMenu(self.ui.column_view)
-
-        self._no_groups_action = QtWidgets.QAction("Ungroup", self.ui.column_view)
-        self._no_groups_action.triggered.connect(self._no_groups)
-        menu.addAction(self._no_groups_action)
-
-        menu.addSeparator()
 
         # Add the "Group by folder" menu item
         self._group_by_folder_action = QtWidgets.QAction("Group by folder", self.ui.column_view)
-
         self._group_by_folder_action.triggered.connect(self._group_by_folder)
-        menu.addAction(self._group_by_folder_action)
 
         # Add the "Group by action" menu item
         self._group_by_action_action = QtWidgets.QAction("Group by action", self.ui.column_view)
         self._group_by_action_action.triggered.connect(self._group_by_action)
-        menu.addAction(self._group_by_action_action)
 
         # Add grouping options for revision, file extension, type, task name, and task status
         self._group_by_revision_action = QtWidgets.QAction("Group by Revision", self.ui.column_view)
         self._group_by_revision_action.triggered.connect(self._group_by_revision)
-        menu.addAction(self._group_by_revision_action)
 
         self._group_by_file_extension_action = QtWidgets.QAction("Group by File Extension", self.ui.column_view)
         self._group_by_file_extension_action.triggered.connect(self._group_by_file_extension)
-        menu.addAction(self._group_by_file_extension_action)
 
         self._group_by_type_action = QtWidgets.QAction("Group by Type", self.ui.column_view)
         self._group_by_type_action.triggered.connect(self._group_by_type)
-        menu.addAction(self._group_by_type_action)
 
         # Add the "Group by user" menu item
         self._group_by_user_action = QtWidgets.QAction("Group by user", self.ui.column_view)
         self._group_by_user_action.triggered.connect(self._group_by_user)
-        menu.addAction(self._group_by_user_action)
 
         self._group_by_task_name_action = QtWidgets.QAction("Group by Task Name", self.ui.column_view)
         self._group_by_task_name_action.triggered.connect(self._group_by_task_name)
-        menu.addAction(self._group_by_task_name_action)
 
         self._group_by_task_status_action = QtWidgets.QAction("Group by Task Status", self.ui.column_view)
         self._group_by_task_status_action.triggered.connect(self._group_by_task_status)
-        menu.addAction(self._group_by_task_status_action)
 
-        menu.addSeparator()
+        # Add a general Ungroup option
+        self._no_groups_action = QtWidgets.QAction("Ungroup", self.ui.column_view)
+        self._no_groups_action.triggered.connect(self._no_groups)
 
         # Add "Expand All" action
         self._expand_all_action = QtWidgets.QAction("Expand All", self.ui.column_view)
         self._expand_all_action.triggered.connect(self._expand_all)
-        menu.addAction(self._expand_all_action)
 
         # Add "Collapse All" action
         self._collapse_all_action = QtWidgets.QAction("Collapse All", self.ui.column_view)
         self._collapse_all_action.triggered.connect(self._collapse_all)
-        menu.addAction(self._collapse_all_action)
+
+        # Map each column to its relevant action(s)
+        actions_map = {
+            "Folder": [self._group_by_folder_action],
+            "Action": [self._group_by_action_action],
+            "Revision#": [self._group_by_revision_action],
+            "Extension": [self._group_by_file_extension_action],
+            "Type": [self._group_by_type_action],
+            "User": [self._group_by_user_action],  # Change "user" to "User"
+            "Task": [self._group_by_task_name_action],
+            "Status": [self._group_by_task_status_action]
+        }
+
+        # Add actions that are always present, regardless of the column
+        common_actions = [self._expand_all_action, self._collapse_all_action]
+
+        # Add actions
+
+        # Add actions based on the current column
+        for action in actions_map.get(col_name, []):
+            menu.addAction(action)
+
+        menu.addSeparator()
+
+        menu.addAction(self._no_groups_action)
+        menu.addSeparator()
+
+        # Add common actions
+        for action in common_actions:
+            menu.addAction(action)
 
         # Calculate the global position of the menu
         global_pos = header.mapToGlobal(pos)
@@ -1826,61 +1784,6 @@ class AppDialog(QtGui.QWidget):
     def _collapse_all(self):
         # Collapse all items
         self.ui.column_view.collapseAll()
-
-    def _get_sg_item_list(self, sg_item):
-        if not sg_item:
-            return []
-        # logger.debug(">>> sg_item {} data".format(sg_item))
-        folder = sg_item.get("folder")
-        name = sg_item.get("name")
-        action = sg_item.get("action")
-        revision = sg_item.get("revision")
-        size = sg_item.get("fileSize")
-        file_extension = sg_item.get("file_extension")
-        type = sg_item.get("type")
-        user = sg_item.get("user")
-        task_name = sg_item.get("task_name")
-        task_status = sg_item.get("task_status")
-        publish_id = sg_item.get("publish_id")
-        description = sg_item.get("description")
-        # Get descrption from the begining until the first line break
-        if description:
-            description = description.split("\n")[0]
-        # Create a list of QStandardItems for each column
-        sg_list = ["", folder, action, name, revision, size, file_extension, type, user, task_name, task_status, publish_id,
-                   description]
-        return sg_list
-
-
-    def _create_groups_old(self, group_dict):
-        # Clear all rows from the model
-        #self.column_view_model.clear()
-        # Set up the column view
-        self._setup_column_view()
-
-        # Add items to the model
-        for category, sg_data in group_dict.items():
-            # logger.debug(">>> category: {}, sg_data: {}".format(category, sg_data))
-            category_item = QtGui.QStandardItem(category)
-            self.column_view_model.appendRow(category_item)
-            for sg_list in sg_data:
-                # logger.debug(">>> sg_list: {}".format(sg_list))
-                tooltip = ""
-                if sg_list and len(sg_list) >= 12:
-                    id = sg_list[11]
-                    sg_item = self._column_view_dict.get(id, None)
-                    tooltip = self._get_tooltip(sg_list, sg_item)
-                item_list = []
-                for col, value in enumerate(sg_list):
-                    item = QtGui.QStandardItem(str(value))
-                    item.setToolTip(tooltip)
-                    if col == 4 or col == 5:
-                        item.setData(value, QtCore.Qt.DisplayRole)
-                    item_list.append(item)
-                #item = [QtGui.QStandardItem(str(data)) for data in sg_list]
-
-                category_item.appendRow(item_list)
-        self.ui.column_view.expandAll()
 
     def _create_groups(self, group_dict):
         # Clear all rows from the model
@@ -1925,18 +1828,6 @@ class AppDialog(QtGui.QWidget):
         self.ui.column_view.expandAll()
 
 
-    """
-    def on_column_view_item_clicked(self, index):
-        # Handle the item click here
-        item = self.column_view_model.itemFromIndex(index)
-        if item:
-            sg_list = [item.text() for _ in range(item.rowCount())]
-            logger.debug("Item clicked - sg_list:", sg_list)
-        else:
-            logger.debug("No item found for the clicked index")
-    """
-
-
     def _get_sg_item_list_by_column_order(self, sg_item):
         if not sg_item:
             return [""]  # Fill the first column with an empty item
@@ -1971,40 +1862,57 @@ class AppDialog(QtGui.QWidget):
         #self.column_view_model.clear()
         # Set up the column view
         self._setup_column_view()
+        self._current_column_view_grouping = self.COLUMN_VIEW_UNGROUP
         # Add items to the model
         self._populate_column_view_no_groups()
 
     def _group_by_folder(self):
         # self._group_by_folder_action.setCheckable(True)
+        #self._setup_column_view()
         self._set_groups = True
+        self._current_column_view_grouping = self.COLUMN_VIEW_GROUP_BY_FOLDER
         self._create_groups(self._folder_dict)
 
     def _group_by_action(self):
+        #self._setup_column_view()
         self._set_groups = True
+        self._current_column_view_grouping = self.COLUMN_VIEW_GROUP_BY_ACTION
         self._create_groups(self._action_dict)
 
     def _group_by_revision(self):
+        #self._setup_column_view()
         self._set_groups = True
+        self._current_column_view_grouping = self.COLUMN_VIEW_GROUP_BY_REVISION
         self._create_groups(self._revision_dict)
 
     def _group_by_file_extension(self):
+        #self._setup_column_view()
         self._set_groups = True
+        self._current_column_view_grouping = self.COLUMN_VIEW_GROUP_BY_EXTENSION
         self._create_groups(self._file_extension_dict)
 
     def _group_by_type(self):
+        #self._setup_column_view()
         self._set_groups = True
+        self._current_column_view_grouping = self.COLUMN_VIEW_GROUP_BY_TYPE
         self._create_groups(self._type_dict)
 
     def _group_by_user(self):
+        #self._setup_column_view()
         self._set_groups = True
+        self._current_column_view_grouping = self.COLUMN_VIEW_GROUP_BY_USER
         self._create_groups(self._user_dict)
 
     def _group_by_task_name(self):
+        #self._setup_column_view()
         self._set_groups = True
+        self._current_column_view_grouping = self.COLUMN_VIEW_GROUP_BY_TASK
         self._create_groups(self._task_name_dict)
 
     def _group_by_task_status(self):
+        #self._setup_column_view()
         self._set_groups = True
+        self._current_column_view_grouping = self.COLUMN_VIEW_GROUP_BY_STATUS
         self._create_groups(self._task_status_dict)
 
     def _create_column_view_context_menu(self):
@@ -2014,7 +1922,6 @@ class AppDialog(QtGui.QWidget):
         self._column_edit_action.triggered.connect(lambda: self._on_column_model_action("edit"))
         self._column_delete_action = QtGui.QAction("Delete", self.ui.column_view)
         self._column_delete_action.triggered.connect(lambda: self._on_column_model_action("delete"))
-
 
         self._column_revert_action = QtGui.QAction("Revert", self.ui.column_view)
         self._column_revert_action.triggered.connect(lambda: self._on_column_model_action("revert"))
@@ -2316,7 +2223,10 @@ class AppDialog(QtGui.QWidget):
         """
         #logger.debug(">>>>>>>>>>>> _set_tooltip: data: {}".format(data))
         #logger.debug(">>>>>>>>>>>> _set_tooltip: sg_item: {}".format(sg_item))
-        tooltip = "<b>Name:</b> %s" % (sg_item.get("code") or "No name given.")
+        tooltip = ""
+        if not sg_item or not data:
+            return tooltip
+        tooltip += "<b>Name:</b> %s" % (sg_item.get("code") or "No name given.")
 
         # Version 012 by John Smith at 2014-02-23 10:34
 
@@ -4904,6 +4814,8 @@ class AppDialog(QtGui.QWidget):
                 selection_model.setCurrentIndex(
                     proxy_index, QtGui.QItemSelectionModel.ClearAndSelect
                 )
+                if self.main_view_mode == self.MAIN_VIEW_COLUMN:
+                    self._populate_column_view_widget()
 
         else:
             # clear selection to match no items
@@ -5630,7 +5542,7 @@ class AppDialog(QtGui.QWidget):
 
         logger.debug(">>> main_view_mode is: {}".format(self.main_view_mode))
         if self.main_view_mode == self.MAIN_VIEW_COLUMN:
-            self._populate_column_view_no_groups_widget()
+            self._populate_column_view_widget()
         if self.main_view_mode == self.MAIN_VIEW_SUBMITTED:
             self._populate_submitted_widget()
 
