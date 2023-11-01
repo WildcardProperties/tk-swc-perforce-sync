@@ -1500,9 +1500,9 @@ class AppDialog(QtGui.QWidget):
             #logger.debug(">>> self._column_view_dict: {}".format(self._column_view_dict))
             #logger.debug(">>> self._standard_item_dict: {}".format(self._standard_item_dict))
             #self._populate_column_view_no_groups()
-            self._set_column_group()
             self._get_grouped_column_view_data()
             self._get_publish_icons()
+            self._set_column_group()
 
     def _set_column_group(self):
         if self._current_column_view_grouping == self.COLUMN_VIEW_UNGROUP:
@@ -1538,7 +1538,7 @@ class AppDialog(QtGui.QWidget):
         self._task_status_dict = self._get_column_dict("task_status")
         self._user_dict = self._get_column_dict("user")
 
-    def _get_column_dict(self, key):
+    def _get_column_dict_old(self, key):
         column_dict = {}
         if self._column_view_dict:
             for id, sg_item in self._column_view_dict.items():
@@ -1546,14 +1546,36 @@ class AppDialog(QtGui.QWidget):
                 if sg_item:
                     value = sg_item.get(key, None)
                     #logger.debug(">>> value: {}".format(value))
-                    if value:
+                    if key not in ["folder"]:
+                        if value:
+                            if value not in column_dict:
+                                column_dict[value] = []
+                            if id in self._standard_item_dict:
+                                #logger.debug(">>> id: {}, self._standard_item_dict[id]: {}".format(id, self._standard_item_dict[id]))
+                                column_dict[value].append(self._standard_item_dict[id])
+                    else:
+                        new_value = value or "Empty"
+                        column_dict.setdefault(new_value, []).append(self._standard_item_dict.get(id))
+                        """
                         if value not in column_dict:
-                            column_dict[value] = []
+                            column_dict[new_value] = []
                         if id in self._standard_item_dict:
-                            #logger.debug(">>> id: {}, self._standard_item_dict[id]: {}".format(id, self._standard_item_dict[id]))
-                            column_dict[value].append(self._standard_item_dict[id])
+                            column_dict[new_value].append(self._standard_item_dict[id])
+                        """
+
         return column_dict
 
+    def _get_column_dict(self, key):
+        column_dict = {}
+        for id, sg_item in self._column_view_dict.items():
+            if sg_item:
+                value = sg_item.get(key)
+                if value is not None and key != "folder":
+                    column_dict.setdefault(value, []).append(self._standard_item_dict.get(id))
+                else:
+                    column_dict.setdefault(value or "Empty", []).append(self._standard_item_dict.get(id))
+
+        return column_dict
 
     def _get_column_data(self, sg_item):
         new_sg_item = sg_item
@@ -4814,8 +4836,8 @@ class AppDialog(QtGui.QWidget):
                 selection_model.setCurrentIndex(
                     proxy_index, QtGui.QItemSelectionModel.ClearAndSelect
                 )
-                if self.main_view_mode == self.MAIN_VIEW_COLUMN:
-                    self._populate_column_view_widget()
+            #if self.main_view_mode == self.MAIN_VIEW_COLUMN:
+            #    self._populate_column_view_widget()
 
         else:
             # clear selection to match no items
@@ -5612,7 +5634,6 @@ class AppDialog(QtGui.QWidget):
 
     def _update_perforce_data(self):
         logger.debug(">>>>>>>>>>  _get_perforce_data: START")
-        logger.debug(">>>>>>>>>>  get_peforce_data...")
         msg = "\n <span style='color:#2C93E2'>Getting Perforce data ...</span> \n"
         self._add_log(msg, 2)
         self._get_perforce_data()
