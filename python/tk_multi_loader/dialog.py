@@ -1362,6 +1362,7 @@ class AppDialog(QtGui.QWidget):
 
         # publish_widget, self._pending_publish_list = self._create_perforce_ui(self._change_dict, sorted=True)
         self.pending_tree_view = TreeViewWidget(data_dict=self._change_dict, sorted=True, mode="pending", p4=self._p4)
+        self.pending_tree_view.single_selection()
         self.pending_tree_view.populate_treeview_widget_pending()
         self._pending_view_widget = self.pending_tree_view.get_treeview_widget()
 
@@ -1371,12 +1372,16 @@ class AppDialog(QtGui.QWidget):
         self._create_pending_view_context_menu()
 
         # self._change_dict = {}
-        msg = "\n <span style='color:#2C93E2'>Choose the files you want to publish from the Pending view and then initiate the publishing process using the Shotgrid Publisher by clicking 'Submit Files'.</span> \n"
+        msg = "\n <span style='color:#2C93E2'> Right-click on a file to 'Publish...' the changelist in Shotgrid or 'Revert' it in Perforce.</span> \n"
+
+        #msg = "\n <span style='color:#2C93E2'>Choose the files you want to publish from the Pending view and then initiate the publishing process using the Shotgrid Publisher by clicking 'Submit Files'.</span> \n"
         self._add_log(msg, 2)
 
 
     def _create_pending_view_context_menu(self):
 
+        self._pending_view_publish_action = QtGui.QAction("Publish...", self._pending_view_widget)
+        self._pending_view_publish_action.triggered.connect(lambda: self._on_pending_view_model_action("publish"))
         self._pending_view_revert_action = QtGui.QAction("Revert", self._pending_view_widget)
         self._pending_view_revert_action.triggered.connect(lambda: self._on_pending_view_model_action("revert"))
 
@@ -1394,6 +1399,9 @@ class AppDialog(QtGui.QWidget):
 
         # Build a menu with all the actions.
         menu = QtGui.QMenu(self)
+
+        menu.addAction(self._pending_view_publish_action)
+        menu.addSeparator()
 
         menu.addAction(self._pending_view_revert_action)
         menu.addSeparator()
@@ -1414,38 +1422,58 @@ class AppDialog(QtGui.QWidget):
 
         # First, gather all the files that are to be reverted
         selected_indexes = self._pending_view_widget.selectionModel().selectedRows()
-        for selected_index in selected_indexes:
+        change = 0
+        if action == "publish" and selected_indexes:
+            for selected_index in selected_indexes:
+                try:
+                    source_index = self._pending_view_model.mapToSource(selected_index)
+                    change = self._get_pending_change_from_source(source_index)
+                except Exception as e:
+                    logger.debug("Error processing selection: {}".format(e))
             try:
-                source_index = self._pending_view_model.mapToSource(selected_index)
-                selected_row_data = self._get_pending_data_from_source(source_index)
-                if selected_row_data and "#" in selected_row_data:
-                    target_file = selected_row_data.split("#")[0]
-                    target_file = target_file.strip()
-                    selected_files_to_revert.append(target_file)
+                logger.debug(">>> change is: {}".format(change))
+                engine = sgtk.platform.current_engine()
+                if engine:
+                    app_command = engine.commands.get("Publish...")
+                    if app_command:
+                        # now run the command, which in this case will launch the Publish app,
+                        # passing in the desired changelist parameter.
+                        app_command["callback"](change)
             except Exception as e:
-                logger.debug("Error processing selection: {}".format(e))
+                logger.debug("Error loading publisher: {}".format(e))
 
-        # If there are files to revert and the action is revert, then proceed
-        if action == "revert" and selected_files_to_revert:
-            # Convert list of files into a string, to show in the confirmation dialog
-            files_str = "\n".join(selected_files_to_revert)
+        # If the action is revert, then proceed
+        if action == "revert" and selected_indexes:
+            for selected_index in selected_indexes:
+                try:
+                    source_index = self._pending_view_model.mapToSource(selected_index)
+                    selected_row_data = self._get_pending_data_from_source(source_index)
+                    if selected_row_data and "#" in selected_row_data:
+                        target_file = selected_row_data.split("#")[0]
+                        target_file = target_file.strip()
+                        selected_files_to_revert.append(target_file)
+                except Exception as e:
+                    logger.debug("Error processing selection: {}".format(e))
+            if selected_files_to_revert:
+                # Convert list of files into a string, to show in the confirmation dialog
+                files_str = "\n".join(selected_files_to_revert)
 
-            # Show confirmation dialog
-            reply = QtGui.QMessageBox.question(self, 'Confirmation',
-                                         f"Are you sure you want to revert the following files?\n\n{files_str}",
-                                         QtGui.QMessageBox.Yes | QtGui.QMessageBox.No, QtGui.QMessageBox.No)
+                # Show confirmation dialog
+                reply = QtGui.QMessageBox.question(self, 'Confirmation',
+                                             f"Are you sure you want to revert the following files?\n\n{files_str}",
+                                             QtGui.QMessageBox.Yes | QtGui.QMessageBox.No, QtGui.QMessageBox.No)
 
-            if reply == QtGui.QMessageBox.Yes:
-                for target_file in selected_files_to_revert:
-                    try:
-                        msg = f"Reverting file {target_file} ..."
-                        self._add_log(msg, 3)
-                        p4_result = self._p4.run("revert", target_file)
-                        logger.debug("p4_result for {target_file}: {p4_result}")
-                    except Exception as e:
-                        logger.debug("Unable to revert file: {}, Error: {}".format(target_file, e))
+                if reply == QtGui.QMessageBox.Yes:
+                    for target_file in selected_files_to_revert:
+                        try:
+                            msg = f"Reverting file {target_file} ..."
+                            self._add_log(msg, 3)
+                            p4_result = self._p4.run("revert", target_file)
+                            logger.debug("p4_result for {target_file}: {p4_result}")
+                        except Exception as e:
+                            logger.debug("Unable to revert file: {}, Error: {}".format(target_file, e))
 
-                self._populate_pending_widget()
+            self._populate_pending_widget()
 
 
     def _get_pending_data_from_source(self, source_index):
@@ -1462,6 +1490,25 @@ class AppDialog(QtGui.QWidget):
 
             if child_item:
                 return child_item.text()
+        return None
+
+    def _get_pending_change_from_source(self, source_index):
+        # Get changelist from the source model using the source index
+        if source_index.isValid():
+            item_model = source_index.model()
+            parent_index = source_index.parent()
+
+            # If the parent index is valid, it means the item is a child.
+            # In that case, get the parent item and its data.
+            # Otherwise, it means the item is a parent, so get its data directly.
+            if parent_index.isValid():
+                parent_item = item_model.itemFromIndex(parent_index)
+                changelist = parent_item.data(QtCore.Qt.UserRole)
+            else:
+                item = item_model.itemFromIndex(source_index)
+                changelist = item.data(QtCore.Qt.UserRole)
+
+            return changelist
         return None
 
     def _populate_column_view_widget(self):
@@ -1582,88 +1629,113 @@ class AppDialog(QtGui.QWidget):
         sg_list = []
         if not sg_item:
             return new_sg_item, sg_list
-        try:
-            # logger.debug(">>> Getting row {} data".format(row))
-            # self._print_sg_item(sg_item)
-            # Extract relevant data from the Shotgun response
-            name = sg_item.get("name", "N/A")
-            new_sg_item["name"] = name
-            action = sg_item.get("action") or sg_item.get("headAction") or "N/A"
-            new_sg_item["action"] = action
-            revision = sg_item.get("revision", "N/A")
-            if revision != "N/A":
-                #revision = "#{}".format(revision)
-                new_sg_item["revision"] = revision
+        #try:
+        # logger.debug(">>> Getting row {} data".format(row))
+        # self._print_sg_item(sg_item)
+        # Extract relevant data from the Shotgun response
+        name = sg_item.get("name", "N/A")
+        new_sg_item["name"] = name
+        action = sg_item.get("action") or sg_item.get("headAction") or "N/A"
+        new_sg_item["action"] = action
+        revision = sg_item.get("revision", "N/A")
+        if revision != "N/A":
+            #revision = "#{}".format(revision)
+            new_sg_item["revision"] = revision
 
-            local_path = "N/A"
-            folder = "N/A"
-            if "path" in sg_item:
-                path = sg_item.get("path", None)
-                if path:
-                    local_path = path.get("local_path", "N/A")
-                    if local_path and local_path != "N/A":
-                        local_directory = os.path.dirname(local_path)
-                        folder = self._path_difference(self._entity_path, local_directory)
+        local_path = "N/A"
+        folder = "N/A"
+        if "path" in sg_item:
+            path = sg_item.get("path", None)
+            if path:
+                local_path = path.get("local_path", "N/A")
+                if local_path and local_path != "N/A":
+                    local_directory = os.path.dirname(local_path)
+                    entity_path = self._entity_path
+                    if local_directory and not entity_path:
+                        entity = sg_item.get("entity", None)
+                        if entity:
+                            # Get entity path
+                            entity_path = self._get_entity_path(entity)
+
+                    if entity_path and local_directory:
+                        folder = self._path_difference(entity_path, local_directory)
                         if folder and folder != "N/A":
                             #folder = "{}\\".format(difference_str)
                             new_sg_item["folder"] = folder
 
-            file_extension = "N/A"
-            if local_path and local_path != "N/A":
-                file_extension = local_path.split(".")[-1] or "N/A"
-                new_sg_item["file_extension"] = file_extension
+        file_extension = "N/A"
+        if local_path and local_path != "N/A":
+            file_extension = local_path.split(".")[-1] or "N/A"
+            new_sg_item["file_extension"] = file_extension
 
-            type = "N/A"
-            if file_extension and file_extension != "N/A":
-                type = self.settings.get(file_extension, "N/A")
-                new_sg_item["file_type"] = type
+        type = "N/A"
+        if file_extension and file_extension != "N/A":
+            type = self.settings.get(file_extension, "N/A")
+            new_sg_item["file_type"] = type
 
-            size = sg_item.get("fileSize", 0)
-            new_sg_item["size"] = size
+        size = sg_item.get("fileSize", 0)
+        new_sg_item["size"] = size
 
-            # published_file_type = sg_item.get("published_file_type", {}).get("name", "N/A")
-            # Todo: get the step
-            # step = sg_item.get("step", {}).get("name", "N/A")
-            # step = sg_item.get("task.Task.step.Step.code", "N/A") if step == "N/A" else step
+        # published_file_type = sg_item.get("published_file_type", {}).get("name", "N/A")
+        # Todo: get the step
+        # step = sg_item.get("step", {}).get("name", "N/A")
+        # step = sg_item.get("task.Task.step.Step.code", "N/A") if step == "N/A" else step
 
-            description = sg_item.get("description", "N/A")
-            #new_sg_item["description"] = description
-            if description:
-                description = description.split("\n")[0]
-            
-            
-            task_name = "N/A"
-            if "task" in sg_item:
-                task = sg_item.get("task", None)
-                if task:
-                    task_name = task.get("name", "N/A")
-                    new_sg_item["task_name"] = task_name
+        description = sg_item.get("description", "N/A")
+        #new_sg_item["description"] = description
+        if description:
+            description = description.split("\n")[0]
 
-            task_status = sg_item.get("task.Task.sg_status_list", "N/A")
-            new_sg_item["task_status"] = task_status
 
-            user = "N/A"
-            if "created_by" in sg_item:
-                user = sg_item.get("created_by", None)
-                if user:
-                    user = user.get("name", "N/A")
-                    new_sg_item["user"] = user
+        task_name = "N/A"
+        if "task" in sg_item:
+            task = sg_item.get("task", None)
+            if task:
+                task_name = task.get("name", "N/A")
+                new_sg_item["task_name"] = task_name
 
-            publish_id = 0
-            if "id" in sg_item:
-                publish_id = sg_item.get("id", 0)
-                new_sg_item["publish_id"] = publish_id
+        task_status = sg_item.get("task.Task.sg_status_list", "N/A")
+        new_sg_item["task_status"] = task_status
 
-            # Create a list of QStandardItems for each column
-            sg_list = ["", folder, action, name, revision, size, file_extension, type, user, task_name, task_status,
-                       publish_id,
-                       description]
+        user = "N/A"
+        if "created_by" in sg_item:
+            user = sg_item.get("created_by", None)
+            if user:
+                user = user.get("name", "N/A")
+                new_sg_item["user"] = user
+
+        publish_id = 0
+        if "id" in sg_item:
+            publish_id = sg_item.get("id", 0)
+            new_sg_item["publish_id"] = publish_id
+
+        # Create a list of QStandardItems for each column
+        sg_list = ["", folder, action, name, revision, size, file_extension, type, user, task_name, task_status,
+                   publish_id,
+                   description]
                 
-        except Exception as e:
-            logger.debug(">>> Error getting column data for sg_item: {}, error {}".format(sg_item, e))
-            pass
+        #except Exception as e:
+        #    logger.debug(">>> Error getting column data for sg_item, error {}".format(e))
         return new_sg_item, sg_list
-        
+
+    def _get_entity_path(self, entity_data):
+        """
+        Get entity path
+        """
+        if not entity_data:
+            return None
+
+        entity_id = entity_data.get('id', 0)
+        entity_type = entity_data.get('type', None)
+        if entity_type == "Task":
+            entity = entity_data.get("entity", None)
+            if entity:
+                entity_id = entity.get('id', entity_id)
+                entity_type = entity.get('type', entity_type)
+
+        entity_path = self._app.sgtk.paths_from_entity(entity_type, entity_id)
+        return entity_path[-1] if entity_path else None
+
     def _get_perforce_sg_data(self):
         perforce_sg_data = []
 
@@ -5362,7 +5434,7 @@ class AppDialog(QtGui.QWidget):
         Get entity path
         """
         entity_path, entity_id, entity_type = None, 0, None
-        logger.debug(">>>>>>>>>>>>>> entity_data is: {}".format(entity_data))
+        #logger.debug(">>>>>>>>>>>>>> entity_data is: {}".format(entity_data))
         if entity_data:
             entity_id = entity_data.get('id', 0)
             entity_type = entity_data.get('type', None)
@@ -5374,9 +5446,9 @@ class AppDialog(QtGui.QWidget):
                         entity_type = entity.get('type', None)
 
             entity_path = self._app.sgtk.paths_from_entity(entity_type, entity_id)
-            logger.debug(">>>>>>>>>>>>>> entity_id is: {}".format(entity_id))
-            logger.debug(">>>>>>>>>>>>>> entity_type is: {}".format(entity_type))
-            logger.debug(">>>>>>>>>>>>>> entity_path is: {}".format(entity_path))
+            #logger.debug(">>>>>>>>>>>>>> entity_id is: {}".format(entity_id))
+            #logger.debug(">>>>>>>>>>>>>> entity_type is: {}".format(entity_type))
+            #logger.debug(">>>>>>>>>>>>>> entity_path is: {}".format(entity_path))
 
             if entity_path and len(entity_path) > 0:
                 entity_path = entity_path[-1]
@@ -5600,37 +5672,40 @@ class AppDialog(QtGui.QWidget):
     def get_current_publish_data(self, entity_id, entity_type):
         self._sg_data = []
         logger.debug(">>>>>>>>>>  entity_type: {}".format(entity_type))
-        filters = [[]]
-        if entity_type == "Asset":
-            filters = [
-                 ["entity.Asset.id", "is", entity_id],
-            ]
-        elif entity_type == "Shot":
-            filters = [
-                ["entity.Shot.id", "is", entity_id],
-            ]
-        elif entity_type == "Task":
-            filters = [
-                ["task.Task.id", "is", entity_id],
-            ]
+        if entity_id and entity_type:
+            filters = [[]]
+            if entity_type == "Asset":
+                filters = [
+                     ["entity.Asset.id", "is", entity_id],
+                ]
+            elif entity_type == "Shot":
+                filters = [
+                    ["entity.Shot.id", "is", entity_id],
+                ]
+            elif entity_type == "Task":
+                filters = [
+                    ["task.Task.id", "is", entity_id],
+                ]
 
-        entity_published_files = self._app.shotgun.find(
-            "PublishedFile",
-            filters,
-            ["entity", "path_cache", "path", "version_number"],
-            #["entity", "path_cache", "path", "version_number", "name", "description", "created_at", "created_by", "image", "published_file_type", "task","],
-        )
-        """
-        # Exclude published files associated with child entities
-        published_files = []
-        for published_file in entity_published_files:
-            if published_file["entity"]["id"] == entity_id:
-                published_files.append(published_file)
-        """
+            entity_published_files = self._app.shotgun.find(
+                "PublishedFile",
+                filters,
+                ["entity", "path_cache", "path", "version_number"],
+                #["entity", "path_cache", "path", "version_number", "name", "description", "created_at", "created_by", "image", "published_file_type", "task","],
+            )
+            """
+            # Exclude published files associated with child entities
+            published_files = []
+            for published_file in entity_published_files:
+                if published_file["entity"]["id"] == entity_id:
+                    published_files.append(published_file)
+            """
 
-        # self._sg_data = published_files
-        self._sg_data = entity_published_files
-        #logger.debug(">>>>>>>>>>  Published files are: {}".format(self._sg_data))
+            # self._sg_data = published_files
+            self._sg_data = entity_published_files
+            #logger.debug(">>>>>>>>>>  Published files are: {}".format(self._sg_data))
+        else:
+            logger.debug("Unable to get current publish data, entity_id or entity_type is None")
 
     def _update_perforce_data(self):
         logger.debug(">>>>>>>>>>  _get_perforce_data: START")

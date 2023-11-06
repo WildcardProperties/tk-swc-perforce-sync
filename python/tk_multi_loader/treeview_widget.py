@@ -44,6 +44,7 @@ class SWCTreeView(QtWidgets.QTreeView):
         # self.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.AllEditTriggers)
         self.setDragDropMode(QtWidgets.QAbstractItemView.DragDropMode.InternalMove)
         self.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection)
+        #self.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
         # self.setDefaultDropAction(QtCore.Qt.MoveAction)
 
         self.setHeaderHidden(True)
@@ -58,6 +59,12 @@ class SWCTreeView(QtWidgets.QTreeView):
 
     #def setModel(self, model):
     #    self.setModel(model)
+
+    def single_selection(self):
+        self.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
+
+    def multi_selection(self):
+        self.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection)
 
     def dropEvent(self, event):
         if event.source() == self:
@@ -205,6 +212,11 @@ class TreeViewWidget(QtWidgets.QWidget):
         self.p4_file_delete_icon = QtGui.QIcon(QtGui.QPixmap(p4_file_delete_path))
 
         #self.pending_icon = QtGui.QIcon(":/res/pending.png")
+    def single_selection(self):
+        self.tree_view.single_selection()
+
+    def multi_selection(self):
+        self.tree_view.multi_selection()
 
     def select_items(self):
         #selected = self.tree_view.getSelectedIndexes()
@@ -476,7 +488,8 @@ class TreeViewWidget(QtWidgets.QWidget):
                     (change_item.flags() | QtCore.Qt.ItemFlag.ItemIsDropEnabled) & ~QtCore.Qt.ItemFlag.ItemIsDragEnabled
                 )
 
-                msg = "Changelist# {}".format(key)
+                msg = "Right-click the selected changelist '{}' and choose 'Publish...' to publish it in Shotgrid.".format(
+                    key)
                 change_item.setToolTip(msg)
                 change_item.setData(key, QtCore.Qt.UserRole)
                 change_item.setSizeHint(QtCore.QSize(0, 25))
@@ -516,6 +529,9 @@ class TreeViewWidget(QtWidgets.QWidget):
                                 depot_item.setFlags(
                                     (depot_item.flags() | QtCore.Qt.ItemFlag.ItemIsDragEnabled) & ~QtCore.Qt.ItemFlag.ItemIsDropEnabled
                                 )
+                                msg = "Right-click the selected file to 'Publish...' the changelist in Shotgrid or 'Revert' the file in Perforce."
+                                depot_item.setToolTip(msg)
+
                                 depot_item.setIcon(action_icon)
                                 depot_item.setData(key, QtCore.Qt.UserRole)
                                 depot_item.setTextAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)

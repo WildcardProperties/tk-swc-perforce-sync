@@ -411,7 +411,7 @@ class Ui_Dialog(object):
         self.submit_files.setMinimumSize(QtCore.QSize(100, 26))
         self.submit_files.setMaximumSize(QtCore.QSize(100, 26))
         self.submit_files.setObjectName("publish_files")
-        #self.submit_files.hide()
+        self.submit_files.hide()
 
         self.progress = QtGui.QProgressBar(self.middle_area_widget)
         self.progress.setMaximumHeight(20)
