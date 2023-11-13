@@ -89,6 +89,7 @@ class SgLatestPublishModel(ShotgunModel):
 
         app = sgtk.platform.current_bundle()
         sg_data = {}
+        data_type = None
 
         if item is None:
             # nothing selected in the treeview
@@ -159,7 +160,7 @@ class SgLatestPublishModel(ShotgunModel):
                     entity_type = sg_data.get('type', None)
                     entity_path = app.sgtk.paths_from_entity(entity_type, entity_id)
                     """
-
+                    data_type = sg_data.get("type", None)
                     #logger.debug(">>>>>>>>>>>>>> entity_path is: {}".format(entity_path))
                     # leaf node!
                     # show the items associated. Handle tasks
@@ -177,6 +178,7 @@ class SgLatestPublishModel(ShotgunModel):
                             ["version", "is", {"type": "Version", "id": sg_data["id"]}]
                         ]
                     else:
+
                         sg_filters = [
                             [
                                 "entity",
@@ -221,7 +223,12 @@ class SgLatestPublishModel(ShotgunModel):
 
         # now that we have establishes the sg filters and which
         # folders to load, set up the actual model
-        self._do_load_data(sg_filters, child_folders)
+        logger.debug("model_latestpublish: sg_data type is: {}".format(data_type))
+        logger.debug("model_latestpublish: sg_filters is: {}".format(sg_filters))
+        if data_type == "Asset" or data_type == "Shot" or data_type == "Task":
+            self._do_load_data(sg_filters, child_folders, sg_data_type=data_type)
+        else:
+            self._do_load_data(sg_filters, child_folders)
 
         return sg_data
 
@@ -306,7 +313,7 @@ class SgLatestPublishModel(ShotgunModel):
     ############################################################################################
     # private methods
 
-    def _do_load_data(self, sg_filters, treeview_folder_items):
+    def _do_load_data(self, sg_filters, treeview_folder_items, sg_data_type=None):
         """
         Load and refresh data.
 
@@ -338,6 +345,7 @@ class SgLatestPublishModel(ShotgunModel):
             hierarchy=["code"],
             fields=publish_fields,
             order=[{"field_name": "created_at", "direction": "asc"}],
+            sg_data_type=sg_data_type
         )
 
         # now calculate type aggregates

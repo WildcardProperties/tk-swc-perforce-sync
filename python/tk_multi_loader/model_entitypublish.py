@@ -89,6 +89,7 @@ class SgEntityPublishModel(ShotgunModel):
 
         app = sgtk.platform.current_bundle()
         sg_filters = None
+        data_type = None
 
         if sg_data is None:
             # nothing selected in the treeview
@@ -118,7 +119,7 @@ class SgEntityPublishModel(ShotgunModel):
                     entity_type = sg_data.get('type', None)
                     entity_path = app.sgtk.paths_from_entity(entity_type, entity_id)
                     """
-
+                    data_type = sg_data.get('type', None)
                     #logger.debug(">>>>>>>>>>>>>> entity_path is: {}".format(entity_path))
                     # leaf node!
                     # show the items associated. Handle tasks
@@ -180,6 +181,8 @@ class SgEntityPublishModel(ShotgunModel):
 
         # now that we have establishes the sg filters and which
         # folders to load, set up the actual model
+        logger.debug("model_entitypublish: sg_data type is: {}".format(data_type))
+        logger.debug("model_entitypublish: sg_filters is: {}".format(sg_filters))
         self._do_load_data(sg_filters, child_folders)
 
         return sg_data

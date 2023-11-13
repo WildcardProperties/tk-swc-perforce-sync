@@ -5614,17 +5614,17 @@ class AppDialog(QtGui.QWidget):
         self._fstat_dict = {}
         self._entity_data, item = self._reload_treeview()
 
-        logger.debug(">>>>>>>>>>1 In _on_treeview_item_selected entity_data is: {}".format(self._entity_data))
+        # logger.debug(">>>>>>>>>>1 In _on_treeview_item_selected entity_data is: {}".format(self._entity_data))
 
         self._entity_path, entity_id, entity_type = self._get_entity_info(self._entity_data)
 
         # Create SG file system structure
         # self._create_filesystem_structure(self._entity_data)
 
-        logger.debug(">>>>>>>>>>>>>>>>>> self._entity_path: {}".format(self._entity_path))
+        # logger.debug(">>>>>>>>>>>>>>>>>> self._entity_path: {}".format(self._entity_path))
 
         model = self.ui.publish_view.model()
-        logger.debug(">>>>>>>>>>2 In _on_treeview_item_selected model.rowCount() is {}".format(model.rowCount()))
+        # logger.debug(">>>>>>>>>>2 In _on_treeview_item_selected model.rowCount() is {}".format(model.rowCount()))
 
         if model.rowCount() > 0:
             self.get_current_sg_data()
@@ -5647,7 +5647,7 @@ class AppDialog(QtGui.QWidget):
         self._submitted_data_to_publish = []
 
         model = self.ui.publish_view.model()
-        logger.debug(">>>>>>>>>> In get_current_sg_data model.rowCount() is {}".format(model.rowCount()))
+        # logger.debug(">>>>>>>>>> In get_current_sg_data model.rowCount() is {}".format(model.rowCount()))
         if model.rowCount() > 0:
             for row in range(model.rowCount()):
                 model_index = model.index(row, 0)
