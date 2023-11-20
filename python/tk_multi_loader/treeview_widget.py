@@ -60,6 +60,31 @@ class SWCTreeView(QtWidgets.QTreeView):
 
     def adjust_selection_mode(self, index):
         """
+        Adjusts the selection mode based on the clicked item and updates the selection.
+        If a parent item is clicked, it clears the selection and selects the parent.
+        If a child item is clicked, it keeps the existing child selections and ensures
+        the last selected item is visible.
+        """
+        is_parent = not index.parent().isValid()
+
+        # Set the selection mode
+        if is_parent:
+            # Clear the selection only if the clicked item is a parent
+            self.clearSelection()
+            self.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        else:
+            # For child items, maintain existing selections (if any)
+            self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+
+        # Ensure the clicked item is included in the selection
+        self.selectionModel().select(index, QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows)
+
+        # Scroll to the last selected item to bring it into focus
+        self.scrollTo(index, QtWidgets.QAbstractItemView.PositionAtCenter)
+
+
+    def adjust_selection_mode_old(self, index):
+        """
         Adjusts the selection mode and clears the selection if the clicked item is of a different type (parent or child).
         """
         is_parent = not index.parent().isValid()
@@ -82,7 +107,7 @@ class SWCTreeView(QtWidgets.QTreeView):
         self.selectionModel().select(index, QtCore.QItemSelectionModel.Select)
 
 
-    def adjust_selection_mode_old(self, index):
+    def adjust_selection_mode_old2(self, index):
         """
         Adjusts the selection mode based on whether the clicked item is a parent or a child.
         """
