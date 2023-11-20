@@ -53,6 +53,9 @@ def create_change(p4, description):
 
     return new_change
 
+import shutil
+import os
+
 
 def add_to_change(p4, change, file_paths):
     """

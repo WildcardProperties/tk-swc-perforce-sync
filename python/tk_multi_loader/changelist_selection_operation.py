@@ -139,7 +139,7 @@ class ChangelistSelection(QtWidgets.QDialog):
                 for sg_item, action in self.selected_actions:
                     perform_actions = PerformActions(self.p4, sg_item, action, change, desc)
                     self.new_sg_item = perform_actions.run()
-
+                self.parent._populate_pending_widget()
                 self.parent.refresh_publish_data()
 
         except Exception as e:
