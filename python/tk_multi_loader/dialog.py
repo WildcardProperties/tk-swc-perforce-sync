@@ -1362,6 +1362,7 @@ class AppDialog(QtGui.QWidget):
 
         # publish_widget, self._pending_publish_list = self._create_perforce_ui(self._change_dict, sorted=True)
         self.pending_tree_view = TreeViewWidget(data_dict=self._change_dict, sorted=True, mode="pending", p4=self._p4, parent=self)
+        self.pending_tree_view.set_mode()
         self.pending_tree_view.single_selection()
         self.pending_tree_view.populate_treeview_widget_pending()
         self._pending_view_widget = self.pending_tree_view.get_treeview_widget()

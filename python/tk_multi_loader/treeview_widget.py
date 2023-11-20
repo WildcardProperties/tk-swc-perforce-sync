@@ -53,6 +53,7 @@ class SWCTreeView(QtWidgets.QTreeView):
 
         if self.mode:
             self.set_mode(self.mode)
+        self.expandAll()
 
     def set_mode(self, mode):
         self.mode = mode
@@ -274,6 +275,7 @@ class TreeViewWidget(QtWidgets.QWidget):
         # major widgets
 
         self.tree_view = SWCTreeView(myp4=self.p4, parent=self.parent, mode=self.mode)
+        self.tree_view.set_mode(self.mode)
         self.model = QtGui.QStandardItemModel()
         self.proxymodel = QtGui.QSortFilterProxyModel()
         self.proxymodel.setSourceModel(self.model)
@@ -303,6 +305,9 @@ class TreeViewWidget(QtWidgets.QWidget):
 
         p4_file_delete_path = os.path.join(self.repo_root, "icons/p4_file_delete.png")
         self.p4_file_delete_icon = QtGui.QIcon(QtGui.QPixmap(p4_file_delete_path))
+
+    def set_mode(self):
+        self.tree_view.set_mode(self.mode)
 
         #self.pending_icon = QtGui.QIcon(":/res/pending.png")
     def single_selection(self):
@@ -393,6 +398,7 @@ class TreeViewWidget(QtWidgets.QWidget):
 
     def get_treeview_widget(self):
         #return self.main_layout
+        self.tree_view.set_mode(self.mode)
         return self.tree_view
 
     def get_published_status(self, change_list):
