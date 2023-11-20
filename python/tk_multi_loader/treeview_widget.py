@@ -49,11 +49,25 @@ class SWCTreeView(QtWidgets.QTreeView):
         #self.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
         # self.setDefaultDropAction(QtCore.Qt.MoveAction)
 
+        # Connect the clicked signal to a custom method
+        self.clicked.connect(self.adjust_selection_mode)
+
         self.setHeaderHidden(True)
 
         if self.mode:
             self.set_mode(self.mode)
         self.expandAll()
+
+    def adjust_selection_mode(self, index):
+        """
+        Adjusts the selection mode based on whether the clicked item is a parent or a child.
+        """
+        is_parent = not index.parent().isValid()
+
+        if is_parent:
+            self.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        else:
+            self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
 
     def set_mode(self, mode):
         self.mode = mode

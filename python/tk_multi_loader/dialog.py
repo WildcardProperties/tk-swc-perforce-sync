@@ -1398,15 +1398,30 @@ class AppDialog(QtGui.QWidget):
                :param pos: Local coordinates inside the viewport when the context menu was requested.
         """
 
+        # Get the index of the item at the menu position
+        index = self._pending_view_widget.indexAt(pos)
+        if not index.isValid():
+            return
+
+        # Determine if the index is a parent or a child
+        is_parent = not index.parent().isValid()
+
+        # Set selection mode based on whether the item is a parent or a child
+        #if is_parent:
+        #    self._pending_view_widget.single_selection()
+        # else:
+        #    self._pending_view_widget.multi_selection()
+
         # Build a menu with all the actions.
         menu = QtGui.QMenu(self)
 
-        menu.addAction(self._pending_view_publish_action)
-        menu.addSeparator()
+        # Add "Publish..." for parent rows, "Revert" for child rows
+        if is_parent:
+            menu.addAction(self._pending_view_publish_action)
+        else:
+            menu.addAction(self._pending_view_revert_action)
 
-        menu.addAction(self._pending_view_revert_action)
         menu.addSeparator()
-        # menu.addAction(self._column_refresh_action)
 
         # Calculate the global position of the menu
         global_pos = self._pending_view_widget.mapToGlobal(pos)
