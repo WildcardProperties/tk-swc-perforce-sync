@@ -686,6 +686,7 @@ class TreeViewWidget(QtWidgets.QWidget):
                     key)
                 change_item.setToolTip(msg)
                 change_item.setData(key, QtCore.Qt.UserRole)
+                change_item.setData(key, QtCore.Qt.UserRole + 2)
                 change_item.setSizeHint(QtCore.QSize(0, 25))
                 change_item.setEditable(False)
                 self.model.appendRow([change_item])
@@ -729,6 +730,8 @@ class TreeViewWidget(QtWidgets.QWidget):
                                 depot_item.setIcon(action_icon)
                                 depot_item.setData(key, QtCore.Qt.UserRole)
                                 depot_item.setTextAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+                                depot_item.setData(action, QtCore.Qt.UserRole + 1)
+                                depot_item.setData(key, QtCore.Qt.UserRole + 2)
                                 change_item.appendRow(depot_item)
 
 

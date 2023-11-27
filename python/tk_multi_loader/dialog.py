@@ -1435,6 +1435,7 @@ class AppDialog(QtGui.QWidget):
 
     def _on_pending_view_model_action(self, action):
         selected_files_to_revert = []
+        selected_files_to_delete = []
 
         # First, gather all the files that are to be reverted
         selected_indexes = self._pending_view_widget.selectionModel().selectedRows()
@@ -1464,10 +1465,15 @@ class AppDialog(QtGui.QWidget):
                 try:
                     source_index = self._pending_view_model.mapToSource(selected_index)
                     selected_row_data = self._get_pending_data_from_source(source_index)
+                    action = self._get_action_data_from_source(source_index)
+                    change = self._get_change_data_from_source(source_index)
                     if selected_row_data and "#" in selected_row_data:
                         target_file = selected_row_data.split("#")[0]
                         target_file = target_file.strip()
                         selected_files_to_revert.append(target_file)
+                        if action in ["add"]:
+                            selected_files_to_delete.append((change,target_file))
+
                 except Exception as e:
                     logger.debug("Error processing selection: {}".format(e))
             if selected_files_to_revert:
@@ -1488,9 +1494,35 @@ class AppDialog(QtGui.QWidget):
                             logger.debug("p4_result for {target_file}: {p4_result}")
                         except Exception as e:
                             logger.debug("Unable to revert file: {}, Error: {}".format(target_file, e))
+            if selected_files_to_delete:
+                # Convert list of files into a string, to show in the confirmation dialog
+                files_str = "\n".join(selected_files_to_revert)
+
+                # Show confirmation dialog
+                reply = QtGui.QMessageBox.question(self, 'Confirmation',
+                                             f"Are you sure you want to delete the following files?\n\n{files_str}",
+                                             QtGui.QMessageBox.Yes | QtGui.QMessageBox.No, QtGui.QMessageBox.No)
+
+                if reply == QtGui.QMessageBox.Yes:
+                    for change, target_file in selected_files_to_revert:
+                        try:
+                            msg = f"Deleting file {target_file} ..."
+                            self._add_log(msg, 3)
+                            self._delete_pending_file(target_file)
+                        except Exception as e:
+                            logger.debug("Unable to delete file: {}, Error: {}".format(target_file, e))
 
             self._populate_pending_widget()
 
+    def _delete_pending_file(self, change, target_file):
+        try:
+            # Mark the file for delete in Perforce
+            p4_result = self._p4.run("delete", target_file)
+            # Submit the file to Perforce
+            submit_del_res = submit_change(self._p4, change, target_file)
+            logger.debug("p4_result for {target_file}: {submit_del_res}")
+        except Exception as e:
+            logger.debug("Unable to delete file: {}, Error: {}".format(target_file, e))
 
     def _get_pending_data_from_source(self, source_index):
         # Get data from the source model using the source index
@@ -1507,6 +1539,24 @@ class AppDialog(QtGui.QWidget):
             if child_item:
                 return child_item.text()
         return None
+
+    def _get_action_data_from_source(self, source_index):
+        # Get data from the source model using the source index
+        if source_index.isValid():
+            id_role = QtCore.Qt.UserRole + 1
+            action = source_index.data(id_role)
+            return action
+        return None
+
+    def _get_change_data_from_source(self, source_index):
+        # Get data from the source model using the source index
+        if source_index.isValid():
+            id_role = QtCore.Qt.UserRole + 2
+            change = source_index.data(id_role)
+            if change:
+                change = int(change)
+                return change
+        return 0
 
     def _get_pending_change_from_source(self, source_index):
         # Get changelist from the source model using the source index
@@ -5763,7 +5813,6 @@ class AppDialog(QtGui.QWidget):
                     self._add_log(msg, 4)
             msg = "\n <span style='color:#2C93E2'>Click on 'Fix Files' to publish above files</span> \n"
             self._add_log(msg, 2)
-
 
     def _update_fstat_data(self):
         """Update the fstat data for the selected entity"""

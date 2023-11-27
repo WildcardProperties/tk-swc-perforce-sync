@@ -229,6 +229,16 @@ class SgLatestPublishModel(ShotgunModel):
             self._do_load_data(sg_filters, child_folders, sg_data_type=data_type)
         else:
             self._do_load_data(sg_filters, child_folders)
+        """
+        logger.debug(">>>>>> model_latestpublish: sg_data is: {}, type: {}".format(sg_data, type(sg_data)))
+        for sg_item in sg_data:
+            logger.debug(">>>>>> model_latestpublish: sg_item: {}".format(sg_item))
+            # check if sg_item is a dict
+            if isinstance(sg_item, dict):
+                for key, value in sg_item.items():
+                    logger.debug(">>>>>> model_latestpublish: {}: {}".format(key, value))
+            logger.debug("-------------------------------------------------")
+        """
 
         return sg_data
 
