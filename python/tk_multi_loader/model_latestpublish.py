@@ -606,8 +606,11 @@ class SgLatestPublishModel(ShotgunModel):
             if task_link:
                 task_id = task_link["id"]
 
+            # also get the local path
+            depotFile = sg_item["sg_p4_depo_path"]    
+
             # key publishes in dict by type and name
-            unique_data[(sg_item["name"], type_id, task_id)] = {
+            unique_data[(sg_item["name"], type_id, task_id, depotFile)] = {
                 "sg_item": sg_item,
                 "type_id": type_id,
             }

@@ -76,6 +76,7 @@ class SgPublishHistoryModel(ShotgunModel):
             ["task", "is", sg_data["task"]],
             ["entity", "is", sg_data["entity"]],
             [publish_type_field, "is", sg_data[publish_type_field]],
+            ["sg_p4_depo_path", "is", sg_data["sg_p4_depo_path"]]
         ]
 
         # add external filters from config

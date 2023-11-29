@@ -20,6 +20,7 @@ PUBLISHED_FILES_FIELDS = [
     "image",
     "entity",
     "path",
+    "sg_p4_depo_path",
     "description",
     "sg_status_list",
     "task",
