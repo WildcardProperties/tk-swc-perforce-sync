@@ -13,8 +13,44 @@ from tank_vendor import shotgun_api3
 import sgtk
 logger = sgtk.platform.get_logger(__name__)
 
+import datetime
 
 def create_modified_date(dt):
+    """
+    Return the date represented by the argument as a string, displaying recent
+    dates as "Today", "This Week", "This Month", or "Older".
+
+    :param dt: The date to convert to a string. Can be a UNIX timestamp (float),
+               a :class:`datetime.date`, or a :class:`datetime.datetime` object.
+    :type dt: float, :class:`datetime.date`, or :class:`datetime.datetime`
+
+    :returns: A String representing date appropriate for display
+    """
+    if isinstance(dt, float):  # Check if dt is a UNIX timestamp
+        dt = datetime.datetime.fromtimestamp(dt)  # Convert UNIX timestamp to datetime
+
+    now = datetime.datetime.now(dt.tzinfo if isinstance(dt, datetime.datetime) else None)
+    today = now.date()
+
+
+    if isinstance(dt, datetime.datetime):
+        dt = dt.date()  # convert datetime to date for comparison
+
+    delta = today - dt
+
+    if delta.days == 0:
+        date_str = "Today"
+    elif delta.days <= 7:
+        date_str = "This Week"
+    elif delta.days <= 30:
+        date_str = "This Month"
+    else:
+        date_str = "Older"
+
+    return date_str
+
+
+def create_modified_date_old5(dt):
     """
     Return the date represented by the argument as a string, displaying recent
     dates as "Today", "This Week", "This Month", or "Older".
