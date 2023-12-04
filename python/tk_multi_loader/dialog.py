@@ -20,12 +20,13 @@ from .threads import SyncThread, FileSyncThread
 import concurrent.futures
 import subprocess
 import queue
-
+import re
 import concurrent.futures
 
 
 import datetime
-from .date_time import create_publish_timestamp
+
+from .date_time import create_publish_timestamp, create_human_readable_timestamp, create_modified_date, create_human_readable_date, get_time_now
 
 from .model_hierarchy import SgHierarchyModel
 from .model_entity import SgEntityModel
@@ -55,7 +56,7 @@ from .publish_item import PublishItem
 
 from .publish_files_ui import PublishFilesUI
 
-from .perforce_change import create_change, add_to_change, submit_change
+from .perforce_change import create_change, add_to_change, submit_change, submit_and_delete_file, submit_and_delete_file_list
 from .treeview_widget import TreeViewWidget, SWCTreeView
 from .changelist_selection_operation import ChangelistSelection
 from collections import defaultdict, OrderedDict
@@ -98,7 +99,7 @@ class AppDialog(QtGui.QWidget):
     # enum to control the grouping of the column view
     (COLUMN_VIEW_UNGROUP, COLUMN_VIEW_GROUP_BY_FOLDER, COLUMN_VIEW_GROUP_BY_ACTION, COLUMN_VIEW_GROUP_BY_REVISION,
      COLUMN_VIEW_GROUP_BY_EXTENSION, COLUMN_VIEW_GROUP_BY_TYPE, COLUMN_VIEW_GROUP_BY_USER, COLUMN_VIEW_GROUP_BY_TASK,
-     COLUMN_VIEW_GROUP_BY_STATUS) = range(9)
+     COLUMN_VIEW_GROUP_BY_STATUS, COLUMN_VIEW_GROUP_BY_STEP, COLUMN_VIEW_GROUP_BY_DATE_MODIFIED) = range(11)
 
     # signal emitted whenever the selected publish changes
     # in either the main view or the details file_history view
@@ -358,7 +359,6 @@ class AppDialog(QtGui.QWidget):
         self._change_lists = QtGui.QAction("1001", self._delete_action)
         self._change_lists.triggered.connect(lambda: self._on_publish_model_action("1001"))
 
-
         self._revert_action = QtGui.QAction("Revert", self.ui.publish_view)
         self._revert_action.triggered.connect(lambda: self._on_publish_model_action("revert"))
 
@@ -415,7 +415,7 @@ class AppDialog(QtGui.QWidget):
         #################################################
         #Table view setup
         self._headers = ["", "Folder", "Action", "Name", "Revision#", "Size(MB)", "Extension", "Type",
-                         "User", "Task", "Status", "ID",
+                         "User", "Task", "Status", "Step", "Date/Time", "Date Modified", "ID",
                          "Description"]
         self._setup_column_view()
         self._current_column_view_grouping = self.COLUMN_VIEW_UNGROUP
@@ -1386,6 +1386,7 @@ class AppDialog(QtGui.QWidget):
         self._pending_view_revert_action = QtGui.QAction("Revert", self._pending_view_widget)
         self._pending_view_revert_action.triggered.connect(lambda: self._on_pending_view_model_action("revert"))
 
+
         self._pending_view_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self._pending_view_widget.customContextMenuRequested.connect(
             self._show_pending_view_actions
@@ -1504,6 +1505,8 @@ class AppDialog(QtGui.QWidget):
                                              QtGui.QMessageBox.Yes | QtGui.QMessageBox.No, QtGui.QMessageBox.No)
 
                 if reply == QtGui.QMessageBox.Yes:
+                    self._delete_pending_data(selected_files_to_revert)
+                    """
                     for change, target_file in selected_files_to_revert:
                         try:
                             msg = f"Deleting file {target_file} ..."
@@ -1511,7 +1514,7 @@ class AppDialog(QtGui.QWidget):
                             self._delete_pending_file(target_file)
                         except Exception as e:
                             logger.debug("Unable to delete file: {}, Error: {}".format(target_file, e))
-
+                    """
             self._populate_pending_widget()
 
     def _delete_pending_file(self, change, target_file):
@@ -1599,6 +1602,9 @@ class AppDialog(QtGui.QWidget):
 
             logger.debug(">>> Updating Column View is complete")
             for sg_item in self._perforce_sg_data:
+                # logger.debug("------------------------------------------")
+                #for k, v in sg_item.items():
+                #   logger.debug(">>> {}:{}".format(k, v))
                 id = sg_item.get("id", 0)
                 new_sg_item, sg_list = self._get_column_data(sg_item)
                 #logger.debug(">>> original sg_item: {}".format(sg_item))
@@ -1636,6 +1642,10 @@ class AppDialog(QtGui.QWidget):
             self._group_by_task_name()
         elif self._current_column_view_grouping == self.COLUMN_VIEW_GROUP_BY_STATUS:
             self._group_by_task_status()
+        elif self._current_column_view_grouping == self.COLUMN_VIEW_GROUP_BY_STEP:
+            self._group_by_step()
+        elif self._current_column_view_grouping == self.COLUMN_VIEW_GROUP_BY_DATE_MODIFIED:
+            self._group_by_date_modified()
         else:
             raise ValueError("Invalid column view grouping specified!")
 
@@ -1650,43 +1660,22 @@ class AppDialog(QtGui.QWidget):
         self._task_name_dict = self._get_column_dict("task_name")
         self._task_status_dict = self._get_column_dict("task_status")
         self._user_dict = self._get_column_dict("user")
+        self._step_dict = self._get_column_dict("step")
+        self._date_modified_dict = self._get_column_dict("date_modified")
 
-    def _get_column_dict_old(self, key):
-        column_dict = {}
-        if self._column_view_dict:
-            for id, sg_item in self._column_view_dict.items():
-                #logger.debug(">>> id: {}, sg_item: {}".format(id, sg_item))
-                if sg_item:
-                    value = sg_item.get(key, None)
-                    #logger.debug(">>> value: {}".format(value))
-                    if key not in ["folder"]:
-                        if value:
-                            if value not in column_dict:
-                                column_dict[value] = []
-                            if id in self._standard_item_dict:
-                                #logger.debug(">>> id: {}, self._standard_item_dict[id]: {}".format(id, self._standard_item_dict[id]))
-                                column_dict[value].append(self._standard_item_dict[id])
-                    else:
-                        new_value = value or "Empty"
-                        column_dict.setdefault(new_value, []).append(self._standard_item_dict.get(id))
-                        """
-                        if value not in column_dict:
-                            column_dict[new_value] = []
-                        if id in self._standard_item_dict:
-                            column_dict[new_value].append(self._standard_item_dict[id])
-                        """
 
-        return column_dict
 
     def _get_column_dict(self, key):
         column_dict = {}
         for id, sg_item in self._column_view_dict.items():
             if sg_item:
                 value = sg_item.get(key)
+                # logger.debug(">>> value: {}".format(value))
+                # logger.debug(">>> id: {}".format(id))
                 if value is not None and key != "folder":
                     column_dict.setdefault(value, []).append(self._standard_item_dict.get(id))
                 else:
-                    column_dict.setdefault(value or "Empty", []).append(self._standard_item_dict.get(id))
+                    column_dict.setdefault(value or "N/A", []).append(self._standard_item_dict.get(id))
 
         return column_dict
 
@@ -1695,6 +1684,8 @@ class AppDialog(QtGui.QWidget):
         sg_list = []
         if not sg_item:
             return new_sg_item, sg_list
+
+        # logger.debug(">>> In _get_column_data, getting column data for sg_item: {}".format(sg_item))
         #try:
         # logger.debug(">>> Getting row {} data".format(row))
         # self._print_sg_item(sg_item)
@@ -1743,22 +1734,32 @@ class AppDialog(QtGui.QWidget):
         new_sg_item["size"] = size
 
         # published_file_type = sg_item.get("published_file_type", {}).get("name", "N/A")
-        # Todo: get the step
-        # step = sg_item.get("step", {}).get("name", "N/A")
-        # step = sg_item.get("task.Task.step.Step.code", "N/A") if step == "N/A" else step
 
         description = sg_item.get("description", "N/A")
         #new_sg_item["description"] = description
         if description:
             description = description.split("\n")[0]
 
+        publish_id = 0
+        if "id" in sg_item:
+            publish_id = sg_item.get("id", 0)
+            new_sg_item["publish_id"] = publish_id
 
         task_name = "N/A"
+        step = "N/A"
         if "task" in sg_item:
             task = sg_item.get("task", None)
             if task:
                 task_name = task.get("name", "N/A")
                 new_sg_item["task_name"] = task_name
+
+                step = sg_item.get("task.Task.step.Step.code", None)
+                # logger.debug(">>> step: {}".format(step))
+                if not step:
+                    step = self._get_pipeline_step(publish_id)
+                new_sg_item["step"] = step
+                # step = sg_item.get("step", {}).get("name", "N/A")
+                # step = sg_item.get("task.Task.step.Step.code", "N/A") if step == "N/A" else step
 
         task_status = sg_item.get("task.Task.sg_status_list", "N/A")
         new_sg_item["task_status"] = task_status
@@ -1770,19 +1771,78 @@ class AppDialog(QtGui.QWidget):
                 user = user.get("name", "N/A")
                 new_sg_item["user"] = user
 
-        publish_id = 0
-        if "id" in sg_item:
-            publish_id = sg_item.get("id", 0)
-            new_sg_item["publish_id"] = publish_id
+        dt = sg_item.get("created_at") or sg_item.get("headModTime") or sg_item.get("headTime") or None
+        # logger.debug(">>> dt: {}".format(dt))
+        date = self._get_publish_time_for_column_view(dt)
+        new_sg_item["date"] = date
+        # logger.debug(">>> date: {}".format(date))
+        date_modified = self._get_modified_date(dt)
+        new_sg_item["date_modified"] = date_modified
+        # logger.debug(">>> date_modified: {}".format(date_modified))
 
         # Create a list of QStandardItems for each column
-        sg_list = ["", folder, action, name, revision, size, file_extension, type, user, task_name, task_status,
+        sg_list = ["", folder, action, name, revision, size, file_extension, type, user, task_name, task_status, step, date,date_modified,
                    publish_id,
                    description]
                 
         #except Exception as e:
         #    logger.debug(">>> Error getting column data for sg_item, error {}".format(e))
         return new_sg_item, sg_list
+
+    def _get_pipeline_step(self, published_file_id):
+
+        pipeline_step = "N/A"
+        published_file = self._app.shotgun.find_one("PublishedFile", [["id", "is", published_file_id]], ["id", "code", "pipeline_step", "task.Task.step.Step.code", "step"])
+        if published_file:
+            # logger.debug(">>>>>>>>> published_file: {}".format(published_file))
+            pipeline_step = published_file.get("task.Task.step.Step.code", "N/A")
+            # logger.debug(">>>>>>>>> pipeline_step: {}".format(pipeline_step))
+            """
+            if not pipeline_step:
+                task = published_file.get("task")
+                if task:
+                    pipeline_step = task.get("step")
+            """
+        return pipeline_step
+
+    def _get_modified_date(self, dt):
+
+        publish_time = create_modified_date(dt)
+        return publish_time
+
+    def _get_publish_time_for_column_view(self, dt):
+        publish_time = "N/A"
+        if dt > 0:
+            publish_time = datetime.datetime.fromtimestamp(dt).strftime(
+                "%Y-%m-%d %H:%M"
+            )
+
+        return publish_time
+
+    def _get_publish_time_for_column_view_old(self, sg_item):
+        publish_time = "N/A"
+        version_numer = int(sg_item.get("version_number", 0))
+        if version_numer == 0:
+            # No prior publish, use Perforce creation time as publish time
+            dt = sg_item.get("headModTime") or self.sg_item.get("headTime") or None
+            # logger.debug(">>>>> dt is: {}".format(dt))
+            # if dt:
+            #    publish_time = create_human_readable_timestamp(dt)
+        else:
+
+            dt = sg_item.get("created_at") or 0
+            # publish_time = create_human_readable_timestamp(dt)
+            """
+            if dt > 0:
+                publish_time = datetime.datetime.fromtimestamp(dt).strftime(
+                    "%Y-%m-%d %H:%M"
+                )
+            else:
+                publish_time = "N/A"
+            """
+        publish_time = dt
+        # logger.debug(">>>>> Publish time is: {}".format(publish_time))
+        return publish_time
 
     def _get_entity_path(self, entity_data):
         """
@@ -1887,6 +1947,12 @@ class AppDialog(QtGui.QWidget):
         self._group_by_task_status_action = QtWidgets.QAction("Group by Task Status", self.ui.column_view)
         self._group_by_task_status_action.triggered.connect(self._group_by_task_status)
 
+        self._group_by_step_action = QtWidgets.QAction("Group by Task Step", self.ui.column_view)
+        self._group_by_step_action.triggered.connect(self._group_by_step)
+
+        self._group_by_date_modified_action = QtWidgets.QAction("Group by Date Modified", self.ui.column_view)
+        self._group_by_date_modified_action.triggered.connect(self._group_by_date_modified)
+
         # Add a general Ungroup option
         self._no_groups_action = QtWidgets.QAction("Ungroup", self.ui.column_view)
         self._no_groups_action.triggered.connect(self._no_groups)
@@ -1908,7 +1974,9 @@ class AppDialog(QtGui.QWidget):
             "Type": [self._group_by_type_action],
             "User": [self._group_by_user_action],  # Change "user" to "User"
             "Task": [self._group_by_task_name_action],
-            "Status": [self._group_by_task_status_action]
+            "Status": [self._group_by_task_status_action],
+            "Step": [self._group_by_step_action],
+            "Date Modified": [self._group_by_date_modified_action],
         }
 
         # Add actions that are always present, regardless of the column
@@ -1961,8 +2029,8 @@ class AppDialog(QtGui.QWidget):
                 # logger.debug(">>> sg_list: {}".format(sg_list))
                 tooltip = ""
                 id = 0
-                if sg_list and len(sg_list) >= 12:
-                    id = sg_list[11]
+                if sg_list and len(sg_list) >= 15:
+                    id = sg_list[14]
                     sg_item = self._column_view_dict.get(id, None)
                     tooltip = self._get_tooltip(sg_list, sg_item)
                 item_list = []
@@ -1992,7 +2060,7 @@ class AppDialog(QtGui.QWidget):
         if not sg_item:
             return [""]  # Fill the first column with an empty item
         column_order = ["", "folder", "action", "name", "revision", "size", "file_extension", "type", "user",
-                        "task_name", "task_status", "publish_id", "description"]
+                        "task_name", "task_status", "step", "date", "date_modified", "publish_id", "description"]
 
         sg_list = []
         for attribute in column_order:
@@ -2003,7 +2071,6 @@ class AppDialog(QtGui.QWidget):
             sg_list.append(value)
 
         return sg_list
-
 
     def _populate_column_view_no_groups(self):
         """ Populate the table with data"""
@@ -2074,6 +2141,18 @@ class AppDialog(QtGui.QWidget):
         self._set_groups = True
         self._current_column_view_grouping = self.COLUMN_VIEW_GROUP_BY_STATUS
         self._create_groups(self._task_status_dict)
+
+    def _group_by_step(self):
+        #self._setup_column_view()
+        self._set_groups = True
+        self._current_column_view_grouping = self.COLUMN_VIEW_GROUP_BY_STEP
+        self._create_groups(self._step_dict)
+
+    def _group_by_date_modified(self):
+        #self._setup_column_view()
+        self._set_groups = True
+        self._current_column_view_grouping = self.COLUMN_VIEW_GROUP_BY_DATE_MODIFIED
+        self._create_groups(self._date_modified_dict)
 
     def _create_column_view_context_menu(self):
         self._column_add_action = QtGui.QAction("Add", self.ui.column_view)
@@ -2161,13 +2240,14 @@ class AppDialog(QtGui.QWidget):
         source_index = self.perforce_proxy_model.mapToSource(index)
         row_number = source_index.row()
         # logger.debug(f"Clicked Row {row_number}")
-        item = self.column_view_model.item(row_number, 11)  # Get the publish id from the 11th column
+        item = self.column_view_model.item(row_number, 14)  # Get the publish id from the 14th column
         if item:
             data = item.text()
             # Perform actions with the data from the clicked row
             # logger.debug(f"Clicked Row {row_number}, Data: {data}")
-            id = int(data)
-            self._setup_column_details_panel(id)
+            if data and data != "N/A":
+                id = int(data)
+                self._setup_column_details_panel(id)
 
     def on_column_view_row_clicked_group(self, index):
         id_role = QtCore.Qt.UserRole + 1  # Custom role for "id"
@@ -2288,8 +2368,8 @@ class AppDialog(QtGui.QWidget):
             source_index = self.perforce_proxy_model.mapToSource(selected_index)
             selected_row_data = self.get_row_data_from_source(source_index)
             id = 0
-            if (len(selected_row_data) >= 12):
-                id = selected_row_data[11]
+            if (len(selected_row_data) >= 15):
+                id = selected_row_data[14]
 
             sg_item = self._column_view_dict.get(int(id), None)
             # logger.debug("selected_row_data: {}".format(selected_row_data))
@@ -3924,28 +4004,77 @@ class AppDialog(QtGui.QWidget):
         When someone clicks on the "Submit Files" button
         Send pending files to the Shotgrid Publisher.
         """
-        # Publish depot files
-        # Get the selected pending files
-        other_data_to_publish, deleted_data_to_publish = self.pending_tree_view.get_selected_publish_items_by_action()
-        if other_data_to_publish or deleted_data_to_publish:
-            msg = "\n <span style='color:#2C93E2'>Submitting pending files...</span> \n"
-            self._add_log(msg, 2)
-            if deleted_data_to_publish:
-                self._publish_delete_pending_data(deleted_data_to_publish)
-            if other_data_to_publish:
-                self._publish_other_pending_data(other_data_to_publish)
+        selected_files_to_delete = []
+        selected_tuples_to_delete = []
 
-            msg = "\n <span style='color:#2C93E2'>Updating the Pending view ...</span> \n"
-            self._add_log(msg, 2)
-            # Update the Pending view
-            self._update_pending_view()
+        selected_indexes = self._pending_view_widget.selectionModel().selectedRows()
+        for selected_index in selected_indexes:
+            try:
+                source_index = self._pending_view_model.mapToSource(selected_index)
+                selected_row_data = self._get_pending_data_from_source(source_index)
+                action = self._get_action_data_from_source(source_index)
+                change = self._get_change_data_from_source(source_index)
+                if selected_row_data and "#" in selected_row_data:
+                    target_file = selected_row_data.split("#")[0]
+                    target_file = target_file.strip()
+                    # logger.debug(">>>>>>>>>>> action:{}".format(action))
+                    if action in ["delete"]:
+                        if target_file not in selected_files_to_delete:
+                            delete_tuple = (change, target_file)
+                            selected_files_to_delete.append(target_file)
+                            selected_tuples_to_delete.append(delete_tuple)
+
+            except Exception as e:
+                logger.debug(">>>>>>>>>>> Unable to find pending files marked for deletion: {}".format(e))
+
+        if selected_files_to_delete:
+
+            # Convert list of files into a string, to show in the confirmation dialog
+            files_str = "\n".join(selected_files_to_delete)
+
+            # Show confirmation dialog
+            reply = QtGui.QMessageBox.question(self, 'Confirmation',
+                                         f"Are you sure you want to delete the following files in Perforce?\n\n{files_str}",
+                                         QtGui.QMessageBox.Yes | QtGui.QMessageBox.No, QtGui.QMessageBox.No)
+
+            if reply == QtGui.QMessageBox.Yes:
+                msg = "\n <span style='color:#2C93E2'>Submitting pending files for deletion in Perforce...</span> \n"
+                self._add_log(msg, 2)
+                if selected_files_to_delete:
+                    self._delete_pending_data(selected_tuples_to_delete)
+
+
+                msg = "\n <span style='color:#2C93E2'>Updating the Pending view ...</span> \n"
+                self._add_log(msg, 2)
+                # Update the Pending view
+                self._update_pending_view()
         else:
-            msg = "\n <span style='color:#2C93E2'>Please select files in the Pending view...</span> \n"
+            msg = "\n <span style='color:#2C93E2'>Please select files marked for deletion in the Pending view...</span> \n"
             self._add_log(msg, 2)
 
         # msg = "\n <span style='color:#2C93E2'>Hard refreshing data...</span> \n"
         # self._add_log(msg, 2)
         # self._publish_model.hard_refresh()
+
+    def _delete_pending_data(self, selected_tuples_to_delete):
+        """
+        Publish Depot Data in the Pending view that needs to be deleted.
+        """
+        if selected_tuples_to_delete:
+            msg = "\n <span style='color:#2C93E2'>Submitting files for deletion...</span> \n"
+            self._add_log(msg, 2)
+            for change, file_to_submit in selected_tuples_to_delete:
+                # logger.debug(">>>>>>>>>>  file_to_submit: {}".format(file_to_submit))
+                # logger.debug(">>>>>>>>>>  change: {}".format(change))
+                if change and file_to_submit:
+                    msg = "{}".format(file_to_submit)
+                    self._add_log(msg, 4)
+                    submit_del_res = submit_and_delete_file(self._p4, change, file_to_submit)
+                    # logger.debug(">>>>>>>>>>  Result of deleting files: {}".format(submit_del_res))
+                    if submit_del_res:
+                        msg = "\n <span style='color:#2C93E2'>File deleted from Perforce:</span> \n".format(file_to_submit)
+                        self._add_log(msg, 2)
+
 
     def _publish_other_pending_data(self, other_data_to_publish):
         """
@@ -3977,6 +4106,9 @@ class AppDialog(QtGui.QWidget):
             # Run the publisher UI
             engine = sgtk.platform.current_engine()
             engine.commands["Publish..."]["callback"]()
+
+
+
 
     def _publish_delete_pending_data(self, deleted_data_to_publish):
         """
@@ -4073,7 +4205,7 @@ class AppDialog(QtGui.QWidget):
         ]
 
         # Specify the fields to retrieve for the versions
-        fields = ["id", "code", "created_at", "user", "action"]
+        fields = ["id", "code", "created_at", "user", "action", "step"]
 
         # Make the Shotgrid API call to search for versions
         versions = self._app.shotgun("Version", filters, fields, order=[{"field_name": "created_at", "direction": "asc"}])
@@ -5756,7 +5888,7 @@ class AppDialog(QtGui.QWidget):
             entity_published_files = self._app.shotgun.find(
                 "PublishedFile",
                 filters,
-                ["entity", "path_cache", "path", "version_number"],
+                ["entity", "path_cache", "path", "version_number", "step"],
                 #["entity", "path_cache", "path", "version_number", "name", "description", "created_at", "created_by", "image", "published_file_type", "task","],
             )
             """

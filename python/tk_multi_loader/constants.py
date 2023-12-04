@@ -26,6 +26,8 @@ PUBLISHED_FILES_FIELDS = [
     "task",
     "task.Task.sg_status_list",
     "task.Task.due_date",
+    "step",
+    "task.Task.step.Step.code",
     "project",
     "task.Task.content",
     "created_by",
@@ -33,6 +35,7 @@ PUBLISHED_FILES_FIELDS = [
     "version",  # note: not supported on TankPublishedFile so always None
     "version.Version.sg_status_list",
     "created_by.HumanUser.image",
+
 ]
 
 # left hand side tree view search only kicks in

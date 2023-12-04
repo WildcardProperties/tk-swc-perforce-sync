@@ -724,7 +724,8 @@ class TreeViewWidget(QtWidgets.QWidget):
                                 depot_item.setFlags(
                                     (depot_item.flags() | QtCore.Qt.ItemFlag.ItemIsDragEnabled) & ~QtCore.Qt.ItemFlag.ItemIsDropEnabled
                                 )
-                                msg = "Right-click the selected file to 'Publish...' the changelist in Shotgrid or 'Revert' the file in Perforce."
+                                # msg = "Right-click the selected file 'Revert' the file in Perforce. "
+                                msg = "Select the file for further action"
                                 depot_item.setToolTip(msg)
 
                                 depot_item.setIcon(action_icon)

@@ -190,6 +190,55 @@ def submit_change(p4, change, filelist):
         msg = "Perforce: %s" % (p4.errors[0] if p4.errors else e)
         log.debug(msg)
 
+def submit_and_delete_file(p4, change, filepath):
+    """
+    Submit the specified change and then completely delete the file in Perforce.
+    """
+    try:
+        # Mark files for deletion
+        p4.run('delete', filepath)
+
+        # Fetch the change
+        change_spec = p4.fetch_change("-o", str(change))
+
+        # Submit the change
+        submit = p4.run_submit(change_spec)
+        log.debug("Return of run_submit: {}".format(submit))
+
+        # Obliterate the files to completely remove them from the depot
+
+        p4.run('obliterate', '-y', filepath)
+
+        return submit
+    except Exception as e:
+        msg = "Perforce: %s" % (p4.errors[0] if p4.errors else e)
+        log.debug(msg)
+
+def submit_and_delete_file_list(p4, change, filelist):
+    """
+    Submit the specified change and then completely delete the file in Perforce.
+    """
+    try:
+        # Mark files for deletion
+        for file in filelist:
+            p4.run('delete', file)
+
+        # Fetch the change
+        change_spec = p4.fetch_change("-o", str(change))
+
+        # Submit the change
+        submit = p4.run_submit(change_spec)
+        log.debug("Return of run_submit: {}".format(submit))
+
+        # Obliterate the files to completely remove them from the depot
+        for file in filelist:
+            p4.run('obliterate', '-y', file)
+
+        return submit
+    except Exception as e:
+        msg = "Perforce: %s" % (p4.errors[0] if p4.errors else e)
+        log.debug(msg)
+
 def get_change_details(p4, changes):
     """
     Get the changes details for one or more changes

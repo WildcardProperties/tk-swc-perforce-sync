@@ -13,6 +13,185 @@ from tank_vendor import shotgun_api3
 import sgtk
 logger = sgtk.platform.get_logger(__name__)
 
+
+def create_modified_date(dt):
+    """
+    Return the date represented by the argument as a string, displaying recent
+    dates as "Today", "This Week", "This Month", or "Older".
+
+    :param dt: The date to convert to a string. Can be a UNIX timestamp (float),
+               a :class:`datetime.date`, or a :class:`datetime.datetime` object.
+    :type dt: float, :class:`datetime.date`, or :class:`datetime.datetime`
+
+    :returns: A String representing date appropriate for display
+    """
+    if isinstance(dt, float):  # Check if dt is a UNIX timestamp
+        dt = datetime.datetime.fromtimestamp(dt)  # Convert UNIX timestamp to datetime
+
+    now = datetime.datetime.now(dt.tzinfo if isinstance(dt, datetime.datetime) else None)
+    today = now.date()
+    start_of_this_week = today - datetime.timedelta(days=today.weekday())  # Monday is 0
+    start_of_this_month = today.replace(day=1)
+
+    if isinstance(dt, datetime.datetime):
+        dt = dt.date()  # convert datetime to date for comparison
+
+    delta = today - dt
+
+    if delta.days == 0:
+        date_str = "Today"
+    elif start_of_this_week <= dt <= today:
+        date_str = "This Week"
+    elif start_of_this_month <= dt < start_of_this_week:
+        date_str = "This Month"
+    else:
+        date_str = "Older"
+
+    return date_str
+
+def create_modified_date_old4(dt):
+    """
+    Return the date represented by the argument as a string, displaying recent
+    dates as "Today", "This Week", "This Month", or "Older".
+
+    :param dt: The date to convert to a string
+    :type dt: :class:`datetime.date` or :class:`datetime.datetime`
+
+    :returns: A String representing date appropriate for display
+    """
+    now = datetime.datetime.now(dt.tzinfo if isinstance(dt, datetime.datetime) else None)
+    today = now.date()
+    start_of_this_week = today - datetime.timedelta(days=today.weekday())  # Monday is 0
+    start_of_this_month = today.replace(day=1)
+
+    if isinstance(dt, datetime.datetime):
+        dt = dt.date()  # convert datetime to date for comparison
+
+    delta = today - dt
+
+    if delta.days == 0:
+        date_str = "Today"
+    elif start_of_this_week <= dt <= today:
+        date_str = "This Week"
+    elif start_of_this_month <= dt < start_of_this_week:
+        date_str = "This Month"
+    else:
+        # If the date doesn't fit into the above categories, label it as "Older"
+        date_str = "Older"
+
+    return date_str
+
+def create_modified_date_old2(dt):
+    """
+    Return the date represented by the argument as a string, displaying recent
+    dates as "Yesterday", "Today", or "Tomorrow".
+
+    :param dt: The date convert to a string
+    :type dt: :class:`datetime.date` or :class:`datetime.datetime`
+
+    :returns: A String representing date appropriate for display
+    """
+
+    delta, date_str = None, None
+    if isinstance(dt, datetime.datetime):
+        delta = datetime.datetime.now(dt.tzinfo) - dt
+    elif isinstance(dt, datetime.date):
+        delta = datetime.date.today() - dt
+
+    now = datetime.datetime.now(dt.tzinfo if isinstance(dt, datetime.datetime) else None)
+    today = now.date()
+    start_of_this_week = today - datetime.timedelta(days=today.weekday())  # Monday is 0
+    start_of_this_month = today.replace(day=1)
+    date_str = "N/A"
+    if delta:
+
+        if delta.days == 0:
+            date_str = "Today"
+        elif start_of_this_week <= dt <= today:
+            date_str = "This Week"
+        elif start_of_this_month <= dt < start_of_this_week:
+            date_str = "This Month"
+        else:
+            # If the date doesn't fit into the above categories, label it as "Older"
+            date_str = "Older"
+
+    return date_str
+
+def create_modified_date_old(dt):
+    """
+    Return the date represented by the argument as a string, displaying recent
+    dates as "Yesterday", "Today", or "Tomorrow".
+
+    :param dt: The date convert to a string
+    :type dt: :class:`datetime.date` or :class:`datetime.datetime`
+
+    :returns: A String representing date appropriate for display
+    """
+    delta, date_str = None, None
+    if isinstance(dt, datetime.datetime):
+        delta = datetime.datetime.now(dt.tzinfo) - dt
+    elif isinstance(dt, datetime.date):
+        delta = datetime.date.today() - dt
+
+    logger.debug(">>>>>>>>>> delta is: {}".format(delta))
+    date_str = "N/A"
+    if delta:
+        if delta.days == 0:
+            date_str = "Today"
+        elif delta.days == 1:
+            date_str = "Yesterday"
+        elif delta.days == 7:
+            date_str = "This Week"
+        elif delta.days == 30:
+            date_str = "This Month"
+        else:
+            # use the locale appropriate date representation
+            date_str = "Older"
+
+    return date_str
+
+def create_modified_date_2(dt):
+    """
+    Return the date represented by the argument as a string, displaying recent
+    dates as "Yesterday", "Today", or "Tomorrow".
+
+    :param dt: The date to convert to a string. Can be a Unix timestamp, datetime.date, or datetime.datetime
+    :type dt: float, :class:`datetime.date`, or :class:`datetime.datetime`
+
+    :returns: A String representing date appropriate for display
+    """
+    delta, date_str = None, None
+
+    # Convert Unix timestamp to datetime
+    if isinstance(dt, (int, float)):
+        try:
+            dt = datetime.datetime.fromtimestamp(dt)
+        except ValueError:
+            logger.error("Invalid Unix timestamp")
+            return "Invalid Date"
+
+    if isinstance(dt, datetime.datetime):
+        delta = datetime.datetime.now(dt.tzinfo) - dt
+    elif isinstance(dt, datetime.date):
+        delta = datetime.date.today() - dt
+
+    logger.debug(">>>>>>>>>> delta is: {}".format(delta))
+    date_str = "N/A"
+    if delta:
+        if delta.days == 0:
+            date_str = "Today"
+        elif delta.days == 1:
+            date_str = "Yesterday"
+        elif delta.days == 7:
+            date_str = "This Week"
+        elif delta.days == 30:
+            date_str = "This Month"
+        else:
+            # use the locale appropriate date representation
+            date_str = "Older"
+
+    return date_str
+
 def create_human_readable_date(dt):
     """
     Return the date represented by the argument as a string, displaying recent
