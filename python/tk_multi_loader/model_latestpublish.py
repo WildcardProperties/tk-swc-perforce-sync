@@ -135,6 +135,9 @@ class SgLatestPublishModel(ShotgunModel):
                 else:
                     sg_filters = [["entity", "in", data]]
 
+                data_type = entity_type
+                # logger.debug("model_latestpublish:show_sub_items data_type is: {}".format(data_type))
+
                 # lastly, when we are in this special mode, the main view
                 # is no longer functioning as a browsable hierarchy
                 # but is switching into more of a paradigm of an inverse
@@ -161,6 +164,7 @@ class SgLatestPublishModel(ShotgunModel):
                     entity_path = app.sgtk.paths_from_entity(entity_type, entity_id)
                     """
                     data_type = sg_data.get("type", None)
+                    # logger.debug("model_latestpublish: data_type is: {}".format(data_type))
                     #logger.debug(">>>>>>>>>>>>>> entity_path is: {}".format(entity_path))
                     # leaf node!
                     # show the items associated. Handle tasks
