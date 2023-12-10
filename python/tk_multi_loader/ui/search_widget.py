@@ -31,6 +31,9 @@ class Ui_SearchWidget(object):
         self.retranslateUi(SearchWidget)
         QtCore.QMetaObject.connectSlotsByName(SearchWidget)
 
+    def get_query_text(self):
+        return self.search.text()
+
     def retranslateUi(self, SearchWidget):
         SearchWidget.setWindowTitle(QtGui.QApplication.translate("SearchWidget", "Form", None, QtGui.QApplication.UnicodeUTF8))
         self.search.setToolTip(QtGui.QApplication.translate("SearchWidget", "Enter some text to filter the publishes shown in the view below.<br>\n"

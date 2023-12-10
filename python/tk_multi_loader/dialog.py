@@ -388,6 +388,10 @@ class AppDialog(QtGui.QWidget):
         self._search_widget.filter_changed.connect(
             self._publish_proxy_model.set_search_query
         )
+        self._search_widget.filter_changed.connect(
+            self._on_column_view_set_search_query
+        )
+        self._column_view_search_filter = None
 
         #################################################
         # checkboxes, buttons etc
@@ -1227,6 +1231,14 @@ class AppDialog(QtGui.QWidget):
         if default_action:
             default_action.trigger()
 
+    def _on_column_view_set_search_query(self, search_filter):
+        # Chech if we are in Column view mode
+        if self.main_view_mode == self.MAIN_VIEW_COLUMN:
+            logger.debug(">>>>>>>  _on_column_view_set_search_query: search_filter: {}".format(search_filter))
+            if len(search_filter) > 1:
+                self._column_view_search_filter = search_filter
+                self._set_column_group()
+
     def _on_publish_filter_clicked(self):
         """
         Executed when someone clicks the filter button in the main UI
@@ -1236,11 +1248,21 @@ class AppDialog(QtGui.QWidget):
                 QtGui.QIcon(QtGui.QPixmap(":/res/search_active.png"))
             )
             self._search_widget.enable()
+            # Chech if we are in Column view mode
+            if self.main_view_mode == self.MAIN_VIEW_COLUMN:
+                # log search string from self.ui.search_publishes
+                logger.debug(">>>>>>> Column view mode, search is active")
         else:
             self.ui.search_publishes.setIcon(
                 QtGui.QIcon(QtGui.QPixmap(":/res/search.png"))
             )
             self._search_widget.disable()
+            if self.main_view_mode == self.MAIN_VIEW_COLUMN:
+                # log search string from self.ui.search_publishes
+                logger.debug(">>>>>>> Column view mode, search is disabled")
+                self._column_view_search_filter = None
+                self._set_column_group()
+
 
     def _on_thumbnail_mode_clicked(self):
         """
@@ -2031,6 +2053,12 @@ class AppDialog(QtGui.QWidget):
                 id = 0
                 if sg_list and len(sg_list) >= 15:
                     id = sg_list[14]
+                    base_name = sg_list[3]
+                    if self._column_view_search_filter and len(self._column_view_search_filter) > 1:
+                        prefix = self._column_view_search_filter
+                        if not base_name.startswith(prefix):
+                            logger.debug(">>> skipping base_name: {}, prefix: {}".format(base_name, prefix))
+                            continue
                     sg_item = self._column_view_dict.get(id, None)
                     tooltip = self._get_tooltip(sg_list, sg_item)
                 item_list = []
@@ -2079,6 +2107,12 @@ class AppDialog(QtGui.QWidget):
         for id, sg_item in self._column_view_dict.items():
             if not sg_item:
                 continue
+            base_name = sg_item.get("name", None)
+            if base_name and self._column_view_search_filter and len(self._column_view_search_filter) > 1:
+                prefix = self._column_view_search_filter
+                if not base_name.startswith(prefix):
+                    logger.debug(">>> skipping base_name: {}, prefix: {}".format(base_name, prefix))
+                    continue
             if id in self._standard_item_dict:
                 item_data = self._standard_item_dict[id]
                 self._insert_perforce_row(row, item_data, sg_item)
