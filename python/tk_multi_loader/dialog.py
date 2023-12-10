@@ -1237,7 +1237,9 @@ class AppDialog(QtGui.QWidget):
             logger.debug(">>>>>>>  _on_column_view_set_search_query: search_filter: {}".format(search_filter))
             if len(search_filter) > 1:
                 self._column_view_search_filter = search_filter
-                self._set_column_group()
+            else:
+                self._column_view_search_filter = None
+            self._set_column_group()
 
     def _on_publish_filter_clicked(self):
         """
