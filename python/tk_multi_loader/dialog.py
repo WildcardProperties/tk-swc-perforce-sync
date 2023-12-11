@@ -1905,6 +1905,35 @@ class AppDialog(QtGui.QWidget):
                         perforce_sg_data.append(sg_item)
         return perforce_sg_data
 
+    def _clean_sg_data(self):
+        is_model_changed = False
+        model = self.ui.publish_view.model()
+        if model.rowCount() > 0:
+            for row in range(model.rowCount()):
+                model_index = model.index(row, 0)
+                proxy_model = model_index.model()
+                source_index = proxy_model.mapToSource(model_index)
+                item = source_index.model().itemFromIndex(source_index)
+
+                is_folder = item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
+                if not is_folder:
+                    # Run default action.
+                    sg_item = shotgun_model.get_sg_data(model_index)
+                    action = sg_item.get("action") or sg_item.get("headAction") or None
+                    if action and action in ["delete"]:
+                        # remove the item from the model
+                        model.removeRow(row)
+                        is_model_changed = True
+
+            if is_model_changed:
+                # Refresh the model
+                model.layoutChanged.emit()
+                # Refresh the view
+                self.ui.publish_view.update()
+
+
+
+
     def _reset_perforce_widget(self):
         self.ui.column_view = QtWidgets.QTableView()
     
@@ -2059,8 +2088,16 @@ class AppDialog(QtGui.QWidget):
                     if self._column_view_search_filter and len(self._column_view_search_filter) > 1:
                         prefix = self._column_view_search_filter
                         if not base_name.startswith(prefix):
-                            logger.debug(">>> skipping base_name: {}, prefix: {}".format(base_name, prefix))
+                            # logger.debug(">>> skipping base_name: {}, prefix: {}".format(base_name, prefix))
                             continue
+                    # Skip deleted files
+                    action = sg_list[2]
+                    if action and action in ["delete"]:
+                        msg = "\n <span style='color:#2C93E2'>skipping deleted file: {}</span> \n".format(
+                            base_name)
+                        self._add_log(msg, 2)
+
+                        continue
                     sg_item = self._column_view_dict.get(id, None)
                     tooltip = self._get_tooltip(sg_list, sg_item)
                 item_list = []
@@ -2113,8 +2150,15 @@ class AppDialog(QtGui.QWidget):
             if base_name and self._column_view_search_filter and len(self._column_view_search_filter) > 1:
                 prefix = self._column_view_search_filter
                 if not base_name.startswith(prefix):
-                    logger.debug(">>> skipping base_name: {}, prefix: {}".format(base_name, prefix))
+                    # logger.debug(">>> skipping base_name: {}, prefix: {}".format(base_name, prefix))
                     continue
+            # Skip deleted files
+            action = sg_item.get("action") or sg_item.get("headAction") or None
+            if action and action in ["delete"]:
+                msg = "\n <span style='color:#2C93E2'>skipping deleted file: {}</span> \n".format(
+                    base_name)
+                self._add_log(msg, 2)
+                continue
             if id in self._standard_item_dict:
                 item_data = self._standard_item_dict[id]
                 self._insert_perforce_row(row, item_data, sg_item)
@@ -5879,29 +5923,34 @@ class AppDialog(QtGui.QWidget):
         total_file_count = 0
         self._sg_data = []
         self._submitted_data_to_publish = []
+        try:
+            model = self.ui.publish_view.model()
+            # logger.debug(">>>>>>>>>> In get_current_sg_data model.rowCount() is {}".format(model.rowCount()))
+            if model.rowCount() > 0:
+                for row in range(model.rowCount()):
+                    model_index = model.index(row, 0)
+                    proxy_model = model_index.model()
+                    source_index = proxy_model.mapToSource(model_index)
+                    item = source_index.model().itemFromIndex(source_index)
 
-        model = self.ui.publish_view.model()
-        # logger.debug(">>>>>>>>>> In get_current_sg_data model.rowCount() is {}".format(model.rowCount()))
-        if model.rowCount() > 0:
-            for row in range(model.rowCount()):
-                model_index = model.index(row, 0)
-                proxy_model = model_index.model()
-                source_index = proxy_model.mapToSource(model_index)
-                item = source_index.model().itemFromIndex(source_index)
+                    is_folder = item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
+                    if not is_folder:
+                        # Run default action.
+                        total_file_count += 1
+                        sg_item = shotgun_model.get_sg_data(model_index)
+                        action = sg_item.get("action") or sg_item.get("headAction") or None
+                        if action and action in ["delete"]:
+                            # remove the item from the model
+                            # logger.debug(">>>>>>>>>>  Removing item: {}".format(sg_item))
+                            model.removeRow(row)
+                            # remove the model_index from the model
+                            # model.removeRow(model_index.row())
 
-                is_folder = item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
-                if not is_folder:
-                    # Run default action.
-                    total_file_count += 1
-                    sg_item = shotgun_model.get_sg_data(model_index)
-                    self._sg_data.append(sg_item)
-                # else:
-                #    is_folder = selected_item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
-                #     if not is_folder:
-                #        self._publish_main_overlay.show_message_pixmap(self._no_pubs_found_icon)
+                        else:
+                            self._sg_data.append(sg_item)
+        except:
+            pass
 
-        # time.sleep(1)
-        #logger.debug(">>>>>>>>>>  sg_data is: {}".format(self._sg_data))
 
     def get_current_publish_data(self, entity_id, entity_type):
         self._sg_data = []
