@@ -139,7 +139,8 @@ class ChangelistSelection(QtWidgets.QDialog):
             if change:
                 for sg_item, action in self.selected_actions:
                     # check if the filepath lead to a valid shotgrid entity
-                    if not self.is_file_valid_in_shotgrid(sg_item):
+                    is_valid, entity = self.is_file_valid_in_shotgrid(sg_item)
+                    if not is_valid:
                         continue
                     perform_actions = PerformActions(self.p4, sg_item, action, change, desc)
                     performed_actions.append(sg_item)
@@ -160,7 +161,7 @@ class ChangelistSelection(QtWidgets.QDialog):
         :return:
         """
         if not sg_item:
-            return False
+            return False, None
 
         if "path" in sg_item:
             local_path = sg_item["path"].get("local_path", None)
@@ -168,14 +169,14 @@ class ChangelistSelection(QtWidgets.QDialog):
                 if not os.path.exists(local_path):
                     msg = "File does not exist: {}".format(local_path)
                     self.send_error_message(msg)
-                    return False
+                    return False, None
 
                 if "entity" in sg_item:
                     entity = sg_item.get("entity", None)
                     if entity:
                         msg = "File is valid: {}".format(local_path)
                         self.send_success_message(msg)
-                        return True
+                        return True, entity
 
                 else:
                     sg = sgtk.platform.current_bundle()
@@ -210,12 +211,12 @@ class ChangelistSelection(QtWidgets.QDialog):
                             if entity:
                                 msg = "Successfully retrieved the associated ShotGrid entity for the file located at {}".format(local_path)
                                 self.send_success_message(msg)
-                                return True
+                                return True, entity
 
                     msg = "Failed to retrieve the associated Shotgrid entity for the file located at {}".format(local_path)
                     self.send_error_message(msg)
-                    return False
-        return False
+                    return False, None
+        return False, None
 
     def convert_to_relative_path(self, absolute_path):
         # Split the path on ":/" and take the second part, if it exists

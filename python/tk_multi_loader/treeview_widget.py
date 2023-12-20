@@ -207,7 +207,7 @@ class SWCTreeView(QtWidgets.QTreeView):
                             selected_actions.append((sg_item, action))
                     except Exception as e:
                         logger.error("Perforce error: {}".format(e))
-
+            logger.debug("Selected actions: {}".format(selected_actions))
             # Add file to the changelist
             try:
                 # Perform the changelist selection operation
@@ -442,9 +442,11 @@ class TreeViewWidget(QtWidgets.QWidget):
         selected = self.tree_view.selectionModel().selectedIndexes()
         for index in selected:
             depot_key = self.model.data(index)
+            logger.debug("get_selected_publish_items_by_action: <<<<<<<  depot_key: {}".format(depot_key))
             if depot_key:
                 if depot_key in self.publish_dict:
                     sg_item = self.publish_dict.get(depot_key, None)
+                    logger.debug("get_selected_publish_items_by_action: <<<<<<<  sg_item: {}".format(sg_item))
                     if sg_item:
                         key = sg_item.get("key", None)
                         if key:
@@ -687,6 +689,7 @@ class TreeViewWidget(QtWidgets.QWidget):
                 change_item.setToolTip(msg)
                 change_item.setData(key, QtCore.Qt.UserRole)
                 change_item.setData(key, QtCore.Qt.UserRole + 2)
+
                 change_item.setSizeHint(QtCore.QSize(0, 25))
                 change_item.setEditable(False)
                 self.model.appendRow([change_item])
@@ -697,6 +700,7 @@ class TreeViewWidget(QtWidgets.QWidget):
 
                     for j, sg_item in enumerate(node_dictionary[key]):
                         #logger.debug("<<<<<<<  setting file ...")
+                        logger.debug("<<<<<<<populate_treeview_widget_pending  sg_item: {}".format(sg_item))
                         if 'changeListInfo' in sg_item:
                             publish_time_txt = self._get_publish_time_info(sg_item)
                             user_name_txt = sg_item.get("p4_user", None)
@@ -733,6 +737,7 @@ class TreeViewWidget(QtWidgets.QWidget):
                                 depot_item.setTextAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
                                 depot_item.setData(action, QtCore.Qt.UserRole + 1)
                                 depot_item.setData(key, QtCore.Qt.UserRole + 2)
+                                depot_item.setData(sg_item, QtCore.Qt.UserRole + 3)
                                 change_item.appendRow(depot_item)
 
 

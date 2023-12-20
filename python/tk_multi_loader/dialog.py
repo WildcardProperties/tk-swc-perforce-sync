@@ -56,7 +56,7 @@ from .publish_item import PublishItem
 
 from .publish_files_ui import PublishFilesUI
 
-from .perforce_change import create_change, add_to_change, submit_change, submit_and_delete_file, submit_and_delete_file_list
+from .perforce_change import create_change, add_to_change, submit_change, submit_and_delete_file, submit_single_file, submit_and_delete_file_list
 from .treeview_widget import TreeViewWidget, SWCTreeView
 from .changelist_selection_operation import ChangelistSelection
 from collections import defaultdict, OrderedDict
@@ -1457,6 +1457,33 @@ class AppDialog(QtGui.QWidget):
         menu.exec_(global_pos)
         event_loop.exec_()
 
+    def _list_files_in_changelist(self, change):
+        try:
+            p4_result = self._p4.run("describe", "-s", str(change))
+            logger.debug("p4_result for {change}: {p4_result}")
+            files_in_changelist = []
+            for depot_file in p4_result[0]["depotFile"]:
+                client_file = self._get_client_file(depot_file)
+                files_in_changelist.append(client_file)
+            return files_in_changelist
+        except Exception as e:
+            logger.debug("Error listing files in changelist {}: {}".format(change, e))
+            return []
+
+    def _validate_changelist_files(self, files_in_changelist):
+        """ Validate changelist files """
+        error_list = []
+        for filepath in files_in_changelist:
+            sg_item = {}
+            sg_item["path"] = {}
+            sg_item["path"]["local_path"] = filepath
+            entity, published_file = self._get_entity_from_sg_item(sg_item)
+            if not entity:
+                error_list.append(filepath)
+        if error_list and len(error_list)>0:
+            return False, error_list
+        else:
+            return True, error_list
 
     def _on_pending_view_model_action(self, action):
         selected_files_to_revert = []
@@ -1472,6 +1499,19 @@ class AppDialog(QtGui.QWidget):
                     change = self._get_pending_change_from_source(source_index)
                 except Exception as e:
                     logger.debug("Error processing selection: {}".format(e))
+            if change:
+                files_in_changelist = self._list_files_in_changelist(change)
+                logger.debug("Files in changelist {}: {}".format(change, files_in_changelist))
+                result, error_list = self._validate_changelist_files(files_in_changelist)
+                if not result:
+                    msg = "\n <span style='color:#CC3333'>The following files in the changelist {} are not linked to any Shotgrid entity:</span> \n".format(change)
+                    self._add_log(msg, 2)
+                    for filepath in error_list:
+                        msg = "\n <span style='color:#CC3333'>{}</span> \n".format(filepath)
+                        self._add_log(msg, 2)
+                    # Exit without publishing
+                    return
+
             try:
                 logger.debug(">>> change is: {}".format(change))
                 engine = sgtk.platform.current_engine()
@@ -1480,9 +1520,11 @@ class AppDialog(QtGui.QWidget):
                     if app_command:
                         # now run the command, which in this case will launch the Publish app,
                         # passing in the desired changelist parameter.
+                        # app_command["callback"](change)
                         app_command["callback"](change)
             except Exception as e:
                 logger.debug("Error loading publisher: {}".format(e))
+
 
         # If the action is revert, then proceed
         if action == "revert" and selected_indexes:
@@ -1580,10 +1622,23 @@ class AppDialog(QtGui.QWidget):
         if source_index.isValid():
             id_role = QtCore.Qt.UserRole + 2
             change = source_index.data(id_role)
-            if change:
+            if change and change != "default":
                 change = int(change)
                 return change
         return 0
+
+
+    def _get_sg_data_from_source(self, source_index):
+        # Get sg_item from the source model using the source index
+        try:
+            if source_index.isValid():
+                id_role = QtCore.Qt.UserRole + 3
+                sg_item = source_index.data(id_role)
+                if sg_item:
+                    return sg_item
+        except Exception as e:
+            logger.debug("Unable to get sg_item data: {}".format(e))
+        return None
 
     def _get_pending_change_from_source(self, source_index):
         # Get changelist from the source model using the source index
@@ -3172,6 +3227,39 @@ class AppDialog(QtGui.QWidget):
         # populate the thumbnail
         self._populate_thumbnail(item, field, thumb_path)
 
+    def _get_entity_parents_new(self, entity_data):
+        """
+        Get the entity parents for a given item.
+        :param entity_data:
+        :return:
+        """
+        self.entity_parents = []
+        if entity_data:
+            entity_id = entity_data.get("id", None)
+            entity_type = entity_data.get("type", None)
+
+            if entity_id and entity_type:
+                filters = [["id", "is", entity_id]]
+                fields = ["id", "code", "type", "parents"]
+
+                # Get the entity
+                published_entities = self._app.shotgun.find(entity_type, filters, fields)
+
+                logger.debug(">>>>>>>>>>> Published entity: %s" % published_entities)
+                for published_entity in published_entities:
+                    # Get the parents
+                    linked_assets = published_entity.get("parents", None)
+                    if linked_assets:
+                        for parent in linked_assets:
+                            self.entity_parents.append(parent)
+
+                logger.debug(">>>>>>>>>>> Parents: %s" % self.entity_parents)
+                for entity_parent in self.entity_parents:
+                    entity_path, entity_id, entity_type = self._get_entity_info(entity_parent)
+                    entity_parent["entity_path"] = entity_path
+
+                logger.debug(">>>>>>>>>>> Parents with paths: %s" % self.entity_parents)
+
     def _get_entity_parents(self, entity_data):
         """
         Get the entity parents for a given item.
@@ -3193,8 +3281,9 @@ class AppDialog(QtGui.QWidget):
 
             if entity_id and entity_type:
                 filters = [["id", "is", entity_id]]
-                fields = ["id", "code", "type", "parents", "sg_asset_parent", "sg_assets", "project",
-                          "sg_asset_library", "asset_section", "asset_category", "sg_asset_type", "sg_status_list"]
+                fields = ["id", "code", "type", "parents", "sg_asset_parent", "project", "sg_status_list"]
+                #fields = ["id", "code", "type", "parents", "sg_asset_parent", "sg_assets", "project",
+                #          "sg_asset_library", "asset_section", "asset_category", "sg_asset_type", "sg_status_list"]
 
                 # get the entity
                 published_entities = self._app.shotgun.find(entity_type, filters, fields)
@@ -3203,6 +3292,7 @@ class AppDialog(QtGui.QWidget):
                 for published_entity in published_entities:
                     # get the asset parent
                     asset_parent = published_entity.get("sg_asset_parent", None)
+                    logger.debug(">>>>>>>>>>>sg_asset_parent: %s" % asset_parent)
                     if asset_parent:
                         self.entity_parents.append(asset_parent)
                     # get the parents
@@ -3395,12 +3485,14 @@ class AppDialog(QtGui.QWidget):
                 parent_id = parent.get("id", None)
                 if parent_id and parent_type:
                     filters = [["entity", "is", {"type": parent_type, "id": parent_id}]]
-                    fields = ["id", "code", "type", "entity", "parents", "sg_asset_parent", "sg_assets", "project", "name", "image",
-                              "path", "task", "publish_type_field", 'published_file_type', 'created_by', 'created_at',
-                              "sg_asset_library", "asset_section", "asset_category", "sg_asset_type", "sg_status_list"]
+                    fields = ["id", "code", "type", "entity", "project", "name", "path", "path",
+                              "publish_type_field", 'published_file_type', 'created_by', 'created_at']
+                    # fields = ["id", "code", "type", "entity","project","name", "image", "path","path", "task",
+                    #          "publish_type_field", 'published_file_type', 'created_by', 'created_at', "sg_status_list"]
                     published_files = self._app.shotgun.find("PublishedFile", filters, fields)
                     self.entity_parents_published_files_list.extend(published_files)
-        # logger.debug(">>>>>>>>>>> Entity parents Published Files: %s" % self.entity_parents_published_files_list)
+        #logger.debug(">>>>>>>>>>> Entity parents Published Files: ")
+
         return self.entity_parents_published_files_list
 
 
@@ -4081,6 +4173,13 @@ class AppDialog(QtGui.QWidget):
 
     def _on_submit_files(self):
         """
+                When someone clicks on the "Submit Files" button
+        """
+        self._on_submit_deleted_files()
+        self._on_submit_other_files()
+
+    def _on_submit_deleted_files(self):
+        """
         When someone clicks on the "Submit Files" button
         Send pending files to the Shotgrid Publisher.
         """
@@ -4089,7 +4188,7 @@ class AppDialog(QtGui.QWidget):
 
         selected_indexes = self._pending_view_widget.selectionModel().selectedRows()
         for selected_index in selected_indexes:
-            try:
+           try:
                 source_index = self._pending_view_model.mapToSource(selected_index)
                 selected_row_data = self._get_pending_data_from_source(source_index)
                 action = self._get_action_data_from_source(source_index)
@@ -4097,17 +4196,18 @@ class AppDialog(QtGui.QWidget):
                 if selected_row_data and "#" in selected_row_data:
                     target_file = selected_row_data.split("#")[0]
                     target_file = target_file.strip()
-                    # logger.debug(">>>>>>>>>>> action:{}".format(action))
+                    logger.debug(">>>>>>>>>>> action:{}".format(action))
                     if action in ["delete"]:
                         if target_file not in selected_files_to_delete:
                             delete_tuple = (change, target_file)
                             selected_files_to_delete.append(target_file)
                             selected_tuples_to_delete.append(delete_tuple)
 
-            except Exception as e:
-                logger.debug(">>>>>>>>>>> Unable to find pending files marked for deletion: {}".format(e))
+           except:
+                pass
 
         if selected_files_to_delete:
+            logger.debug("_on_submit_deleted_files: selected_files_to_delete: {}".format(selected_files_to_delete))
 
             # Convert list of files into a string, to show in the confirmation dialog
             files_str = "\n".join(selected_files_to_delete)
@@ -4127,14 +4227,216 @@ class AppDialog(QtGui.QWidget):
                 msg = "\n <span style='color:#2C93E2'>Updating the Pending view ...</span> \n"
                 self._add_log(msg, 2)
                 # Update the Pending view
-                self._update_pending_view()
+                # self._update_pending_view()
         else:
             msg = "\n <span style='color:#2C93E2'>Please select files marked for deletion in the Pending view...</span> \n"
             self._add_log(msg, 2)
 
-        # msg = "\n <span style='color:#2C93E2'>Hard refreshing data...</span> \n"
-        # self._add_log(msg, 2)
-        # self._publish_model.hard_refresh()
+    def _on_submit_other_files(self):
+        """
+        When someone clicks on the "Submit Files" button
+        Send pending files to the Shotgrid Publisher.
+        """
+        selected_files_to_submit = []
+        selected_tuples_to_submit = []
+        selected_indexes = self._pending_view_widget.selectionModel().selectedRows()
+        for selected_index in selected_indexes:
+            try:
+                source_index = self._pending_view_model.mapToSource(selected_index)
+                selected_row_data = self._get_pending_data_from_source(source_index)
+                action = self._get_action_data_from_source(source_index)
+                change = self._get_change_data_from_source(source_index)
+
+                if selected_row_data and "#" in selected_row_data:
+                    target_file = selected_row_data.split("#")[0]
+                    target_file = target_file.strip()
+                    logger.debug(">>>>>>>>>>> action:{}".format(action))
+                    if action not in ["delete"]:
+                        sg_item = self._get_sg_data_from_source(source_index)
+                        if target_file not in selected_files_to_submit:
+                            submit_tuple = (change, target_file, action, sg_item)
+                            selected_files_to_submit.append(target_file)
+                            selected_tuples_to_submit.append(submit_tuple)
+            except Exception as e:
+                logger.debug("{}".format(e))
+
+        if selected_files_to_submit:
+
+            self._submit_other_pending_data(selected_tuples_to_submit)
+            self._publish_pending_data_using_command_line(selected_tuples_to_submit)
+
+            msg = "\n <span style='color:#2C93E2'>Updating the Pending view ...</span> \n"
+            self._add_log(msg, 2)
+            # Update the Pending view
+            self._update_pending_view()
+
+    def _publish_pending_data_using_command_line(self, selected_tuples_to_publish):
+        """
+        Publish Depot Data
+        """
+
+        if selected_tuples_to_publish:
+            msg = "\n <span style='color:#2C93E2'>Publishing other pending files in shotgrid</span> \n"
+            self._add_log(msg, 2)
+            files_count = len(selected_tuples_to_publish)
+            i = 0
+            for change, target_file, action, sg_item in selected_tuples_to_publish:
+                entity, new_sg_item = self._get_entity_from_sg_item(sg_item)
+                logger.debug(">>>>>>>>>>> entity:{}".format(entity))
+                if entity:
+                    if new_sg_item:
+                        sg_item.update(new_sg_item)
+                    else:
+                        sg_item["entity"] = entity
+                    if 'path' in sg_item:
+                        rev = sg_item.get("version_number") or sg_item.get("headRev") or 1
+
+                        file_to_publish = sg_item['path'].get('local_path', None)
+                        msg = "({}/{})  Publishing file: {}#{}".format(i + 1, files_count, file_to_publish, rev)
+                        self._add_log(msg, 4)
+                        logger.debug(">>>>>>>>>>> file_to_publish:{}".format(file_to_publish))
+                        logger.debug(">>>>>>>>>>> sg_item:{}".format(sg_item))
+                        publisher = PublishItem(sg_item)
+                        publish_result = publisher.commandline_publishing()
+                        # publish_result = publisher.gui_publishing()
+                        if publish_result:
+                            logger.debug("New data is: {}".format(publish_result))
+                        i += 1
+                else:
+                    msg = "Unable to find the entity associated with the file: {}".format(target_file)
+                    msg = "\n <span style='color:#CC3333'>{}:</span> \n".format(msg)
+                    self._add_log(msg, 4)
+
+            msg = "\n <span style='color:#2C93E2'>Publishing files is complete</span> \n"
+            self._add_log(msg, 2)
+
+        else:
+            msg = "\n <span style='color:#2C93E2'>No need to publish any file</span> \n"
+            self._add_log(msg, 2)
+
+
+    def _get_entity_from_sg_item(self, sg_item):
+        """
+        Check if the filepath lead to a valid shotgrid entity
+        :param sg_item:
+        :return:
+        """
+        if not sg_item:
+            return None, None
+        logger.debug(">>>>> _get_entity_from_sg_item: sg_item: {}".format(sg_item))
+        if "path" in sg_item:
+            local_path = sg_item["path"].get("local_path", None)
+            logger.debug(">>>>> local_path: {}".format(local_path))
+            if local_path:
+                if not os.path.exists(local_path):
+                    msg = "File does not exist: {}".format(local_path)
+                    self.send_error_message(msg)
+                    return None, None
+
+                if "entity" in sg_item:
+                    entity = sg_item.get("entity", None)
+                    if entity:
+                        logger.debug(">>>>> Found the entity in sg_item: {}".format(entity))
+                        return entity, None
+
+                else:
+                    sg = sgtk.platform.current_bundle()
+                    current_relative_path = self.fix_query_path(local_path)
+                    logger.debug(">>>>> current_relative_path: {}".format(current_relative_path))
+                    file_name = os.path.basename(local_path)  # Extracting file name from the path
+                    logger.debug(">>>>> file_name: {}".format(file_name))
+                    local_path = local_path.replace("\\", "/")  # Replacing backslash with forward slash
+
+                    # Modify your query to search by the file name
+                    filter_query = [['name', 'is', file_name]]
+                    # fields = ["path", "entity", "name", "version_number"]
+                    fields = ["entity", "path_cache", "path", "version_number", "name",
+                                    "description", "created_at", "created_by", "image",
+                                    "published_file_type", "task", "task.Task.content", "task.Task.sg_status_list","task.Task.sg_status_list"]
+
+                    # Modify your query to search by the file name and order by version_nu  mber in descending order
+                    published_files = sg.shotgun.find("PublishedFile", filter_query, fields,
+                                                      order=[{'field_name': 'version_number', 'direction': 'desc'}])
+
+                    # logger.debug(">>>>> published_files: {}".format(published_files))
+
+                    for published_file in published_files:
+                        logger.debug(">>>>> published_file: ")
+                        for k, v in published_file.items():
+                            logger.debug(">>>>> {} : {}".format(k, v))
+                        if "path" in published_file:
+                            path = published_file["path"]
+                            entity = None
+                            if "relative_path" in path:
+                                query_relative_path = path.get("relative_path", None)
+                                query_relative_path = query_relative_path.replace("\\", "/")
+                                query_relative_path = self.fix_query_path(query_relative_path)
+                                logger.debug(">>>>> query_relative_path: {}".format(query_relative_path))
+                                if query_relative_path == current_relative_path:
+                                    entity = published_file.get("entity", None)
+                                    if entity:
+                                        return entity, published_file
+                            elif "local_path" in path:
+                                query_local_path = path.get("local_path", None)
+                                query_local_path = query_local_path.replace("\\", "/")
+                                query_local_path = self.fix_query_path(query_local_path)
+                                logger.debug(">>>>> query_local_path: {}".format(query_local_path))
+                                if query_local_path == current_relative_path:
+                                    entity = published_file.get("entity", None)
+                                    if entity:
+                                        return entity, published_file
+
+                    msg = "Failed to retrieve the associated Shotgrid entity for the file located at {}".format(local_path)
+                    logger.debug(">>>>> {}".format(msg))
+                    return None, None
+        return None, None
+
+    def fix_query_path(self, query_local_path):
+
+        modified_path = query_local_path
+        # Split the path into drive and rest of the path
+        drive, rest_of_path = os.path.splitdrive(query_local_path)
+
+        # Remove leading slashes from the rest of the path
+        while rest_of_path.startswith('/'):
+            rest_of_path = rest_of_path[1:]
+
+        modified_path = rest_of_path
+        return modified_path
+
+    def convert_to_relative_path(self, absolute_path):
+        # Split the path on ":/" and take the second part, if it exists
+        parts = absolute_path.split(":/", 1)
+        relative_path = parts[1] if len(parts) > 1 else absolute_path
+
+        return relative_path
+
+    def _on_submit_other_files_original(self):
+        """
+        When someone clicks on the "Submit Files" button
+        Send pending files to the Shotgrid Publisher.
+        """
+        # Publish depot files
+        # Get the selected pending files
+        other_data_to_publish, deleted_data_to_publish = self.pending_tree_view.get_selected_publish_items_by_action()
+        logger.debug(">>>>>>>>>>  other_data_to_publish: {}".format(other_data_to_publish))
+        logger.debug(">>>>>>>>>>  deleted_data_to_publish: {}".format(deleted_data_to_publish))
+        if other_data_to_publish:
+            msg = "\n <span style='color:#2C93E2'>Submitting other pending files...</span> \n"
+            self._add_log(msg, 2)
+            if other_data_to_publish:
+                # self._publish_other_pending_data(other_data_to_publish)
+                logger.debug(">>>>>>>>>>  other_data_to_publish: {}".format(other_data_to_publish))
+
+            msg = "\n <span style='color:#2C93E2'>Updating the Pending view ...</span> \n"
+            self._add_log(msg, 2)
+            # Update the Pending view
+            self._update_pending_view()
+        else:
+            msg = "\n <span style='color:#2C93E2'>Please select files in the Pending view...</span> \n"
+            self._add_log(msg, 2)
+
+
 
     def _delete_pending_data(self, selected_tuples_to_delete):
         """
@@ -4154,6 +4456,27 @@ class AppDialog(QtGui.QWidget):
                     if submit_del_res:
                         msg = "\n <span style='color:#2C93E2'>File deleted from Perforce:</span> \n".format(file_to_submit)
                         self._add_log(msg, 2)
+
+    def _submit_other_pending_data(self, selected_data_to_submit):
+        """
+        Publish Depot Data in the Pending view that are not marked for deletion.
+        """
+        if selected_data_to_submit:
+            msg = "\n <span style='color:#2C93E2'>Submitting other pending files...</span> \n"
+            self._add_log(msg, 2)
+
+            for change, file_to_submit, action, sg_item in selected_data_to_submit:
+                # logger.debug(">>>>>>>>>>  file_to_submit: {}".format(file_to_submit))
+                # logger.debug(">>>>>>>>>>  change: {}".format(change))
+                if change and file_to_submit and action:
+                    if action not in ["delete"]:
+                        msg = "{}".format(file_to_submit)
+                        self._add_log(msg, 4)
+                        submit_res = submit_single_file(self._p4, change, file_to_submit, action)
+                        logger.debug(">>>>>>>>>>  Result of submitting files: {}".format(submit_res))
+                        if submit_res:
+                            msg = "\n <span style='color:#2C93E2'>File submitted to Perforce:</span> \n".format(file_to_submit)
+                            self._add_log(msg, 2)
 
 
     def _publish_other_pending_data(self, other_data_to_publish):
@@ -4421,7 +4744,7 @@ class AppDialog(QtGui.QWidget):
         logger.debug(">>> getting entity parents")
         logger.debug(">>> self._entity_data {}".format(self._entity_data))
 
-        logger.debug(">>> getting entity parents")
+        # logger.debug(">>> getting entity parents")
         self._get_entity_parents(self._entity_data)
         #logger.debug(">>> preparing entity parents published files")
         #self._prepare_entity_parents_published_files()

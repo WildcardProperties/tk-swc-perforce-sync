@@ -3,6 +3,9 @@ import sgtk
 from tank.util import sgre as re
 from urllib import request
 
+import tempfile
+import requests
+
 from .date_time import create_human_readable_timestamp, create_human_readable_date, get_time_now
 import datetime
 
@@ -193,6 +196,16 @@ class PublishItem():
         description = self.get_description()
         thumbnail_url = self.get_thumbnail()
 
+
+        """
+        if thumbnail_url:
+            # Download the image and attach it to the published file
+            image_path = os.path.join(self.app.ensure_folder_exists(self.app.get_publish_thumbnail_folder()),
+                                      published_file_name + ".png")
+            logger.debug(">>>>>>> image_path: {}".format(image_path))
+            request.urlretrieve(thumbnail_url, image_path)
+        """
+
         #publish_dependencies_paths = self.get_publish_dependencies(settings, item)
         publish_user = self.get_publish_user()
 
@@ -238,17 +251,43 @@ class PublishItem():
             #image_path = thumbnail_url
             #request.urlretrieve(thumbnail_url, image_path)
             #sg.download_attachment(thumbnail_url, image_path)
+            temp_thumbnail_path = None
+            if thumbnail_url:
+                # Download the thumbnail image and save it to a local temporary file
+                temp_thumbnail_path = os.path.join(tempfile.gettempdir(), "temp_thumbnail.png")
+                logger.debug(">>>>>>> temp_thumbnail_path: {}".format(temp_thumbnail_path))
+                try:
+                    response = requests.get(thumbnail_url)
+                    if response.status_code == 200:
+                        with open(temp_thumbnail_path, 'wb') as f:
+                            f.write(response.content)
+                    else:
+                        logger.warning("Failed to download thumbnail image. Status code: %s", response.status_code)
+                except Exception as e:
+                    logger.error("Error downloading thumbnail image: %s", str(e))
+
+
             updated_data = {
-                'code': published_file_name,
-                #'image': image_path,
-                #'image': thumbnail_url,
-                #'thumbnail_path': thumbnail_url
+                'code': published_file_name
+                #'image': temp_thumbnail_path,
             }
+
+            if os.path.exists(temp_thumbnail_path):
+                updated_data['image'] = temp_thumbnail_path
+
+            id = sg_publish_result.get("id", None)
+            if id and updated_data:
+                update_res = self.app.shotgun.update("PublishedFile", id, updated_data)
+                logger.debug("Updated published file: %s", update_res)
+
+
             logger.debug("updated_data: {}".format(updated_data))
             id = sg_publish_result.get("id", None)
             if id and updated_data:
                 update_res = self.app.shotgun.update("PublishedFile", id, updated_data)
                 logger.debug("Updated published file: {}".format(update_res))
+
+
 
 
         return sg_publish_result
