@@ -362,6 +362,16 @@ class AppDialog(QtGui.QWidget):
         self._revert_action = QtGui.QAction("Revert", self.ui.publish_view)
         self._revert_action.triggered.connect(lambda: self._on_publish_model_action("revert"))
 
+        # Correctly connect the triggered signal to the slot
+        self._preview_create_folders_action = QtGui.QAction("Preview Create Folders", self.ui.publish_view)
+        self._preview_create_folders_action.triggered.connect(lambda: self._on_publish_folder_action("preview"))
+
+        self._create_folders_action = QtGui.QAction("Create Folders", self.ui.publish_view)
+        self._create_folders_action.triggered.connect(lambda: self._on_publish_folder_action("create"))
+
+        self._unregister_folders_action = QtGui.QAction("Unregister Folders", self.ui.publish_view)
+        self._unregister_folders_action.triggered.connect(lambda: self._on_publish_folder_action("unregister"))
+
         self._refresh_action = QtGui.QAction("Refresh", self.ui.publish_view)
         self._refresh_action.triggered.connect(self._publish_model.async_refresh)
 
@@ -629,7 +639,7 @@ class AppDialog(QtGui.QWidget):
 
 
 
-    def _show_publish_actions(self, pos):
+    def _show_publish_actions_old(self, pos):
         """
         Shows the actions for the current publish selection.
 
@@ -652,6 +662,49 @@ class AppDialog(QtGui.QWidget):
         menu.addAction(self._revert_action)
         menu.addSeparator()
         menu.addAction(self._refresh_action)
+        menu.addSeparator()
+        menu.addAction(self._preview_create_folder_action)
+        menu.addAction(self._create_folders_action)
+        menu.addAction(self._unregister_folders_action)
+
+
+        # Wait for the user to pick something.
+        menu.exec_(self.ui.publish_view.mapToGlobal(pos))
+
+    def _show_publish_actions(self, pos):
+        """
+        Shows the actions for the current publish selection.
+
+        :param pos: Local coordinates inside the viewport when the context menu was requested.
+        """
+        # Get the selected item
+        selected_indexes = self.ui.publish_view.selectionModel().selectedIndexes()
+        if not selected_indexes:
+            return  # No selection, do not show menu
+
+        model_index = selected_indexes[0]
+        proxy_model = model_index.model()
+        source_index = proxy_model.mapToSource(model_index)
+        item = source_index.model().itemFromIndex(source_index)
+        is_folder = item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
+
+        # Build a menu with all the actions.
+        menu = QtGui.QMenu(self)
+
+        if is_folder:
+            # Add folder-specific actions
+            menu.addAction(self._preview_create_folders_action)
+            menu.addAction(self._create_folders_action)
+            menu.addAction(self._unregister_folders_action)
+        else:
+            # Add non-folder-specific actions
+            menu.addAction(self._add_action)
+            menu.addAction(self._edit_action)
+            menu.addAction(self._delete_action)
+            menu.addSeparator()
+            menu.addAction(self._revert_action)
+            menu.addSeparator()
+            menu.addAction(self._refresh_action)
 
         # Wait for the user to pick something.
         menu.exec_(self.ui.publish_view.mapToGlobal(pos))
@@ -4738,8 +4791,6 @@ class AppDialog(QtGui.QWidget):
             self._add_log(msg, 2)
 
 
-
-
     def _sync_entity_parents(self):
         logger.debug(">>> getting entity parents")
         logger.debug(">>> self._entity_data {}".format(self._entity_data))
@@ -6459,6 +6510,172 @@ class AppDialog(QtGui.QWidget):
                             sg_item["p4_user"] = p4_user
 
                     self._submitted_data_to_publish.append(sg_item)
+
+    def _on_publish_folder_action(self, action):
+        selected_indexes = self.ui.publish_view.selectionModel().selectedIndexes()
+        for model_index in selected_indexes:
+            proxy_model = model_index.model()
+            source_index = proxy_model.mapToSource(model_index)
+            item = source_index.model().itemFromIndex(source_index)
+
+            is_folder = item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
+            if is_folder:
+                sg_item = shotgun_model.get_sg_data(model_index)
+                logger.debug(">>>>>>>>>>  sg_item is: {}".format(sg_item))
+                if not sg_item:
+                    msg = "\n <span style='color:#2C93E2'>Unable to get item data</span> \n"
+                    self._add_log(msg, 2)
+                    continue
+                entity_type = sg_item.get('type', None)
+                entity_id = sg_item.get('id', None)
+                if entity_type and entity_id:
+                    logger.debug("action is: {}".format(action))
+                    if action in ["preview"]:
+                        msg = "\n <span style='color:#2C93E2'>Generating a preview of the folders, please stand by...</span> \n"
+                        self._add_log(msg, 2)
+                        self._preview_filesystem_structure(entity_type, entity_id, verbose_mode=True)
+                    elif action in ["create"]:
+                        msg = "\n <span style='color:#2C93E2'>Creating folders, please stand by...</span> \n"
+                        self._add_log(msg, 2)
+                        paths_not_on_disk = self._preview_filesystem_structure(entity_type, entity_id, verbose_mode=False)
+                        self._create_filesystem_structure_for_folder(entity_type, entity_id, paths_not_on_disk)
+                    elif action in ["unregister"]:
+                        msg = "\n <span style='color:#2C93E2'>Unregistering folders, please stand by...</span> \n"
+                        self._add_log(msg, 2)
+                        self._unregister_folders(entity_type, entity_id)
+                else:
+                    msg = "\n <span style='color:#CC3333'>No entities specified!</span> \n"
+                    self._add_log(msg, 2)
+
+    def _unregister_folders(self, entity_type, entity_id):
+        """
+        Unregister folders for the specified entity
+        """
+
+        try:
+
+            uf = self._app.sgtk.get_command("unregister_folders")
+            logger.debug(">>>>>>>>>>  uf command is: {}".format(uf))
+            message_list = []
+
+            tk = sgtk.sgtk_from_entity(entity_type, entity_id)
+            if entity_type == "Task":
+                parent_entity = self._app.shotgun.find_one("Task",
+                                    [["id", "is", entity_id]],
+                                    ["entity"]).get("entity")
+                result = uf.execute({"entity": {"type": parent_entity["type"], "id": parent_entity["id"]}})
+                message_list.append(result)
+            else:
+                result = uf.execute({"entity": {"type": entity_type, "id": entity_id}})
+                message_list.append(result)
+            tk.synchronize_filesystem_structure()
+
+
+        except Exception as e:
+            # other errors are not expected and probably bugs - here it's useful with a callstack.
+            msg = "\n <span style='color:#CC3333'>Error when unregistering folders: {}</span> \n".format(e)
+            self._add_log(msg, 2)
+
+        else:
+            # report back to user
+            if message_list and len(message_list) > 0:
+                msg = "\n <span style='color:#2C93E2'>Unregistered Folders:</span> \n"
+                self._add_log(msg, 2)
+                for message in message_list:
+                    self._add_log(message, 3)
+
+
+
+    def _create_filesystem_structure_for_folder(self, entity_type, entity_id, paths_not_on_disk):
+        if len(paths_not_on_disk) == 0:
+            msg = "\n <span style='color:#2C93E2'>No folders would be generated on disk for this item!</span> \n"
+            self._add_log(msg, 2)
+            return
+
+        paths_created = []
+        try:
+            tk = sgtk.sgtk_from_entity(entity_type, entity_id)
+            entities_processed = self._app.sgtk.create_filesystem_structure(entity_type, entity_id)
+            tk.synchronize_filesystem_structure()
+
+        except Exception as e:
+            # other errors are not expected and probably bugs - here it's useful with a callstack.
+            msg = "\n <span style='color:#CC3333'>Error when creating folders!, {}</span> \n".format(e)
+            self._add_log(msg, 2)
+
+        else:
+            # report back to user
+            if len(paths_not_on_disk) > 0:
+                for path in paths_not_on_disk:
+                    # If the path exist on disk, add it to paths_created
+                    if os.path.exists(path):
+                        paths_created.append(path)
+
+                if len(paths_created) > 0:
+                    if len(paths_created) == 1:
+                        msg = "\n <span style='color:#2C93E2'>The following {} folder has been created on disk.</span> \n".format(len(paths_created))
+                    else:
+                        msg = "\n <span style='color:#2C93E2'>The following {} folders have been created on disk.</span> \n".format(len(paths_created))
+                    self._add_log(msg, 2)
+                    for path in paths_created:
+                        self._add_log(path, 3)
+
+
+    def _preview_filesystem_structure(self, entity_type, entity_id, verbose_mode=True):
+        paths = []
+        paths_not_on_disk = []
+        try:
+            paths.extend(
+                self._app.sgtk.preview_filesystem_structure(entity_type, entity_id)
+            )
+
+        except Exception as e:
+            # other errors are not expected and probably bugs - here it's useful with a callstack.
+            msg = "\n <span style='color:#CC3333'>Error when previewing folders!, {}</span> \n".format(e)
+            self._add_log(msg, 2)
+
+        else:
+            # success! report back to user
+            if len(paths) == 0:
+                msg = "\n <span style='color:#2C93E2'>*No folders would be generated on disk for this item!*</span> \n"
+                self._add_log(msg, 2)
+
+            else:
+                # msg = "\n <span style='color:#2C93E2'>Creating folders would generate {} items on disk: </span> \n".format(len(paths))
+                # self._add_log(msg, 2)
+
+                for path in paths:
+                    path.replace(r"\_", r"\\_")
+                    # If the path doesn't exist on disk, add it to paths_not_on_disk
+                    if not os.path.exists(path):
+                        paths_not_on_disk.append(path)
+                self._add_log("", 3)
+
+                if paths_not_on_disk:
+                    if verbose_mode:
+                        if len(paths_not_on_disk) == 1:
+                            msg = "\n <span style='color:#2C93E2'>The following {} folder is not currently present on the disk and will be created:</span> \n".format(len(paths_not_on_disk))
+                        else:
+                            msg = "\n <span style='color:#2C93E2'>The following {} folders are not currently present on the disk and will be created:</span> \n".format(len(paths_not_on_disk))
+                        self._add_log(msg, 2)
+                        for path in paths_not_on_disk:
+                            self._add_log(path, 3)
+                        self._add_log("", 3)
+                if paths and not paths_not_on_disk:
+                    if verbose_mode:
+                        msg = "\n <span style='color:#2C93E2'>All folders are currently present on the disk and will not be created!</span> \n"
+                        self._add_log(msg, 2)
+
+            return paths_not_on_disk
+
+    def _add_plural(self, word, items):
+        """
+        appends an s if items > 1
+        """
+        if items > 1:
+            return "%ss" % word
+        else:
+            return word
 
 
     def _on_publish_model_action(self, action):
