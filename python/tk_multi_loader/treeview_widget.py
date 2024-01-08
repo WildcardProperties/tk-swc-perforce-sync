@@ -700,6 +700,7 @@ class TreeViewWidget(QtWidgets.QWidget):
 
                     for j, sg_item in enumerate(node_dictionary[key]):
                         #logger.debug("<<<<<<<  setting file ...")
+                        description_txt = ""
                         logger.debug("<<<<<<<populate_treeview_widget_pending  sg_item: {}".format(sg_item))
                         if 'changeListInfo' in sg_item:
                             publish_time_txt = self._get_publish_time_info(sg_item)
@@ -708,6 +709,7 @@ class TreeViewWidget(QtWidgets.QWidget):
 
                             msg = "{} \t {} \t {} \t {}".format(key, publish_time_txt, user_name_txt, description_txt)
                             change_item.setText(msg)
+                            change_item.setData(description_txt, QtCore.Qt.UserRole + 4)
                         else:
 
                             depot_path = sg_item.get("depotFile", None)
@@ -738,6 +740,7 @@ class TreeViewWidget(QtWidgets.QWidget):
                                 depot_item.setData(action, QtCore.Qt.UserRole + 1)
                                 depot_item.setData(key, QtCore.Qt.UserRole + 2)
                                 depot_item.setData(sg_item, QtCore.Qt.UserRole + 3)
+                                depot_item.setData(description_txt, QtCore.Qt.UserRole + 4)
                                 change_item.appendRow(depot_item)
 
 

@@ -501,6 +501,7 @@ class AppDialog(QtGui.QWidget):
         # Publishing
         self._home_dir = None
         self._publish_files_path = None
+        self._publish_files_description = None
         self._create_publisher_dir()
         self._sg_data = []
 
@@ -1545,11 +1546,13 @@ class AppDialog(QtGui.QWidget):
         # First, gather all the files that are to be reverted
         selected_indexes = self._pending_view_widget.selectionModel().selectedRows()
         change = 0
+        files_in_changelist = []
+        description = ""
         if action == "publish" and selected_indexes:
             for selected_index in selected_indexes:
                 try:
                     source_index = self._pending_view_model.mapToSource(selected_index)
-                    change = self._get_pending_change_from_source(source_index)
+                    change, description = self._get_pending_info_from_source(source_index)
                 except Exception as e:
                     logger.debug("Error processing selection: {}".format(e))
             if change:
@@ -1566,6 +1569,11 @@ class AppDialog(QtGui.QWidget):
                     return
 
             try:
+                try:
+                    # Create the description file
+                    self._create_description_file(files_in_changelist, description)
+                except:
+                    pass
                 logger.debug(">>> change is: {}".format(change))
                 engine = sgtk.platform.current_engine()
                 if engine:
@@ -1636,6 +1644,19 @@ class AppDialog(QtGui.QWidget):
                     """
             self._populate_pending_widget()
 
+    def _create_description_file(self, files_in_changelist, description):
+        try:
+            if files_in_changelist:
+                with open(self._publish_files_description, "w") as f:
+                    for file in files_in_changelist:
+                        base_file = os.path.basename(file)
+                        msg = f"{base_file}:::{description}"
+                        f.write(msg)
+                        f.write("\n")
+
+        except Exception as e:
+            logger.debug("Error creating description file: {}".format(e))
+
     def _delete_pending_file(self, change, target_file):
         try:
             # Mark the file for delete in Perforce
@@ -1693,7 +1714,7 @@ class AppDialog(QtGui.QWidget):
             logger.debug("Unable to get sg_item data: {}".format(e))
         return None
 
-    def _get_pending_change_from_source(self, source_index):
+    def _get_pending_info_from_source(self, source_index):
         # Get changelist from the source model using the source index
         if source_index.isValid():
             item_model = source_index.model()
@@ -1705,11 +1726,13 @@ class AppDialog(QtGui.QWidget):
             if parent_index.isValid():
                 parent_item = item_model.itemFromIndex(parent_index)
                 changelist = parent_item.data(QtCore.Qt.UserRole)
+                description = parent_item.data(QtCore.Qt.UserRole + 4)
             else:
                 item = item_model.itemFromIndex(source_index)
                 changelist = item.data(QtCore.Qt.UserRole)
+                description = item.data(QtCore.Qt.UserRole + 4)
 
-            return changelist
+            return changelist, description
         return None
 
     def _populate_column_view_widget(self):
@@ -4710,6 +4733,7 @@ class AppDialog(QtGui.QWidget):
         if not os.path.exists(self._home_dir):
             os.makedirs(self._home_dir)
         self._publish_files_path = "{}/publish_files.txt".format(self._home_dir)
+        self._publish_files_description = "{}/publish_files_description.txt".format(self._home_dir)
 
     def _on_publish_files(self):
         files_count = len(self._action_data_to_publish)
