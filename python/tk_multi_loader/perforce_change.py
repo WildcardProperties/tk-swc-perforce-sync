@@ -211,7 +211,7 @@ def submit_single_file(p4, change, filepath, action):
         msg = "Perforce: %s" % (p4.errors[0] if p4.errors else e)
         log.debug(msg)
 
-def submit_and_delete_file(p4, change, filepath):
+def submit_and_delete_file_old(p4, change, filepath):
     """
     Submit the specified change and then completely delete the file in Perforce.
     """
@@ -223,17 +223,46 @@ def submit_and_delete_file(p4, change, filepath):
         change_spec = p4.fetch_change("-o", str(change))
 
         # Submit the change
-        submit = p4.run_submit(change_spec)
-        log.debug("Return of run_submit: {}".format(submit))
+        submit_result = p4.run_submit(change_spec)
+        log.debug("Return of run_submit: {}".format(submit_result))
 
         # Obliterate the files to completely remove them from the depot
 
-        p4.run('obliterate', '-y', filepath)
+        obliterate_result = p4.run('obliterate', '-y', filepath)
+        log.debug("Return of run_obliterate: {}".format(obliterate_result))
 
-        return submit
+        return submit_result, obliterate_result
     except Exception as e:
         msg = "Perforce: %s" % (p4.errors[0] if p4.errors else e)
         log.debug(msg)
+
+def submit_and_delete_file(p4, change, filepath):
+    """
+    Submit the specified change and then completely delete the file in Perforce.
+    """
+    submit_result, obliterate_result, msg = None, None, None  # Initialize as None
+    try:
+        # Mark files for deletion
+        p4.run('delete', filepath)
+
+        # Fetch the change
+        change_spec = p4.fetch_change("-o", str(change))
+
+        # Submit the change
+        submit_result = p4.run_submit(change_spec)
+        log.debug("Return of run_submit: {}".format(submit_result))
+
+        # Obliterate the files to completely remove them from the depot
+        obliterate_result = p4.run('obliterate', '-y', filepath)
+        log.debug("Return of run_obliterate: {}".format(obliterate_result))
+
+    except Exception as e:
+        msg = "Perforce error: %s" % (p4.errors[0] if p4.errors else e)
+        log.debug(msg)
+
+
+    return submit_result, obliterate_result, msg
+
 
 def submit_and_delete_file_list(p4, change, filelist):
     """

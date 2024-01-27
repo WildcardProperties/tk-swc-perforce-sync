@@ -2037,30 +2037,33 @@ class AppDialog(QtGui.QWidget):
         return perforce_sg_data
 
     def _clean_sg_data(self):
-        is_model_changed = False
-        model = self.ui.publish_view.model()
-        if model.rowCount() > 0:
-            for row in range(model.rowCount()):
-                model_index = model.index(row, 0)
-                proxy_model = model_index.model()
-                source_index = proxy_model.mapToSource(model_index)
-                item = source_index.model().itemFromIndex(source_index)
+        try:
+            is_model_changed = False
+            model = self.ui.publish_view.model()
+            if model.rowCount() > 0:
+                for row in range(model.rowCount()):
+                    model_index = model.index(row, 0)
+                    proxy_model = model_index.model()
+                    source_index = proxy_model.mapToSource(model_index)
+                    item = source_index.model().itemFromIndex(source_index)
 
-                is_folder = item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
-                if not is_folder:
-                    # Run default action.
-                    sg_item = shotgun_model.get_sg_data(model_index)
-                    action = sg_item.get("action") or sg_item.get("headAction") or None
-                    if action and action in ["delete"]:
-                        # remove the item from the model
-                        model.removeRow(row)
-                        is_model_changed = True
+                    is_folder = item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
+                    if not is_folder:
+                        # Run default action.
+                        sg_item = shotgun_model.get_sg_data(model_index)
+                        action = sg_item.get("action") or sg_item.get("headAction") or None
+                        if action and action in ["delete"]:
+                            # remove the item from the model
+                            model.removeRow(row)
+                            is_model_changed = True
 
-            if is_model_changed:
-                # Refresh the model
-                model.layoutChanged.emit()
-                # Refresh the view
-                self.ui.publish_view.update()
+                if is_model_changed:
+                    # Refresh the model
+                    model.layoutChanged.emit()
+                    # Refresh the view
+                    self.ui.publish_view.update()
+        except:
+            pass
 
 
 
@@ -4253,6 +4256,12 @@ class AppDialog(QtGui.QWidget):
         """
         self._on_submit_deleted_files()
         self._on_submit_other_files()
+        msg = "\n <span style='color:#2C93E2'>Updating the Pending view ...</span> \n"
+        self._add_log(msg, 2)
+        # Update the Pending view
+        self._update_pending_view()
+        logger.debug(">>>>>>>>>>> Updating the publish view as well")
+        self._on_treeview_item_selected()
 
     def _on_submit_deleted_files(self):
         """
@@ -4264,7 +4273,8 @@ class AppDialog(QtGui.QWidget):
 
         selected_indexes = self._pending_view_widget.selectionModel().selectedRows()
         for selected_index in selected_indexes:
-           try:
+            target_file = None
+            try:
                 source_index = self._pending_view_model.mapToSource(selected_index)
                 selected_row_data = self._get_pending_data_from_source(source_index)
                 action = self._get_action_data_from_source(source_index)
@@ -4273,14 +4283,18 @@ class AppDialog(QtGui.QWidget):
                     target_file = selected_row_data.split("#")[0]
                     target_file = target_file.strip()
                     logger.debug(">>>>>>>>>>> action:{}".format(action))
+                    logger.debug(">>>>>>>>>>> change:{}".format(change))
+                    logger.debug(">>>>>>>>>>> target_file:{}".format(target_file))
                     if action in ["delete"]:
                         if target_file not in selected_files_to_delete:
                             delete_tuple = (change, target_file)
                             selected_files_to_delete.append(target_file)
                             selected_tuples_to_delete.append(delete_tuple)
+                # logger.debug(">>>>>>>>>>> selected_files_to_delete:{}".format(selected_files_to_delete))
+                #vlogger.debug(">>>>>>>>>>> selected_tuples_to_delete:{}".format(selected_tuples_to_delete))
 
-           except:
-                pass
+            except Exception as e:
+                logger.debug("Error deleting file {}: {}".format(target_file, e))
 
         if selected_files_to_delete:
             logger.debug("_on_submit_deleted_files: selected_files_to_delete: {}".format(selected_files_to_delete))
@@ -4341,10 +4355,7 @@ class AppDialog(QtGui.QWidget):
             self._submit_other_pending_data(selected_tuples_to_submit)
             self._publish_pending_data_using_command_line(selected_tuples_to_submit)
 
-            msg = "\n <span style='color:#2C93E2'>Updating the Pending view ...</span> \n"
-            self._add_log(msg, 2)
-            # Update the Pending view
-            self._update_pending_view()
+
 
     def _publish_pending_data_using_command_line(self, selected_tuples_to_publish):
         """
@@ -4522,14 +4533,22 @@ class AppDialog(QtGui.QWidget):
             msg = "\n <span style='color:#2C93E2'>Submitting files for deletion...</span> \n"
             self._add_log(msg, 2)
             for change, file_to_submit in selected_tuples_to_delete:
-                # logger.debug(">>>>>>>>>>  file_to_submit: {}".format(file_to_submit))
-                # logger.debug(">>>>>>>>>>  change: {}".format(change))
+
+                logger.debug(">>>>>>>>>>  file_to_submit: {}".format(file_to_submit))
+                logger.debug(">>>>>>>>>>  change: {}".format(change))
                 if change and file_to_submit:
                     msg = "{}".format(file_to_submit)
                     self._add_log(msg, 4)
-                    submit_del_res = submit_and_delete_file(self._p4, change, file_to_submit)
-                    # logger.debug(">>>>>>>>>>  Result of deleting files: {}".format(submit_del_res))
-                    if submit_del_res:
+                    submit_result, obliterate_result, perforce_msg = submit_and_delete_file(self._p4, change, file_to_submit)
+                    msg = "Result of submitting file: {}".format(submit_result)
+                    self._add_log(msg, 4)
+                    msg = "Result of obliterating file: {}".format(obliterate_result)
+                    self._add_log(msg, 4)
+                    #if perforce_msg:
+                    #    # Log the error message
+                    #    msg = "\n <span style='color:#CC3333'>{}</span> \n".format(perforce_msg)
+                    #    self._add_log(msg, 4)
+                    if submit_result and obliterate_result and not perforce_msg:
                         msg = "\n <span style='color:#2C93E2'>File deleted from Perforce:</span> \n".format(file_to_submit)
                         self._add_log(msg, 2)
 
@@ -6316,6 +6335,8 @@ class AppDialog(QtGui.QWidget):
         if self.main_view_mode == self.MAIN_VIEW_SUBMITTED:
             self._populate_submitted_widget()
 
+        # self. _clean_sg_data()
+
 
     def get_current_sg_data(self):
         total_file_count = 0
@@ -6390,10 +6411,10 @@ class AppDialog(QtGui.QWidget):
 
     def _update_perforce_data(self):
         logger.debug(">>>>>>>>>>  _get_perforce_data: START")
-        msg = "\n <span style='color:#2C93E2'>Getting Perforce data ...</span> \n"
+        msg = "\n <span style='color:#2C93E2'>Retrieving Data from Perforce...</span> \n"
         self._add_log(msg, 2)
         self._get_perforce_data()
-        msg = "\n <span style='color:#2C93E2'>Getting Perforce data is complete</span> \n"
+        msg = "\n <span style='color:#2C93E2'>Perforce Data Retrieval Completed Successfully</span> \n"
         self._add_log(msg, 2)
 
         """
@@ -6745,11 +6766,14 @@ class AppDialog(QtGui.QWidget):
 
         if selected_actions:
             self.perform_changelist_selection(selected_actions)
+        logger.debug(">>>>>>>>>>  publish_model.async_refresh...")
+        self._publish_model.async_refresh()
 
 
     def perform_changelist_selection(self, selected_actions):
         perform_action = ChangelistSelection(self._p4, selected_actions=selected_actions, parent=self)
         perform_action.show()
+
 
     def refresh_publish_data(self):
         self._update_perforce_data()
