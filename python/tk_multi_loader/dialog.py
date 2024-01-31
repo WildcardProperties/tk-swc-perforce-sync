@@ -4548,7 +4548,7 @@ class AppDialog(QtGui.QWidget):
         modified_path = rest_of_path
         return modified_path
 
-    def fix_query_path_2(self, current_relative_path):
+    def fix_query_path_1(self, current_relative_path):
         # Normalize the current relative path to ensure consistent path separators
         normalized_path = os.path.normpath(current_relative_path)
 
