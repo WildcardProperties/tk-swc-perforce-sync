@@ -1532,8 +1532,11 @@ class AppDialog(QtGui.QWidget):
             sg_item["path"] = {}
             sg_item["path"]["local_path"] = filepath
             entity, published_file = self._get_entity_from_sg_item(sg_item)
+            logger.debug("_validate_changelist_files: entity: {}".format(entity))
+            logger.debug("_validate_changelist_files: published_file: {}".format(published_file))
             if not entity:
                 error_list.append(filepath)
+                logger.debug("_validate_changelist_files: error_list: {}".format(error_list))
         if error_list and len(error_list)>0:
             return False, error_list
         else:
@@ -4402,7 +4405,7 @@ class AppDialog(QtGui.QWidget):
             self._add_log(msg, 2)
 
 
-    def _get_entity_from_sg_item(self, sg_item):
+    def _get_entity_from_sg_item_old(self, sg_item):
         """
         Check if the filepath lead to a valid shotgrid entity
         :param sg_item:
@@ -4410,6 +4413,7 @@ class AppDialog(QtGui.QWidget):
         """
         if not sg_item:
             return None, None
+        logger.debug(">>>>> _get_entity_from_sg_item: sg_item: {}".format(sg_item))
         logger.debug(">>>>> _get_entity_from_sg_item: sg_item: {}".format(sg_item))
         if "path" in sg_item:
             local_path = sg_item["path"].get("local_path", None)
@@ -4478,6 +4482,59 @@ class AppDialog(QtGui.QWidget):
                     return None, None
         return None, None
 
+    def _get_entity_from_sg_item(self, sg_item):
+        """
+        Check if the filepath leads to a valid shotgrid entity
+        :param sg_item: Shotgrid item information
+        :return: entity and published file info if found, None otherwise
+        """
+        if not sg_item:
+            return None, None
+
+        logger.debug(">>>>> _get_entity_from_sg_item: sg_item: {}".format(sg_item))
+
+        if "path" in sg_item:
+            local_path = sg_item["path"].get("local_path", None)
+            logger.debug(">>>>> local_path: {}".format(local_path))
+
+            if local_path:
+                if not os.path.exists(local_path):
+                    msg = "File does not exist: {}".format(local_path)
+                    self.send_error_message(msg)
+                    return None, None
+
+                sg = sgtk.platform.current_bundle()
+                current_relative_path = self.fix_query_path(local_path)
+                logger.debug(">>>>> current_relative_path: {}".format(current_relative_path))
+                file_name = os.path.basename(local_path)
+                logger.debug(">>>>> file_name: {}".format(file_name))
+                local_path = local_path.replace("\\", "/")
+
+                # Search by file name
+                filter_query = [['path_cache', 'contains', current_relative_path]]
+                fields = ["entity", "path_cache", "path", "version_number", "name",
+                          "description", "created_at", "created_by", "image",
+                          "published_file_type", "task", "task.Task.content", "task.Task.sg_status_list"]
+
+                published_files = sg.shotgun.find("PublishedFile", filter_query, fields,
+                                                  order=[{'field_name': 'version_number', 'direction': 'desc'}])
+
+                for published_file in published_files:
+                    logger.debug(">>>>> published_file: ")
+                    for k, v in published_file.items():
+                        logger.debug(">>>>> {} : {}".format(k, v))
+                    if "path" in published_file and "local_path" in published_file["path"]:
+                        query_local_path = published_file["path"]["local_path"].replace("\\", "/")
+                        if query_local_path.endswith(current_relative_path):
+                            entity = published_file.get("entity", None)
+                            if entity:
+                                return entity, published_file
+
+                msg = "Failed to retrieve the associated Shotgrid entity for the file located at {}".format(local_path)
+                logger.debug(">>>>> {}".format(msg))
+
+        return None, None
+
     def fix_query_path(self, query_local_path):
 
         modified_path = query_local_path
@@ -4490,6 +4547,19 @@ class AppDialog(QtGui.QWidget):
 
         modified_path = rest_of_path
         return modified_path
+
+    def fix_query_path_2(self, current_relative_path):
+        # Normalize the current relative path to ensure consistent path separators
+        normalized_path = os.path.normpath(current_relative_path)
+
+        # Split the path into drive and the rest
+        drive, path_without_drive = os.path.splitdrive(normalized_path)
+
+        # Remove leading slashes (if any) from the path without the drive
+        trimmed_path = path_without_drive.lstrip(os.sep)
+        trimmed_path = trimmed_path.replace("\\", "/")
+
+        return trimmed_path
 
     def convert_to_relative_path(self, absolute_path):
         # Split the path on ":/" and take the second part, if it exists

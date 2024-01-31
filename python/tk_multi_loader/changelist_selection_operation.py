@@ -156,6 +156,84 @@ class ChangelistSelection(QtWidgets.QDialog):
 
     def is_file_valid_in_shotgrid(self, sg_item):
         """
+        Check if the filepath leads to a valid shotgrid entity
+        :param sg_item: Shotgrid item information
+        :return: entity and published file info if found, None otherwise
+        """
+        if not sg_item:
+            return None, None
+
+        logger.debug(">>>>> _get_entity_from_sg_item: sg_item: {}".format(sg_item))
+
+        if "path" in sg_item:
+            local_path = sg_item["path"].get("local_path", None)
+
+
+            if local_path:
+                if not os.path.exists(local_path):
+                    msg = "File does not exist: {}".format(local_path)
+                    self.send_error_message(msg)
+                    return None, None
+
+                sg = sgtk.platform.current_bundle()
+                logger.debug(">>>>> local_path: {}".format(local_path))
+                current_relative_path = self.fix_query_path(local_path)
+                logger.debug(">>>>>>>>>>>>>> current_relative_path: {}".format(current_relative_path))
+                file_name = os.path.basename(local_path)
+                logger.debug(">>>>> file_name: {}".format(file_name))
+                local_path = local_path.replace("\\", "/")
+
+                # Search by file name
+                filter_query = [['path_cache', 'contains', current_relative_path]]
+                fields = ["entity", "path_cache", "path", "version_number", "name",
+                          "description", "created_at", "created_by", "image",
+                          "published_file_type", "task", "task.Task.content", "task.Task.sg_status_list"]
+
+                published_files = sg.shotgun.find("PublishedFile", filter_query, fields,
+                                                  order=[{'field_name': 'version_number', 'direction': 'desc'}])
+
+                for published_file in published_files:
+                    logger.debug(">>>>> published_file: ")
+                    for k, v in published_file.items():
+                        logger.debug(">>>>> {} : {}".format(k, v))
+                    if "path" in published_file and "local_path" in published_file["path"]:
+                        query_local_path = published_file["path"]["local_path"].replace("\\", "/")
+                        if query_local_path.endswith(current_relative_path):
+                            entity = published_file.get("entity", None)
+                            if entity:
+                                return entity, published_file
+
+                msg = "Failed to retrieve the associated Shotgrid entity for the file located at {}".format(local_path)
+                logger.debug(">>>>> {}".format(msg))
+
+        return None, None
+
+    def fix_query_path_old(self, current_relative_path):
+        # Normalize the current relative path to ensure consistent path separators
+        normalized_path = os.path.normpath(current_relative_path)
+
+        # Remove leading slashes (if any)
+        trimmed_path = normalized_path.lstrip(os.sep)
+        trimmed_path = trimmed_path.replace("\\", "/")
+
+        return trimmed_path
+
+    def fix_query_path(self, current_relative_path):
+        # Normalize the current relative path to ensure consistent path separators
+        normalized_path = os.path.normpath(current_relative_path)
+
+        # Split the path into drive and the rest
+        drive, path_without_drive = os.path.splitdrive(normalized_path)
+
+        # Remove leading slashes (if any) from the path without the drive
+        trimmed_path = path_without_drive.lstrip(os.sep)
+        trimmed_path = trimmed_path.replace("\\", "/")
+
+        return trimmed_path
+
+
+    def is_file_valid_in_shotgrid_old2(self, sg_item):
+        """
         Check if the filepath lead to a valid shotgrid entity
         :param sg_item:
         :return:
@@ -181,7 +259,7 @@ class ChangelistSelection(QtWidgets.QDialog):
                 else:
                     sg = sgtk.platform.current_bundle()
                     current_relative_path = self.convert_to_relative_path(local_path)
-                    logger.debug(">>>>> current_relative_path: {}".format(current_relative_path))
+                    logger.debug(">>>>>>>>> current_relative_path: {}".format(current_relative_path))
                     file_name = os.path.basename(local_path)  # Extracting file name from the path
                     logger.debug(">>>>> file_name: {}".format(file_name))
                     local_path = local_path.replace("\\", "/")  # Replacing backslash with forward slash
@@ -225,48 +303,7 @@ class ChangelistSelection(QtWidgets.QDialog):
 
         return relative_path
 
-    def is_file_valid_in_shotgrid_old(self, sg_item):
-        """
-        Check if the filepath lead to a valid shotgrid entity
-        :param sg_item:
-        :return:
-        """
-        if not sg_item:
-            return False
 
-        if "path" in sg_item:
-            local_path = sg_item["path"].get("local_path", None)
-            if local_path:
-                if not os.path.exists(local_path):
-                    msg = "File does not exist: {}".format(local_path)
-                    self.send_error_message(msg)
-                    return False
-
-                if "entity" in sg_item:
-                    entity = sg_item.get("entity", None)
-                    if entity:
-                        msg = "File is valid: {}".format(local_path)
-                        self.send_success_message(msg)
-                        return True
-                # get tk
-                tk = sgtk.sgtk_from_path(local_path)
-                if not tk:
-                    msg = "Unable to get tk from file: {}".format(local_path)
-                    self.send_error_message(msg)
-                    return False
-                # get entity from path
-                entity = tk.get_entity_from_path(local_path)
-                if not entity:
-                    entity = tk.shotgun.find_one("PublishedFile", [["path", "is", local_path]], ["entity"])
-                    if not entity:
-                        msg = "Unable to get entity for file: {}".format(local_path)
-                        self.send_error_message(msg)
-                        return False
-                if entity:
-                    msg = "Entity is found for file: {}".format(local_path)
-                    self.send_success_message(msg)
-                    return True
-        return False
 
     def send_error_message(self, text):
         """
