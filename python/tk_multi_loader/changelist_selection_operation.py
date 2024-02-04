@@ -155,6 +155,13 @@ class ChangelistSelection(QtWidgets.QDialog):
         self.close()
 
     def is_file_valid_in_shotgrid(self, sg_item):
+        # Check if the filepath leads to a valid shotgrid entity
+        entity, published_file = self.check_validity_by_published_file(sg_item)
+        if not entity:
+            entity, published_file = self.check_validity_by_path_parts(sg_item)
+        return entity, published_file
+
+    def check_validity_by_published_file(self, sg_item):
         """
         Check if the filepath leads to a valid shotgrid entity
         :param sg_item: Shotgrid item information
@@ -163,12 +170,11 @@ class ChangelistSelection(QtWidgets.QDialog):
         if not sg_item:
             return None, None
 
-        logger.debug(">>>>> _get_entity_from_sg_item: sg_item: {}".format(sg_item))
+        logger.debug(">>>>> Checking validity by published file: sg_item: {}".format(sg_item))
 
         if "path" in sg_item:
             local_path = sg_item["path"].get("local_path", None)
-
-
+            logger.debug(">>>>> Checking validity by published file: local_path: {}".format(local_path))
             if local_path:
                 if not os.path.exists(local_path):
                     msg = "File does not exist: {}".format(local_path)
@@ -208,15 +214,6 @@ class ChangelistSelection(QtWidgets.QDialog):
 
         return None, None
 
-    def fix_query_path_old(self, current_relative_path):
-        # Normalize the current relative path to ensure consistent path separators
-        normalized_path = os.path.normpath(current_relative_path)
-
-        # Remove leading slashes (if any)
-        trimmed_path = normalized_path.lstrip(os.sep)
-        trimmed_path = trimmed_path.replace("\\", "/")
-
-        return trimmed_path
 
     def fix_query_path(self, current_relative_path):
         # Normalize the current relative path to ensure consistent path separators
@@ -231,70 +228,81 @@ class ChangelistSelection(QtWidgets.QDialog):
 
         return trimmed_path
 
-
-    def is_file_valid_in_shotgrid_old2(self, sg_item):
+    def check_validity_by_path_parts(self, sg_item):
         """
-        Check if the filepath lead to a valid shotgrid entity
-        :param sg_item:
-        :return:
+        Check if the filepath leads to a valid ShotGrid entity
+        :param sg_item: ShotGrid item information
+        :return: entity and published file info if found, None otherwise
         """
-        if not sg_item:
-            return False, None
+        if not sg_item or "path" not in sg_item:
+            return None, None
 
-        if "path" in sg_item:
-            local_path = sg_item["path"].get("local_path", None)
-            if local_path:
-                if not os.path.exists(local_path):
-                    msg = "File does not exist: {}".format(local_path)
-                    self.send_error_message(msg)
-                    return False, None
+        logger.debug(f">>>>> Checking validity by path parts: sg_item: {sg_item}")
+        local_path = sg_item["path"].get("local_path", None)
+        if not local_path or not os.path.exists(local_path):
+            msg = f"File does not exist: {local_path}"
+            self.send_error_message(msg)
+            return None, None
+        logger.debug(f">>>>> Checking validity by path parts: local_path: {local_path}")
 
-                if "entity" in sg_item:
-                    entity = sg_item.get("entity", None)
-                    if entity:
-                        msg = "File is valid: {}".format(local_path)
-                        self.send_success_message(msg)
-                        return True, entity
+        sg = sgtk.platform.current_bundle()
 
-                else:
-                    sg = sgtk.platform.current_bundle()
-                    current_relative_path = self.convert_to_relative_path(local_path)
-                    logger.debug(">>>>>>>>> current_relative_path: {}".format(current_relative_path))
-                    file_name = os.path.basename(local_path)  # Extracting file name from the path
-                    logger.debug(">>>>> file_name: {}".format(file_name))
-                    local_path = local_path.replace("\\", "/")  # Replacing backslash with forward slash
+        # Extract information from the file path using the extract_info_from_path method
+        asset_info = self.extract_info_from_path(local_path)
+        logger.debug(f">>>>> Extracted asset info: {asset_info}")
 
-                    # Modify your query to search by the file name
-                    filter_query = [['name', 'is', file_name]]
-                    published_files = sg.shotgun.find("PublishedFile", filter_query, ["path", "entity"])
-                    # logger.debug(">>>>> published_files: {}".format(published_files))
+        # Check if required information is extracted
+        if not asset_info.get("project_tank_name") or not asset_info.get("code"):
+            logger.debug("Unable to extract necessary information from the file path.")
+            return None, None
 
-                    for published_file in published_files:
-                        # logger.debug(">>>>> published_file: {}".format(published_file))
-                        if "path" in published_file:
-                            path = published_file["path"]
-                            entity = None
-                            if "relative_path" in path:
-                                query_relative_path = path.get("relative_path", None)
-                                logger.debug(">>>>> query_relative_path: {}".format(query_relative_path))
-                                if query_relative_path == current_relative_path:
-                                    entity = published_file.get("entity", None)
-                            elif "local_path" in path:
-                                query_local_path = path.get("local_path", None)
-                                query_local_path = query_local_path.replace("\\", "/")
-                                logger.debug(">>>>> query_local_path: {}".format(query_local_path))
-                                if query_local_path == local_path:
-                                    entity = published_file.get("entity", None)
+        # Constructing the filter query based on the extracted information
+        # Adjust this query as per your requirement and available fields in ShotGrid
+        filter_query = [['project.Project.tank_name', 'is', asset_info["project_tank_name"]],
+                        ['code', 'is', asset_info["code"]]]
+        entity = sg.shotgun.find_one("Asset", filter_query, ['id', 'code', 'description', 'image', 'project'])
 
-                            if entity:
-                                msg = "Successfully retrieved the associated ShotGrid entity for the file located at {}".format(local_path)
-                                self.send_success_message(msg)
-                                return True, entity
+        if entity:
+            logger.debug(f">>>>> Retrieved entity: {entity}")
+            return entity, None
 
-                    msg = "Failed to retrieve the associated Shotgrid entity for the file located at {}".format(local_path)
-                    self.send_error_message(msg)
-                    return False, None
-        return False, None
+        msg = f"Failed to retrieve the associated ShotGrid entity for the file located at {local_path}"
+        logger.debug(f">>>>> {msg}")
+        return None, None
+
+    def extract_info_from_path(self, local_path):
+        """
+        Extract information from the file path.
+        This function parses the local_path to extract various asset-related information,
+        such as the project tank name, asset library, asset type, asset section, and folder name.
+        The 'code' is also constructed from these extracted parts.
+
+        Example:
+        Extracting info from path: local_path: Z:/ArkDepot/Mods/DinoDefense/Content/UI/Textures/_raw/TXR/backdrop.png
+        Project Tank Name: ArkDepot
+        sg_asset_library: DinoDefense
+        sg_asset_type: Content
+        sg_asset_section: UI
+        sg_folder_name: Textures
+        code: DinoDefense_UI_Textures
+        """
+        logger.debug(f">>>>> Extracting info from path: local_path: {local_path}")
+        local_path = local_path.replace('//', '/', 1).replace("\\", "/")
+        path_parts = local_path.split('/')  # Splitting the path using '/' as separator
+        logger.debug(f">>>>> path_parts: {path_parts}")
+
+        # Extracting asset information and constructing the 'code'
+        asset_info = {
+            "project_tank_name": path_parts[1],  # Extracting project tank name
+            "sg_asset_library": path_parts[3],  # Extracting asset library
+            "sg_asset_type": path_parts[4],  # Extracting asset type
+            "sg_asset_section": path_parts[5],  # Extracting asset section
+            "sg_folder_name": path_parts[6]  # Extracting folder name
+        }
+        asset_info["code"] = "_".join(
+            [asset_info["sg_asset_library"], asset_info["sg_asset_section"], asset_info["sg_folder_name"]])
+
+        return asset_info
 
     def convert_to_relative_path(self, absolute_path):
         # Split the path on ":/" and take the second part, if it exists
@@ -302,7 +310,6 @@ class ChangelistSelection(QtWidgets.QDialog):
         relative_path = parts[1] if len(parts) > 1 else absolute_path
 
         return relative_path
-
 
 
     def send_error_message(self, text):

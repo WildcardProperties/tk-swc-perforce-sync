@@ -4404,85 +4404,14 @@ class AppDialog(QtGui.QWidget):
             msg = "\n <span style='color:#2C93E2'>No need to publish any file</span> \n"
             self._add_log(msg, 2)
 
-
-    def _get_entity_from_sg_item_old(self, sg_item):
-        """
-        Check if the filepath lead to a valid shotgrid entity
-        :param sg_item:
-        :return:
-        """
-        if not sg_item:
-            return None, None
-        logger.debug(">>>>> _get_entity_from_sg_item: sg_item: {}".format(sg_item))
-        logger.debug(">>>>> _get_entity_from_sg_item: sg_item: {}".format(sg_item))
-        if "path" in sg_item:
-            local_path = sg_item["path"].get("local_path", None)
-            logger.debug(">>>>> local_path: {}".format(local_path))
-            if local_path:
-                if not os.path.exists(local_path):
-                    msg = "File does not exist: {}".format(local_path)
-                    self.send_error_message(msg)
-                    return None, None
-
-                if "entity" in sg_item:
-                    entity = sg_item.get("entity", None)
-                    if entity:
-                        logger.debug(">>>>> Found the entity in sg_item: {}".format(entity))
-                        return entity, None
-
-                else:
-                    sg = sgtk.platform.current_bundle()
-                    current_relative_path = self.fix_query_path(local_path)
-                    logger.debug(">>>>> current_relative_path: {}".format(current_relative_path))
-                    file_name = os.path.basename(local_path)  # Extracting file name from the path
-                    logger.debug(">>>>> file_name: {}".format(file_name))
-                    local_path = local_path.replace("\\", "/")  # Replacing backslash with forward slash
-
-                    # Modify your query to search by the file name
-                    filter_query = [['name', 'is', file_name]]
-                    # fields = ["path", "entity", "name", "version_number"]
-                    fields = ["entity", "path_cache", "path", "version_number", "name",
-                                    "description", "created_at", "created_by", "image",
-                                    "published_file_type", "task", "task.Task.content", "task.Task.sg_status_list","task.Task.sg_status_list"]
-
-                    # Modify your query to search by the file name and order by version_nu  mber in descending order
-                    published_files = sg.shotgun.find("PublishedFile", filter_query, fields,
-                                                      order=[{'field_name': 'version_number', 'direction': 'desc'}])
-
-                    # logger.debug(">>>>> published_files: {}".format(published_files))
-
-                    for published_file in published_files:
-                        logger.debug(">>>>> published_file: ")
-                        for k, v in published_file.items():
-                            logger.debug(">>>>> {} : {}".format(k, v))
-                        if "path" in published_file:
-                            path = published_file["path"]
-                            entity = None
-                            if "relative_path" in path:
-                                query_relative_path = path.get("relative_path", None)
-                                query_relative_path = query_relative_path.replace("\\", "/")
-                                query_relative_path = self.fix_query_path(query_relative_path)
-                                logger.debug(">>>>> query_relative_path: {}".format(query_relative_path))
-                                if query_relative_path == current_relative_path:
-                                    entity = published_file.get("entity", None)
-                                    if entity:
-                                        return entity, published_file
-                            elif "local_path" in path:
-                                query_local_path = path.get("local_path", None)
-                                query_local_path = query_local_path.replace("\\", "/")
-                                query_local_path = self.fix_query_path(query_local_path)
-                                logger.debug(">>>>> query_local_path: {}".format(query_local_path))
-                                if query_local_path == current_relative_path:
-                                    entity = published_file.get("entity", None)
-                                    if entity:
-                                        return entity, published_file
-
-                    msg = "Failed to retrieve the associated Shotgrid entity for the file located at {}".format(local_path)
-                    logger.debug(">>>>> {}".format(msg))
-                    return None, None
-        return None, None
-
     def _get_entity_from_sg_item(self, sg_item):
+        # Check if the filepath leads to a valid shotgrid entity
+        entity, published_file = self.check_validity_by_published_file(sg_item)
+        if not entity:
+            entity, published_file = self.check_validity_by_path_parts(sg_item)
+        return entity, published_file
+
+    def check_validity_by_published_file(self, sg_item):
         """
         Check if the filepath leads to a valid shotgrid entity
         :param sg_item: Shotgrid item information
@@ -4547,6 +4476,82 @@ class AppDialog(QtGui.QWidget):
 
         modified_path = rest_of_path
         return modified_path
+
+    def check_validity_by_path_parts(self, sg_item):
+        """
+        Check if the filepath leads to a valid ShotGrid entity
+        :param sg_item: ShotGrid item information
+        :return: entity and published file info if found, None otherwise
+        """
+        if not sg_item or "path" not in sg_item:
+            return None, None
+
+        logger.debug(f">>>>> Checking validity by path parts: sg_item: {sg_item}")
+        local_path = sg_item["path"].get("local_path", None)
+        if not local_path or not os.path.exists(local_path):
+            msg = f"File does not exist: {local_path}"
+            self.send_error_message(msg)
+            return None, None
+        logger.debug(f">>>>> Checking validity by path parts: local_path: {local_path}")
+
+        sg = sgtk.platform.current_bundle()
+
+        # Extract information from the file path using the extract_info_from_path method
+        asset_info = self.extract_info_from_path(local_path)
+        logger.debug(f">>>>> Extracted asset info: {asset_info}")
+
+        # Check if required information is extracted
+        if not asset_info.get("project_tank_name") or not asset_info.get("code"):
+            logger.debug("Unable to extract necessary information from the file path.")
+            return None, None
+
+        # Constructing the filter query based on the extracted information
+        # Adjust this query as per your requirement and available fields in ShotGrid
+        filter_query = [['project.Project.tank_name', 'is', asset_info["project_tank_name"]],
+                        ['code', 'is', asset_info["code"]]]
+        entity = sg.shotgun.find_one("Asset", filter_query, ['id', 'code', 'description', 'image', 'project'])
+
+        if entity:
+            logger.debug(f">>>>> Retrieved entity: {entity}")
+            return entity, None
+
+        msg = f"Failed to retrieve the associated ShotGrid entity for the file located at {local_path}"
+        logger.debug(f">>>>> {msg}")
+        return None, None
+
+    def extract_info_from_path(self, local_path):
+        """
+        Extract information from the file path.
+        This function parses the local_path to extract various asset-related information,
+        such as the project tank name, asset library, asset type, asset section, and folder name.
+        The 'code' is also constructed from these extracted parts.
+
+        Example:
+        Extracting info from path: local_path: Z:/ArkDepot/Mods/DinoDefense/Content/UI/Textures/_raw/TXR/backdrop.png
+        Project Tank Name: ArkDepot
+        sg_asset_library: DinoDefense
+        sg_asset_type: Content
+        sg_asset_section: UI
+        sg_folder_name: Textures
+        code: DinoDefense_UI_Textures
+        """
+        logger.debug(f">>>>> Extracting info from path: local_path: {local_path}")
+        local_path = local_path.replace('//', '/', 1).replace("\\", "/")
+        path_parts = local_path.split('/')  # Splitting the path using '/' as separator
+        logger.debug(f">>>>> path_parts: {path_parts}")
+
+        # Extracting asset information and constructing the 'code'
+        asset_info = {
+            "project_tank_name": path_parts[1],  # Extracting project tank name
+            "sg_asset_library": path_parts[3],  # Extracting asset library
+            "sg_asset_type": path_parts[4],  # Extracting asset type
+            "sg_asset_section": path_parts[5],  # Extracting asset section
+            "sg_folder_name": path_parts[6]  # Extracting folder name
+        }
+        asset_info["code"] = "_".join(
+            [asset_info["sg_asset_library"], asset_info["sg_asset_section"], asset_info["sg_folder_name"]])
+
+        return asset_info
 
     def fix_query_path_1(self, current_relative_path):
         # Normalize the current relative path to ensure consistent path separators
@@ -6199,7 +6204,7 @@ class AppDialog(QtGui.QWidget):
         Get entity path
         """
         entity_path, entity_id, entity_type = None, 0, None
-        #logger.debug(">>>>>>>>>>>>>> entity_data is: {}".format(entity_data))
+        logger.debug(">>>>>>>>>>>>>> entity_data is: {}".format(entity_data))
         if entity_data:
             entity_id = entity_data.get('id', 0)
             entity_type = entity_data.get('type', None)
@@ -6211,9 +6216,9 @@ class AppDialog(QtGui.QWidget):
                         entity_type = entity.get('type', None)
 
             entity_path = self._app.sgtk.paths_from_entity(entity_type, entity_id)
-            #logger.debug(">>>>>>>>>>>>>> entity_id is: {}".format(entity_id))
-            #logger.debug(">>>>>>>>>>>>>> entity_type is: {}".format(entity_type))
-            #logger.debug(">>>>>>>>>>>>>> entity_path is: {}".format(entity_path))
+            logger.debug(">>>>>>>>>>>>>> entity_id is: {}".format(entity_id))
+            logger.debug(">>>>>>>>>>>>>> entity_type is: {}".format(entity_type))
+            logger.debug(">>>>>>>>>>>>>> entity_path is: {}".format(entity_path))
 
             if entity_path and len(entity_path) > 0:
                 entity_path = entity_path[-1]
