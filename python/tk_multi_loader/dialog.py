@@ -14,6 +14,7 @@ from sgtk.util import login
 from sgtk import TankError
 from sgtk.platform.qt import QtCore, QtGui
 
+
 from tank.platform.qt5 import QtWidgets
 import threading
 from .threads import SyncThread, FileSyncThread
@@ -104,8 +105,11 @@ class AppDialog(QtGui.QWidget):
     # signal emitted whenever the selected publish changes
     # in either the main view or the details file_history view
     selection_changed = QtCore.Signal()
+    update_pending_view_signal = QtCore.Signal()
+    # update_pending_view_signal = QtCore.pyqtSignal()
 
     def __init__(self, action_manager, parent=None):
+        super(AppDialog, self).__init__()  # Ensure proper parent initialization
         """
         Constructor
 
@@ -113,7 +117,7 @@ class AppDialog(QtGui.QWidget):
                                 then the default will be used instead
         :param parent:          The parent QWidget for this control
         """
-        QtGui.QWidget.__init__(self, parent)
+       #QtGui.QWidget.__init__(self, parent)
 
 
         self._action_manager = action_manager
@@ -180,6 +184,8 @@ class AppDialog(QtGui.QWidget):
         self.ui.column_mode.clicked.connect(self._on_column_mode_clicked)
         self.ui.submitted_mode.clicked.connect(self._on_submitted_mode_clicked)
         self.ui.pending_mode.clicked.connect(self._on_pending_mode_clicked)
+
+        self.update_pending_view_signal.connect(self._update_pending_view)
         ###########################################
         # File History
         self._publish_file_history_model = SgPublishHistoryModel(self, self._task_manager)
@@ -1586,6 +1592,17 @@ class AppDialog(QtGui.QWidget):
                         # passing in the desired changelist parameter.
                         # app_command["callback"](change)
                         app_command["callback"](change)
+
+                        # Start a new thread to wait for the UI to close
+                        #wait_thread = threading.Thread(target=self._wait_for_ui_close)
+                        #wait_thread.start()
+
+                        #wait_thread = UIWaitThread(self._check_ui_closed, self)
+                        # wait_thread.start()
+
+
+
+
             except Exception as e:
                 logger.debug("Error loading publisher: {}".format(e))
 
@@ -1646,6 +1663,59 @@ class AppDialog(QtGui.QWidget):
                             logger.debug("Unable to delete file: {}, Error: {}".format(target_file, e))
                     """
             self._populate_pending_widget()
+
+
+    def _wait_for_ui_close(self):
+        # Placeholder for logic to check if the UI window is closed
+        ui_is_open = True  # You will need to implement this check based on your UI framework
+        while ui_is_open:
+            time.sleep(1)  # Check every second (adjust the timing as necessary)
+            # Update the condition to check if the UI window is still open
+            ui_is_open = self._check_ui_closed()  # Implement this method based on your UI
+
+        msg = "\n <span style='color:#2C93E2'>Updating the Pending View ...</span> \n"
+        self._add_log(msg, 2)
+        self._update_pending_view()
+
+
+
+    def _check_ui_closed(self):
+        """
+        Display publisher UI is closed status
+        """
+        try:
+            logger.debug(
+                ">>>> checking for publisher is_closed status file: {} ...".format(self._publisher_is_closed_path))
+
+            if not os.path.exists(self._publisher_is_closed_path):
+                logger.debug(">>>> publisher is_closed file does not exist")
+                return None
+
+            with open(self._publisher_is_closed_path, 'r') as in_file:
+                for line in in_file:
+                    line = line.rstrip()
+                    logger.debug(">>>> line: {}".format(line))
+                    if ":::" in line:
+                        parts = line.split(":::")
+                        if len(parts) == 2:
+                            base_file, status = parts
+                            logger.debug(">>>> publisher UI is closed status is: {}".format(status))
+                            msg = "\n <span style='color:#2C93E2'>Updating the Pending View ...</span> \n"
+                            self._add_log(msg, 2)
+                            self._update_pending_view()
+                            return status == 'True'
+                        else:
+                            # This handles the case where the split does not result in 2 parts
+                            logger.debug(">>>> Error: Line does not conform to expected format: '{}'".format(line))
+                            return False
+                    else:
+                        # Handle lines without delimiter or skip
+                        # For example, you might want to log a warning or error
+                        logger.debug("Line without delimiter: {}".format(line))
+                        return False
+        except Exception as e:
+            logger.debug(">>>> Error reading publisher is closed file status {}".format(e))
+            return False
 
     def _create_description_file(self, files_in_changelist, description):
         try:
@@ -4612,20 +4682,23 @@ class AppDialog(QtGui.QWidget):
                 logger.debug(">>>>>>>>>>  file_to_submit: {}".format(file_to_submit))
                 logger.debug(">>>>>>>>>>  change: {}".format(change))
                 if change and file_to_submit:
-                    msg = "{}".format(file_to_submit)
-                    self._add_log(msg, 4)
-                    submit_result, obliterate_result, perforce_msg = submit_and_delete_file(self._p4, change, file_to_submit)
-                    msg = "Result of submitting file: {}".format(submit_result)
-                    self._add_log(msg, 4)
-                    msg = "Result of obliterating file: {}".format(obliterate_result)
-                    self._add_log(msg, 4)
-                    #if perforce_msg:
-                    #    # Log the error message
-                    #    msg = "\n <span style='color:#CC3333'>{}</span> \n".format(perforce_msg)
-                    #    self._add_log(msg, 4)
-                    if submit_result and obliterate_result and not perforce_msg:
-                        msg = "\n <span style='color:#2C93E2'>File deleted from Perforce:</span> \n".format(file_to_submit)
-                        self._add_log(msg, 2)
+                    try:
+                        msg = "{}".format(file_to_submit)
+                        self._add_log(msg, 4)
+                        submit_result, obliterate_result, perforce_msg = submit_and_delete_file(self._p4, change, file_to_submit)
+                        msg = "Result of submitting file: {}".format(submit_result)
+                        self._add_log(msg, 4)
+                        msg = "Result of obliterating file: {}".format(obliterate_result)
+                        self._add_log(msg, 4)
+                        #if perforce_msg:
+                        #    # Log the error message
+                        #    msg = "\n <span style='color:#CC3333'>{}</span> \n".format(perforce_msg)
+                        #    self._add_log(msg, 4)
+                        if submit_result and obliterate_result and not perforce_msg:
+                            msg = "\n <span style='color:#2C93E2'>File deleted from Perforce:</span> \n".format(file_to_submit)
+                            self._add_log(msg, 2)
+                    except Exception as e:
+                        logger.debug("Error deleting file {}: {}".format(file_to_submit, e))
 
     def _submit_other_pending_data(self, selected_data_to_submit):
         """
@@ -4677,8 +4750,19 @@ class AppDialog(QtGui.QWidget):
             out_file.close()
 
             # Run the publisher UI
+            msg = "\n <span style='color:#2C93E2'>Initializing Publisher UI, please stand by...</span> \n"
+            self._add_log(msg, 2)
+
             engine = sgtk.platform.current_engine()
             engine.commands["Publish..."]["callback"]()
+
+            # Update the Pending view
+
+            msg = "\n <span style='color:#2C93E2'>Updating the Pending View ...</span> \n"
+            self._add_log(msg, 2)
+            self._update_pending_view()
+
+
 
 
 
@@ -4827,7 +4911,9 @@ class AppDialog(QtGui.QWidget):
         if not os.path.exists(self._home_dir):
             os.makedirs(self._home_dir)
         self._publish_files_path = "{}/publish_files.txt".format(self._home_dir)
+        logger.debug(">>>>>>>>>>   self._publish_files_path {}".format(self._publish_files_path))
         self._publish_files_description = "{}/publish_files_description.txt".format(self._home_dir)
+        self._publisher_is_closed_path = "{}/publisher_is_closed.txt".format(self._home_dir)
 
     def _on_publish_files(self):
         files_count = len(self._action_data_to_publish)
@@ -5003,11 +5089,17 @@ class AppDialog(QtGui.QWidget):
             self._add_log(msg, 2)
             self._reload_treeview()
 
+            msg = "\n <span style='color:#2C93E2'>Updating the Pending View ...</span> \n"
+            self._add_log(msg, 2)
+            self._update_pending_view()
+
         else:
             msg = "\n <span style='color:#2C93E2'>Check files in the Pending view to publish using the Shotgrid Publisher</span> \n"
             self._add_log(msg, 2)
 
         self._submitted_data_to_publish = []
+
+
 
     def _publish_submitted_data_using_command_line(self):
         """
@@ -7415,3 +7507,32 @@ class EntityPreset(object):
         self.view = view
         self.entity_type = entity_type
         self.publish_filters = publish_filters
+
+class UIWaitThread(QtCore.QThread):
+    def __init__(self, check_ui_closed_callback, parent=None):
+        super(UIWaitThread, self).__init__(parent)
+        self.check_ui_closed_callback = check_ui_closed_callback
+
+    def run(self):
+        ui_is_open = True
+        while ui_is_open:
+            time.sleep(1)
+            ui_is_open = self.check_ui_closed_callback()
+            logger.debug("UI is open: {}".format(ui_is_open))
+        logger.debug("UI is closed, Updating pending view")
+        self.parent().update_pending_view_signal.emit()
+
+class UIWaitThreadOLD(QtCore.QThread):
+    def __init__(self, check_ui_closed_callback, parent=None):
+        super(UIWaitThread, self).__init__(parent)
+        self.check_ui_closed_callback = check_ui_closed_callback
+
+    def run(self):
+        ui_is_open = True
+        while ui_is_open:
+            time.sleep(1)
+            ui_is_open = self.check_ui_closed_callback()
+            logger.debug("UI is open: {}".format(ui_is_open))
+        # When the loop exits (UI is closed), emit a signal to update the UI
+        logger.debug("UI is closed, Updating pending view")
+        self.parent().update_pending_view_signal.emit()
