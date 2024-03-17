@@ -4,7 +4,7 @@ from tank.util import sgre as re
 from urllib import request
 
 import tempfile
-import requests
+
 
 from .date_time import create_human_readable_timestamp, create_human_readable_date, get_time_now
 import datetime
@@ -257,6 +257,7 @@ class PublishItem():
                 temp_thumbnail_path = os.path.join(tempfile.gettempdir(), "temp_thumbnail.png")
                 logger.debug(">>>>>>> temp_thumbnail_path: {}".format(temp_thumbnail_path))
                 try:
+                    import requests
                     response = requests.get(thumbnail_url)
                     if response.status_code == 200:
                         with open(temp_thumbnail_path, 'wb') as f:
@@ -271,9 +272,11 @@ class PublishItem():
                 'code': published_file_name
                 #'image': temp_thumbnail_path,
             }
-
-            if os.path.exists(temp_thumbnail_path):
-                updated_data['image'] = temp_thumbnail_path
+            try:
+                if temp_thumbnail_path and os.path.exists(temp_thumbnail_path):
+                    updated_data['image'] = temp_thumbnail_path
+            except Exception as e:
+                logger.debug("Error setting thumbnail image: %s", str(e))
 
             id = sg_publish_result.get("id", None)
             if id and updated_data:
