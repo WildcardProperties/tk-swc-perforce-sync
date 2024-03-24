@@ -1469,6 +1469,8 @@ class AppDialog(QtGui.QWidget):
         self._pending_view_publish_action.triggered.connect(lambda: self._on_pending_view_model_action("publish"))
         self._pending_view_revert_action = QtGui.QAction("Revert", self._pending_view_widget)
         self._pending_view_revert_action.triggered.connect(lambda: self._on_pending_view_model_action("revert"))
+        self._pending_view_move_action = QtGui.QAction("Move to Changelist", self._pending_view_widget)
+        self._pending_view_move_action.triggered.connect(lambda: self._on_pending_view_model_action("move"))
 
 
         self._pending_view_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
@@ -1505,6 +1507,8 @@ class AppDialog(QtGui.QWidget):
             menu.addAction(self._pending_view_publish_action)
         else:
             menu.addAction(self._pending_view_revert_action)
+            menu.addSeparator()
+            menu.addAction(self._pending_view_move_action)
 
         menu.addSeparator()
 
@@ -1551,6 +1555,8 @@ class AppDialog(QtGui.QWidget):
     def _on_pending_view_model_action(self, action):
         selected_files_to_revert = []
         selected_files_to_delete = []
+        selected_actions_to_move = []
+        selected_files_to_move = []
 
         # First, gather all the files that are to be reverted
         selected_indexes = self._pending_view_widget.selectionModel().selectedRows()
@@ -1662,6 +1668,48 @@ class AppDialog(QtGui.QWidget):
                         except Exception as e:
                             logger.debug("Unable to delete file: {}, Error: {}".format(target_file, e))
                     """
+        # If the action is move, then move files to a different changelist
+        if action == "move" and selected_indexes:
+            logger.debug("Move files to a different changelist")
+            for selected_index in selected_indexes:
+                try:
+                    source_index = self._pending_view_model.mapToSource(selected_index)
+                    selected_row_data = self._get_pending_data_from_source(source_index)
+                    change = self._get_change_data_from_source(source_index)
+                    if selected_row_data:
+                        # get the sg_tem from the source index
+                        action = self._get_action_data_from_source(source_index)
+                        sg_item = self._get_sg_data_from_source(source_index)
+                        selected_actions_to_move.append((sg_item, action))
+                        target_file = sg_item.get("depotFile", None)
+                        # If there is no depot file, try to get the local path
+                        if not target_file:
+                            if "path" in sg_item:
+                                if "local_path" in sg_item["path"]:
+                                    target_file = sg_item["path"].get("local_path", None)
+                        if target_file:
+                            selected_files_to_move.append(target_file)
+
+                except Exception as e:
+                    logger.debug("Error processing selection: {}".format(e))
+            if selected_files_to_move:
+                # Convert list of files into a string, to show in the confirmation dialog
+                files_str = "\n".join(selected_files_to_move)
+
+                # Show confirmation dialog
+                reply = QtGui.QMessageBox.question(self, 'Confirmation',
+                                                   f"Do you wish to transfer the selected files to a new changelist?\n\n{files_str}",
+                                                   QtGui.QMessageBox.Yes | QtGui.QMessageBox.No,
+                                                   QtGui.QMessageBox.No)
+
+                if reply == QtGui.QMessageBox.Yes:
+                        try:
+                            if selected_actions_to_move:
+                                self.perform_changelist_selection(selected_actions_to_move)
+                        except Exception as e:
+                            logger.debug("Unable to revert file: {}, Error: {}".format(target_file, e))
+
+        if selected_files_to_revert or selected_files_to_delete or selected_files_to_move:
             self._populate_pending_widget()
 
 

@@ -34,7 +34,7 @@ class ChangelistSelection(QtWidgets.QDialog):
         #self.action = action
         self.selected_actions = selected_actions
         self.parent = parent
-        self.change = None
+        self.change = "default"
 
         # Variables
         self.changelists_widget = ChangelistSelectionWidget()
