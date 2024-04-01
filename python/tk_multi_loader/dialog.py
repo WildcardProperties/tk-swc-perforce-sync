@@ -5601,6 +5601,15 @@ class AppDialog(QtGui.QWidget):
             self.ui.progress.setVisible(False)
         QtCore.QCoreApplication.processEvents()
 
+    def send_error_message(self, text):
+        """
+        Send error message
+        :param text:
+        :return:
+        """
+        # msg = "\n <span style='color:#FF0000'>{}:</span> \n".format(text)
+        msg = "\n <span style='color:#CC3333'>{}:</span> \n".format(text)
+        self._add_log(msg, 2)
 
     def _add_log(self, msg, flag):
         if flag <= 2:
