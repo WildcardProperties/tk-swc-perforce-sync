@@ -193,6 +193,12 @@ class PublishItem():
         publish_type = self.get_publish_type(self.publish_path)
 
         publish_fields = self.get_publish_fields()
+        sg_status_list = None
+        #if publish_fields and "sg_status_list" in publish_fields:
+        #    sg_status_list = publish_fields.get("sg_status_list", None)
+        #    if sg_status_list and sg_status_list == "p4del":
+        #        publish_fields["sg_status_list"] = "p4edit"
+
         description = self.get_description()
         thumbnail_url = self.get_thumbnail()
 
@@ -242,7 +248,6 @@ class PublishItem():
         logger.info("Publish registered!")
         # logger.debug(">>>>> Publish result: {}".format(sg_publish_result))
 
-
         if sg_publish_result:
             logger.debug(">>>>>>>>>>>> Publish result begin: ")
             for k, v in sg_publish_result.items():
@@ -266,10 +271,11 @@ class PublishItem():
                         logger.warning("Failed to download thumbnail image. Status code: %s", response.status_code)
                 except Exception as e:
                     logger.error("Error downloading thumbnail image: %s", str(e))
-
-
+            #if sg_status_list and sg_status_list == "p4del":
+            #    publish_fields["sg_status_list"] = "p4del"
             updated_data = {
-                'code': published_file_name
+                'code': published_file_name,
+                # "sg_fields": publish_fields
                 #'image': temp_thumbnail_path,
             }
             try:
@@ -283,15 +289,11 @@ class PublishItem():
                 update_res = self.app.shotgun.update("PublishedFile", id, updated_data)
                 logger.debug("Updated published file: %s", update_res)
 
-
             logger.debug("updated_data: {}".format(updated_data))
             id = sg_publish_result.get("id", None)
             if id and updated_data:
                 update_res = self.app.shotgun.update("PublishedFile", id, updated_data)
                 logger.debug("Updated published file: {}".format(update_res))
-
-
-
 
         return sg_publish_result
 
@@ -447,7 +449,10 @@ class PublishItem():
                 sg_fields["sg_p4_change_number"] = int(change_number)
             # sg_fields["Status"] = self.sg_item.get("headAction", None)
             # sg_fields["sg_status_list"] = self.sg_item.get("sg_status_list", None)
-            sg_fields["sg_status_list"] = self.get_sg_status_list()
+
+            sg_status_list = self.get_sg_status_list()
+            sg_fields["sg_status_list"] =sg_status_list
+
             sg_fields["sg_p4_depo_path"] = self.sg_item.get("depotFile", None)
             sg_fields["task"] = self.sg_item.get("task", None)
             #sg_fields["task.Task.sg_status_list"] = self.sg_item.get("task.Task.sg_status_list", None)

@@ -4400,17 +4400,38 @@ class AppDialog(QtGui.QWidget):
                 selected_row_data = self._get_pending_data_from_source(source_index)
                 action = self._get_action_data_from_source(source_index)
                 change = self._get_change_data_from_source(source_index)
-                if selected_row_data and "#" in selected_row_data:
-                    target_file = selected_row_data.split("#")[0]
-                    target_file = target_file.strip()
-                    logger.debug(">>>>>>>>>>> action:{}".format(action))
-                    logger.debug(">>>>>>>>>>> change:{}".format(change))
-                    logger.debug(">>>>>>>>>>> target_file:{}".format(target_file))
-                    if action in ["delete"]:
-                        if target_file not in selected_files_to_delete:
-                            delete_tuple = (change, target_file)
-                            selected_files_to_delete.append(target_file)
-                            selected_tuples_to_delete.append(delete_tuple)
+                if selected_row_data:
+                    if "#" in selected_row_data:
+                        target_file = selected_row_data.split("#")[0]
+                        target_file = target_file.strip()
+                        logger.debug(">>>>>>>>>>> action:{}".format(action))
+                        logger.debug(">>>>>>>>>>> change:{}".format(change))
+                        logger.debug(">>>>>>>>>>> target_file:{}".format(target_file))
+                        if action in ["delete"]:
+                            if target_file not in selected_files_to_delete:
+                                delete_tuple = (change, target_file)
+                                selected_files_to_delete.append(target_file)
+                                selected_tuples_to_delete.append(delete_tuple)
+                    else:
+                        # Parent row
+                        if change and not action:
+                            # Get all the children of this parent row
+                            children = self._get_children_from_source(source_index)
+                            for child in children:
+                                child_row_data = self._get_pending_data_from_source(child)
+                                child_action = self._get_action_data_from_source(child)
+                                child_change = self._get_change_data_from_source(child)
+                                if "#" in child_row_data:
+                                    target_file = child_row_data.split("#")[0]
+                                    target_file = target_file.strip()
+                                    if child_action in ["delete"]:
+                                        if target_file not in selected_files_to_delete:
+                                            delete_tuple = (child_change, target_file)
+                                            selected_files_to_delete.append(target_file)
+                                            selected_tuples_to_delete.append(delete_tuple)
+                        logger.debug(">>>>>>>>>>> action:{}".format(action))
+                        logger.debug(">>>>>>>>>>> change:{}".format(change))
+
                 # logger.debug(">>>>>>>>>>> selected_files_to_delete:{}".format(selected_files_to_delete))
                 #vlogger.debug(">>>>>>>>>>> selected_tuples_to_delete:{}".format(selected_tuples_to_delete))
 
@@ -4433,6 +4454,7 @@ class AppDialog(QtGui.QWidget):
                 self._add_log(msg, 2)
                 if selected_files_to_delete:
                     self._delete_pending_data(selected_tuples_to_delete)
+                    self._publish_pending_data_using_command_line(selected_tuples_to_delete)
 
 
                 msg = "\n <span style='color:#2C93E2'>Updating the Pending view ...</span> \n"
@@ -4458,16 +4480,38 @@ class AppDialog(QtGui.QWidget):
                 action = self._get_action_data_from_source(source_index)
                 change = self._get_change_data_from_source(source_index)
 
-                if selected_row_data and "#" in selected_row_data:
-                    target_file = selected_row_data.split("#")[0]
-                    target_file = target_file.strip()
-                    logger.debug(">>>>>>>>>>> action:{}".format(action))
-                    if action not in ["delete"]:
-                        sg_item = self._get_sg_data_from_source(source_index)
-                        if target_file not in selected_files_to_submit:
-                            submit_tuple = (change, target_file, action, sg_item)
-                            selected_files_to_submit.append(target_file)
-                            selected_tuples_to_submit.append(submit_tuple)
+                if selected_row_data:
+                    if "#" in selected_row_data:
+                        target_file = selected_row_data.split("#")[0]
+                        target_file = target_file.strip()
+                        logger.debug(">>>>>>>>>>> action:{}".format(action))
+                        if action not in ["delete"]:
+                            sg_item = self._get_sg_data_from_source(source_index)
+                            if target_file not in selected_files_to_submit:
+                                submit_tuple = (change, target_file, action, sg_item)
+                                selected_files_to_submit.append(target_file)
+                                selected_tuples_to_submit.append(submit_tuple)
+                    else:
+                        # Parent row
+                        if change and not action:
+                            # Get all the children of this parent row
+                            children = self._get_children_from_source(source_index)
+                            for child in children:
+                                child_row_data = self._get_pending_data_from_source(child)
+                                child_action = self._get_action_data_from_source(child)
+                                child_change = self._get_change_data_from_source(child)
+                                if "#" in child_row_data:
+                                    target_file = child_row_data.split("#")[0]
+                                    target_file = target_file.strip()
+                                    if child_action not in ["delete"]:
+                                        sg_item = self._get_sg_data_from_source(child)
+                                        if target_file not in selected_files_to_submit:
+                                            submit_tuple = (child_change, target_file, child_action, sg_item)
+                                            selected_files_to_submit.append(target_file)
+                                            selected_tuples_to_submit.append(submit_tuple)
+
+                            logger.debug(">>>>>>>>>>> action:{}".format(action))
+                            logger.debug(">>>>>>>>>>> change:{}".format(change))
             except Exception as e:
                 logger.debug("{}".format(e))
 
@@ -4733,16 +4777,14 @@ class AppDialog(QtGui.QWidget):
                     try:
                         msg = "{}".format(file_to_submit)
                         self._add_log(msg, 4)
-                        submit_result, obliterate_result, perforce_msg = submit_and_delete_file(self._p4, change, file_to_submit)
+                        submit_result, perforce_msg = submit_and_delete_file(self._p4, change, file_to_submit)
                         msg = "Result of submitting file: {}".format(submit_result)
-                        self._add_log(msg, 4)
-                        msg = "Result of obliterating file: {}".format(obliterate_result)
                         self._add_log(msg, 4)
                         #if perforce_msg:
                         #    # Log the error message
                         #    msg = "\n <span style='color:#CC3333'>{}</span> \n".format(perforce_msg)
                         #    self._add_log(msg, 4)
-                        if submit_result and obliterate_result and not perforce_msg:
+                        if submit_result and not perforce_msg:
                             msg = "\n <span style='color:#2C93E2'>File deleted from Perforce:</span> \n".format(file_to_submit)
                             self._add_log(msg, 2)
                     except Exception as e:
