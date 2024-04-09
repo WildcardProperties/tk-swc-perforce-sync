@@ -181,8 +181,8 @@ class SgEntityPublishModel(ShotgunModel):
 
         # now that we have establishes the sg filters and which
         # folders to load, set up the actual model
-        logger.debug("model_entitypublish: sg_data type is: {}".format(data_type))
-        logger.debug("model_entitypublish: sg_filters is: {}".format(sg_filters))
+        # logger.debug("model_entitypublish: sg_data type is: {}".format(data_type))
+        # logger.debug("model_entitypublish: sg_filters is: {}".format(sg_filters))
         self._do_load_data(sg_filters, child_folders)
 
         return sg_data

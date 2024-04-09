@@ -1456,7 +1456,6 @@ class AppDialog(QtGui.QWidget):
         self._pending_view_model = self.pending_tree_view.proxymodel
         self._create_pending_view_context_menu()
 
-        # self._change_dict = {}
         msg = "\n <span style='color:#2C93E2'> Right-click on a file to 'Publish...' the changelist in Shotgrid or 'Revert' it in Perforce.</span> \n"
 
         #msg = "\n <span style='color:#2C93E2'>Choose the files you want to publish from the Pending view and then initiate the publishing process using the Shotgrid Publisher by clicking 'Submit Files'.</span> \n"
@@ -4391,6 +4390,7 @@ class AppDialog(QtGui.QWidget):
         """
         selected_files_to_delete = []
         selected_tuples_to_delete = []
+        selected_tuples_to_publish = []
 
         selected_indexes = self._pending_view_widget.selectionModel().selectedRows()
         for selected_index in selected_indexes:
@@ -4400,6 +4400,7 @@ class AppDialog(QtGui.QWidget):
                 selected_row_data = self._get_pending_data_from_source(source_index)
                 action = self._get_action_data_from_source(source_index)
                 change = self._get_change_data_from_source(source_index)
+                sg_item = self._get_sg_data_from_source(source_index)
                 if selected_row_data:
                     if "#" in selected_row_data:
                         target_file = selected_row_data.split("#")[0]
@@ -4410,27 +4411,31 @@ class AppDialog(QtGui.QWidget):
                         if action in ["delete"]:
                             if target_file not in selected_files_to_delete:
                                 delete_tuple = (change, target_file)
+                                publish_tuple = (change, target_file, action, sg_item)
                                 selected_files_to_delete.append(target_file)
                                 selected_tuples_to_delete.append(delete_tuple)
+                                selected_tuples_to_publish.append(publish_tuple)
                     else:
                         # Parent row
                         if change and not action:
-                            # Get all the children of this parent row
-                            children = self._get_children_from_source(source_index)
-                            for child in children:
-                                child_row_data = self._get_pending_data_from_source(child)
-                                child_action = self._get_action_data_from_source(child)
-                                child_change = self._get_change_data_from_source(child)
-                                if "#" in child_row_data:
-                                    target_file = child_row_data.split("#")[0]
-                                    target_file = target_file.strip()
-                                    if child_action in ["delete"]:
+                            key = str(change)
+                            # logger.debug(">>>>>>>>>>>_on_submit_deleted_files: change :{}".format(change))
+                            # logger.debug(">>>>>>>>>>>_on_submit_deleted_files:  self._change_dict[change]:{}".format(self._change_dict.get(key, None)))
+                            children = self._change_dict.get(key, None)
+                            if children:
+                                for sg_item in children:
+                                    target_file = sg_item.get("depotFile", None)
+                                    action = self._get_action(sg_item)
+                                    if target_file and action and action in ["delete"]:
+                                        target_file = target_file.split("#")[0]
+                                        target_file = target_file.strip()
                                         if target_file not in selected_files_to_delete:
-                                            delete_tuple = (child_change, target_file)
+                                            delete_tuple = (change, target_file)
+                                            publish_tuple = (change, target_file, action, sg_item)
                                             selected_files_to_delete.append(target_file)
                                             selected_tuples_to_delete.append(delete_tuple)
-                        logger.debug(">>>>>>>>>>> action:{}".format(action))
-                        logger.debug(">>>>>>>>>>> change:{}".format(change))
+                                            selected_tuples_to_publish.append(publish_tuple)
+
 
                 # logger.debug(">>>>>>>>>>> selected_files_to_delete:{}".format(selected_files_to_delete))
                 #vlogger.debug(">>>>>>>>>>> selected_tuples_to_delete:{}".format(selected_tuples_to_delete))
@@ -4453,8 +4458,8 @@ class AppDialog(QtGui.QWidget):
                 msg = "\n <span style='color:#2C93E2'>Submitting pending files for deletion in Perforce...</span> \n"
                 self._add_log(msg, 2)
                 if selected_files_to_delete:
+                    self._publish_pending_data_using_command_line(selected_tuples_to_publish)
                     self._delete_pending_data(selected_tuples_to_delete)
-                    self._publish_pending_data_using_command_line(selected_tuples_to_delete)
 
 
                 msg = "\n <span style='color:#2C93E2'>Updating the Pending view ...</span> \n"
@@ -4494,24 +4499,23 @@ class AppDialog(QtGui.QWidget):
                     else:
                         # Parent row
                         if change and not action:
-                            # Get all the children of this parent row
-                            children = self._get_children_from_source(source_index)
-                            for child in children:
-                                child_row_data = self._get_pending_data_from_source(child)
-                                child_action = self._get_action_data_from_source(child)
-                                child_change = self._get_change_data_from_source(child)
-                                if "#" in child_row_data:
-                                    target_file = child_row_data.split("#")[0]
-                                    target_file = target_file.strip()
-                                    if child_action not in ["delete"]:
-                                        sg_item = self._get_sg_data_from_source(child)
+                            key = str(change)
+                            # logger.debug(">>>>>>>>>>>_on_submit_deleted_files: change :{}".format(change))
+                            # logger.debug(">>>>>>>>>>>_on_submit_deleted_files:  self._change_dict[change]:{}".format(self._change_dict.get(key, None)))
+                            children = self._change_dict.get(key, None)
+                            if children:
+                                for sg_item in children:
+                                    target_file = sg_item.get("depotFile", None)
+                                    action = self._get_action(sg_item)
+                                    if target_file and action and action not in ["delete"]:
+                                        target_file = target_file.split("#")[0]
+                                        target_file = target_file.strip()
                                         if target_file not in selected_files_to_submit:
-                                            submit_tuple = (child_change, target_file, child_action, sg_item)
+                                            submit_tuple = (change, target_file, action, sg_item)
                                             selected_files_to_submit.append(target_file)
                                             selected_tuples_to_submit.append(submit_tuple)
 
-                            logger.debug(">>>>>>>>>>> action:{}".format(action))
-                            logger.debug(">>>>>>>>>>> change:{}".format(change))
+
             except Exception as e:
                 logger.debug("{}".format(e))
 
@@ -4526,9 +4530,9 @@ class AppDialog(QtGui.QWidget):
         """
         Publish Depot Data
         """
-
+        logger.debug(">>>>>>> _publish_pending_data_using_command_line: selected_tuples_to_publish:{}".format(selected_tuples_to_publish))
         if selected_tuples_to_publish:
-            msg = "\n <span style='color:#2C93E2'>Publishing other pending files in shotgrid</span> \n"
+            msg = "\n <span style='color:#2C93E2'>Publishing pending files in shotgrid</span> \n"
             self._add_log(msg, 2)
             files_count = len(selected_tuples_to_publish)
             i = 0
@@ -4591,8 +4595,9 @@ class AppDialog(QtGui.QWidget):
             if local_path:
                 if not os.path.exists(local_path):
                     msg = "File does not exist: {}".format(local_path)
-                    self.send_error_message(msg)
-                    return None, None
+                    logger.debug(">>>>> {}".format(msg))
+                    # self.send_error_message(msg)
+                    # return None, None
 
                 sg = sgtk.platform.current_bundle()
                 current_relative_path = self.fix_query_path(local_path)
@@ -4652,8 +4657,9 @@ class AppDialog(QtGui.QWidget):
         local_path = sg_item["path"].get("local_path", None)
         if not local_path or not os.path.exists(local_path):
             msg = f"File does not exist: {local_path}"
-            self.send_error_message(msg)
-            return None, None
+            logger.debug(f">>>>> {msg}")
+            # self.send_error_message(msg)
+            # return None, None
         logger.debug(f">>>>> Checking validity by path parts: local_path: {local_path}")
 
         sg = sgtk.platform.current_bundle()

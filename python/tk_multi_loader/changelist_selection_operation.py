@@ -176,10 +176,12 @@ class ChangelistSelection(QtWidgets.QDialog):
             local_path = sg_item["path"].get("local_path", None)
             logger.debug(">>>>> Checking validity by published file: local_path: {}".format(local_path))
             if local_path:
+
                 if not os.path.exists(local_path):
-                    msg = "File does not exist: {}".format(local_path)
-                    self.send_error_message(msg)
-                    return None, None
+                    msg = "File does not exist locally: {}".format(local_path)
+                    logger.debug(">>>>> {}".format(msg))
+                    # self.send_error_message(msg)
+                    # return None, None
 
                 sg = sgtk.platform.current_bundle()
                 logger.debug(">>>>> local_path: {}".format(local_path))
@@ -240,9 +242,10 @@ class ChangelistSelection(QtWidgets.QDialog):
         logger.debug(f">>>>> Checking validity by path parts: sg_item: {sg_item}")
         local_path = sg_item["path"].get("local_path", None)
         if not local_path or not os.path.exists(local_path):
-            msg = f"File does not exist: {local_path}"
-            self.send_error_message(msg)
-            return None, None
+            msg = f"File does not exist locally: {local_path}"
+            logger.debug(f">>>>> {msg}")
+            # self.send_error_message(msg)
+            # return None, None
         logger.debug(f">>>>> Checking validity by path parts: local_path: {local_path}")
 
         sg = sgtk.platform.current_bundle()
