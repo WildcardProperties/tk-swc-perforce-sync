@@ -1938,8 +1938,6 @@ class AppDialog(QtGui.QWidget):
         self._step_dict = self._get_column_dict("step")
         self._date_modified_dict = self._get_column_dict("date_modified")
 
-
-
     def _get_column_dict(self, key):
         column_dict = {}
         for id, sg_item in self._column_view_dict.items():
@@ -1976,8 +1974,10 @@ class AppDialog(QtGui.QWidget):
 
         local_path = "N/A"
         folder = "N/A"
+        # logger.debug(">>> Getting path data")
         if "path" in sg_item:
             path = sg_item.get("path", None)
+            # logger.debug(">>> path: {}".format(path))
             if path:
                 local_path = path.get("local_path", "N/A")
                 if local_path and local_path != "N/A":
@@ -1990,10 +1990,17 @@ class AppDialog(QtGui.QWidget):
                             entity_path = self._get_entity_path(entity)
 
                     if entity_path and local_directory:
+                        logger.debug(">>> entity_path: {}".format(entity_path))
+                        logger.debug(">>> local_directory: {}".format(local_directory))
                         folder = self._path_difference(entity_path, local_directory)
-                        if folder and folder != "N/A":
-                            #folder = "{}\\".format(difference_str)
-                            new_sg_item["folder"] = folder
+
+                    if local_directory and not entity_path:
+                        # Get the parent directory of local_directory
+                        folder = os.path.basename(local_directory)
+                        logger.debug(">>> No entity path found, we will use parent folder: {}".format(folder))
+                    if folder and folder != "N/A":
+                        # folder = "{}\\".format(difference_str)
+                        new_sg_item["folder"] = folder
 
         file_extension = "N/A"
         if local_path and local_path != "N/A":
@@ -2128,6 +2135,7 @@ class AppDialog(QtGui.QWidget):
 
         entity_id = entity_data.get('id', 0)
         entity_type = entity_data.get('type', None)
+        # entity_name = entity_data.get('name', None)
         if entity_type == "Task":
             entity = entity_data.get("entity", None)
             if entity:
@@ -2135,6 +2143,13 @@ class AppDialog(QtGui.QWidget):
                 entity_type = entity.get('type', entity_type)
 
         entity_path = self._app.sgtk.paths_from_entity(entity_type, entity_id)
+        #if not entity_path:
+        #    # Fetch the entity using the id and type
+        #    target_entity = self._app.shotgun.find_one(entity_type, [['id', 'is', entity_id]],
+        #                         ['code', 'path', 'sg_status_list', 'description'])
+        #    logger.debug(">>> target_entity: {}".format(target_entity))
+        #    entity_path = target_entity.get("path", None)
+
         return entity_path[-1] if entity_path else None
 
     def _get_perforce_sg_data(self):
@@ -2895,10 +2910,13 @@ class AppDialog(QtGui.QWidget):
         # Normalize paths to use forward slashes and remove trailing slashes
         path1 = os.path.normpath(path1)
         path2 = os.path.normpath(path2)
-
+        logger.debug(">>>>>>>>>>>> path1: {}".format(path1))
+        logger.debug(">>>>>>>>>>>> path2: {}".format(path2))
         # Split paths into components
         components1 = path1.split(os.sep)
         components2 = path2.split(os.sep)
+        logger.debug(">>>>>>>>>>>> components1: {}".format(components1))
+        logger.debug(">>>>>>>>>>>> components2: {}".format(components2))
 
         # Find the common prefix
         common_prefix = []
@@ -6738,9 +6756,10 @@ class AppDialog(QtGui.QWidget):
                 for sg_item in self._sg_data:
                     # logger.debug(">>>>>>>>>>Checking for published file ...")
                     #logger.debug(">>>>>>>>>>sg_item {}".format(sg_item))
-                    if "path" in sg_item:
-                        if "local_path" in sg_item["path"]:
-                            local_path = sg_item["path"].get("local_path", None)
+                    sg_item_path = sg_item.get("path", None)
+                    if sg_item_path:
+                        if "local_path" in sg_item_path:
+                            local_path = sg_item_path.get("local_path", None)
                             key = self._create_key(local_path)
                             version_number = sg_item.get("version_number", None)
                             # Get the version number from the path if it exists
