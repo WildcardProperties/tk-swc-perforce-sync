@@ -4605,10 +4605,9 @@ class AppDialog(QtGui.QWidget):
             return None, None
 
         logger.debug(">>>>> _get_entity_from_sg_item: sg_item: {}".format(sg_item))
-
-        if "path" in sg_item:
-            local_path = sg_item["path"].get("local_path", None)
-            logger.debug(">>>>> local_path: {}".format(local_path))
+        sg_item_path = sg_item.get("path", None)
+        if sg_item_path:
+            local_path = sg_item_path.get("local_path", None)
 
             if local_path:
                 if not os.path.exists(local_path):
@@ -5286,8 +5285,10 @@ class AppDialog(QtGui.QWidget):
                 total_file_count += 1
                 sg_item = shotgun_model.get_sg_data(model_index)
                 # logger.info("--------->>>>>>  sg_item is: {}".format(sg_item))
-                if 'path' in sg_item:
-                    local_path = sg_item['path'].get('local_path', None)
+                sg_item_path = sg_item.get("path", None)
+                if sg_item_path:
+                    local_path = sg_item_path.get("local_path", None)
+
                     if local_path:
                         """
                         action = sg_item.get("action", None)
@@ -7380,8 +7381,9 @@ class AppDialog(QtGui.QWidget):
             self._item_path_dict[self._entity_path] += 1
         elif self._sg_data:
             for sg_item in self._sg_data:
-                if "path" in sg_item:
-                    local_path = sg_item["path"].get("local_path")
+                sg_item_path = sg_item.get("path", None)
+                if sg_item_path:
+                    local_path = sg_item_path.get("local_path", None)
                     if local_path:
                         item_path = os.path.dirname(local_path)
                         self._item_path_dict[item_path] += 1
@@ -7490,20 +7492,21 @@ class AppDialog(QtGui.QWidget):
         if sg_data:
             for i, sg_item in enumerate(sg_data):
                 if "path" in sg_item:
-                    local_path = sg_item["path"].get("local_path", None)
-
+                    sg_item_path = sg_item.get("path", None)
+                    if sg_item_path:
+                        local_path = sg_item_path.get("local_path", None)
                     # logger.debug(">>>>>>> local_path is: {}".format(local_path))
-                    if local_path:
-                        fstat_list = self._p4.run("fstat", local_path)
-                        # logger.debug("fstat_list: {}".format(fstat_list))
-                        fstat = fstat_list[0]
-                        # logger.debug("fstat is: {}".format(fstat))
-                        have_rev = fstat.get('haveRev', "0")
-                        head_rev = fstat.get('headRev', "0")
-                        sg_item["haveRev"], sg_item["headRev"] = have_rev, head_rev
-                        sg_item["revision"] = "{}/{}".format(have_rev, head_rev )
-                        # logger.debug("{}: Revision: {}".format(i, sg_item["revision"]))
-                        # sg_item['depotFile'] = fstat.get('depotFile', None)
+                        if local_path:
+                            fstat_list = self._p4.run("fstat", local_path)
+                            # logger.debug("fstat_list: {}".format(fstat_list))
+                            fstat = fstat_list[0]
+                            # logger.debug("fstat is: {}".format(fstat))
+                            have_rev = fstat.get('haveRev', "0")
+                            head_rev = fstat.get('headRev', "0")
+                            sg_item["haveRev"], sg_item["headRev"] = have_rev, head_rev
+                            sg_item["revision"] = "{}/{}".format(have_rev, head_rev )
+                            # logger.debug("{}: Revision: {}".format(i, sg_item["revision"]))
+                            # sg_item['depotFile'] = fstat.get('depotFile', None)
 
             # logger.debug("{}: SG item: {}".format(i, sg_item))
 
