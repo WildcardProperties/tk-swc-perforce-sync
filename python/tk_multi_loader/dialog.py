@@ -6017,7 +6017,8 @@ class AppDialog(QtGui.QWidget):
                 layout.addLayout(search_layout)
 
                 # Add the search text field.
-                search = QtGui.QLineEdit(tab)
+                # search = QtGui.QLineEdit(tab)
+                search = MyLineEdit(tab)
                 search.setStyleSheet(
                     "QLineEdit{ border-width: 1px; "
                     "background-image: url(:/res/search.png); "
@@ -6033,13 +6034,58 @@ class AppDialog(QtGui.QWidget):
                     "Use the <i>search</i> field to narrow down the items displayed in the tree above."
                 )
 
+                """
                 try:
                     # This was introduced in Qt 4.7, so try to use it if we can...
                     search.setPlaceholderText("Search...")
                 except:
                     pass
-
+                """
                 search_layout.addWidget(search)
+
+                """
+                # Add a search button with no icons, just the text "Search".
+                search_button = QtGui.QToolButton(tab)
+                search_button.setText("Search")
+                search_button.setAutoRaise(True)
+                search_button.setToolTip("Click to search for items.")
+                search_layout.addWidget(search_button)
+                
+                # When the search button is clicked, we will trigger the search by calling _on_search_text_changed
+                search_button.clicked.connect(
+                    lambda text, v=view, pm=proxy_model: self._on_search_text_changed(
+                        text, v, pm
+                    )
+                )
+                """
+                # Add a Search button.
+                logger.debug("Searching for items in the tree above, query text is {}".format(search.text()))
+                search_button = QtGui.QPushButton("Search", tab)
+                search_button.setToolTip("Click to search for items displayed in the tree above.")
+                #search_button.clicked.connect(
+                #    lambda: self._on_search_text_changed(search.text(), view, proxy_model)
+                #)
+                #search_button.clicked.connect(
+                #    lambda: logger.debug("Search text on click: {}".format(search.text()))
+                #)
+                """
+                def handle_search_click():
+                    logger.debug("Search text on click: {}".format(search.text()))
+                    # Drive the proxy model with the search text.
+                    search.textChanged.connect(
+                        lambda text, v=view, pm=proxy_model: self._on_search_text_changed(
+                            text, v, pm
+                        )
+                    )
+
+                search_button.clicked.connect(handle_search_click)
+                """
+
+
+
+                search_layout.addWidget(search_button)
+
+
 
                 # Add a cancel search button, disabled by default.
                 clear_search = QtGui.QToolButton(tab)
@@ -6063,16 +6109,58 @@ class AppDialog(QtGui.QWidget):
                 clear_search.setToolTip("Click to clear your current search.")
                 search_layout.addWidget(clear_search)
 
+                logger.debug("Text at time of signal: {}".format(search.get_current_text()))
+
+                # Connect the returnPressed signal to fetch text from get_current_text
+                """
+                search.returnPressed.connect(
+                    lambda v=view, pm=proxy_model: self._on_search_text_changed(
+                        search.get_current_text(), v, pm
+                    )
+                )
+                search_button.clicked.connect(
+                    lambda v=view, pm=proxy_model: self._on_search_text_changed(
+                        search.get_current_text(), v, pm
+                    )
+                )
+                """
+
+                # Setup returnPressed to trigger search with processed events
+                search.returnPressed.connect(
+                    lambda v=view, pm=proxy_model, search=search: self.trigger_search(v, pm, search)
+                )
+
+                search_button.clicked.connect(
+                    lambda v=view, pm=proxy_model, search=search: self.trigger_search(v, pm, search)
+                )
+
+
+
+
+                #search.returnPressed.connect(
+                #    lambda v=view, pm=proxy_model: self._on_search_text_changed(
+                #        search.text(), v, pm
+                #    )
+                #)
+
+                # Drive the proxy model with the search text.
+                #search.returnPressed.connect(
+                #    lambda text=search.text(), v=view, pm=proxy_model: self._on_search_text_changed(
+                #        text, v, pm
+                #    )
+                #)
+                """
                 # Drive the proxy model with the search text.
                 search.textChanged.connect(
                     lambda text, v=view, pm=proxy_model: self._on_search_text_changed(
                         text, v, pm
                     )
                 )
+                """
 
                 # Keep a handle to all the new Qt objects, otherwise the GC may not work.
                 self._dynamic_widgets.extend(
-                    [search_layout, search, clear_search, icon]
+                    [search_layout, search, search_button, clear_search, icon]
                 )
 
             else:
@@ -6118,7 +6206,7 @@ class AppDialog(QtGui.QWidget):
 
                 action_reset = QtGui.QAction("Reset", view)
                 action_reset.setToolTip(
-                    "<nobr>Reset the tree to its SG hierarchy root collapsed state.</nobr><br><br>"
+                    "<nobr>Reset the tree to its PTR hierarchy root collapsed state.</nobr><br><br>"
                     "Any existing data contained in the tree will be cleared, "
                     "affecting selection and other related states, and "
                     "available cached data will be immediately reloaded.<br><br>"
@@ -6145,9 +6233,9 @@ class AppDialog(QtGui.QWidget):
 
                 action_refresh = QtGui.QAction("Refresh", view)
                 action_refresh.setToolTip(
-                    "<nobr>Refresh the tree data to ensure it is up to date with ShotGrid.</nobr><br><br>"
+                    "<nobr>Refresh the tree data to ensure it is up to date with Flow Production Tracking.</nobr><br><br>"
                     "Since this action is done in the background, the tree update "
-                    "will be applied whenever the data is returned from ShotGrid.<br><br>"
+                    "will be applied whenever the data is returned from Flow Production Tracking.<br><br>"
                     "When data has been added, it will be added into the existing tree "
                     "without affecting selection and other related states.<br><br>"
                     "When data has been modified or deleted, a tree rebuild will be done, "
@@ -6184,6 +6272,12 @@ class AppDialog(QtGui.QWidget):
         # finalize initialization by clicking the home button, but only once the
         # data has properly arrived in the model.
         self._on_home_clicked()
+
+    def trigger_search(self, view, proxy_model, search):
+        QtWidgets.QApplication.processEvents()  # Process all pending GUI events
+        text = search.get_current_text()  # Retrieve the text
+        logger.debug("Text at time of search: {}".format(text))
+        self._on_search_text_changed(text, view, proxy_model)
 
     def _get_entity_root(self, root):
         """
@@ -6329,7 +6423,7 @@ class AppDialog(QtGui.QWidget):
         :param tree_view: associated tree view.
         :param proxy_model: associated proxy model
         """
-
+        logger.debug("Search for text: {} ".format(pattern))
         # tell proxy model to reevaulate itself given the new pattern.
         proxy_model.setFilterFixedString(pattern)
 
@@ -7663,3 +7757,35 @@ class UIWaitThreadOLD(QtCore.QThread):
         # When the loop exits (UI is closed), emit a signal to update the UI
         logger.debug("UI is closed, Updating pending view")
         self.parent().update_pending_view_signal.emit()
+
+class MyLineEditold(QtWidgets.QLineEdit):
+    customTextChanged = QtCore.Signal(str)
+
+    def __init__(self, *args, **kwargs):
+        super(MyLineEdit, self).__init__(*args, **kwargs)
+        self.textChanged.connect(self.emitCustomText)
+
+    def emitCustomText(self, text):
+        # Emit the custom text changed signal
+        self.customTextChanged.emit(text)
+
+    def get_text(self):
+        # Directly access the QLineEdit's text property
+        return super(MyLineEdit, self).text()
+
+class MyLineEdit(QtWidgets.QLineEdit):
+    customTextChanged = QtCore.Signal(str)
+
+    def __init__(self, *args, **kwargs):
+        super(MyLineEdit, self).__init__(*args, **kwargs)
+        self._currentText = ""  # Initialize the text storage
+        self.textChanged.connect(self.updateText)
+
+    def updateText(self, text):
+        self._currentText = text  # Update the stored text
+        # logger.debug(">>>>>>>>>>  text is: {}".format(text))
+        self.customTextChanged.emit(text)  # Emit the custom signal with the updated text
+
+    def get_current_text(self):
+        # logger.debug(">>>>>>>>>>  self._currentText is: {}".format(self._currentText))
+        return self._currentText  # Accessor method to get the stored text
