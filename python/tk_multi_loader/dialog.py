@@ -1598,15 +1598,19 @@ class AppDialog(QtGui.QWidget):
                         # app_command["callback"](change)
                         app_command["callback"](change)
 
+                        # Start the after_publish_ui_close method in a new thread
+                        threading.Thread(target=self._after_publish_ui_close).start()
+
+                        # After the UI closes, call _populate_pending_widget
+                        # wait_thread = threading.Thread(target=self._after_publish_ui_close)
+                        # wait_thread.start()
+
                         # Start a new thread to wait for the UI to close
                         #wait_thread = threading.Thread(target=self._wait_for_ui_close)
                         #wait_thread.start()
 
                         #wait_thread = UIWaitThread(self._check_ui_closed, self)
                         # wait_thread.start()
-
-
-
 
             except Exception as e:
                 logger.debug("Error loading publisher: {}".format(e))
@@ -1711,6 +1715,43 @@ class AppDialog(QtGui.QWidget):
         if selected_files_to_revert or selected_files_to_delete or selected_files_to_move:
             self._populate_pending_widget()
 
+    def _after_publish_ui_close(self):
+        logger.debug(">>>> Checking if the publisher UI is closed...")
+        # Setup a QTimer to periodically check the condition
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.check_publisher_ui_closed)
+        self.timer.start(1000)  # Check every 1000 milliseconds (1 second)
+
+    def check_publisher_ui_closed(self):
+        logger.debug(">>>> Checking if the publisher UI is closed through the timer...")
+        if os.path.exists(self._publisher_is_closed_path):
+            logger.debug(">>>> Reading publisher is closed status file {}...".format(self._publisher_is_closed_path))
+            with open(self._publisher_is_closed_path, 'r') as infile:
+                first_line = infile.readline().strip()
+
+            if "GUI_IS_CLOSED" in first_line:
+                self._populate_pending_widget()
+
+            os.remove(self._publisher_is_closed_path)
+            self.timer.stop()  # Stop the timer once the file is found and processed
+    def _after_publish_ui_close_original(self):
+        logger.debug(">>>> Checking if the publisher UI is closed...")
+        while not os.path.exists(self._publisher_is_closed_path):
+            time.sleep(2)  # Sleep for a second before checking again
+
+        # Check if the file exists and read it
+        if os.path.exists(self._publisher_is_closed_path):
+            logger.debug(">>>> Reading publisher is closed status file {}...".format(self._publisher_is_closed_path))
+
+            with open(self._publisher_is_closed_path, 'r') as infile:
+                first_line = infile.readline().strip()
+
+            # Check if the GUI was closed properly
+            if "GUI_IS_CLOSED" in first_line:
+                self._populate_pending_widget()
+
+            # Remove the file after reading
+            os.remove(self._publisher_is_closed_path)
 
     def _wait_for_ui_close(self):
         # Placeholder for logic to check if the UI window is closed
