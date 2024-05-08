@@ -187,6 +187,15 @@ class AppDialog(QtGui.QWidget):
 
         self.update_pending_view_signal.connect(self._update_pending_view)
         ###########################################
+        # Shotgun Panel
+        #
+        # Connect the tab change signal to the slot
+        self.shotgun_panel_widget = None
+        self._get_shotgun_panel_widget()
+        #self.ui.details_tab.currentChanged.connect(self._on_details_tab_changed)
+
+
+        ###########################################
         # File History
         self._publish_file_history_model = SgPublishHistoryModel(self, self._task_manager)
 
@@ -622,6 +631,80 @@ class AppDialog(QtGui.QWidget):
             pass
 
         ##########################################################################################
+
+    """
+    def _on_details_tab_changed(self, index):
+        # Check if the newly selected tab is the "Panel" tab
+        if self.ui.details_tab.tabText(index) == "Panel":
+            self._get_shotgun_panel_widget()
+
+    def _get_shotgun_panel_widget(self):
+        # Get the current engine
+        engine = sgtk.platform.current_engine()
+        if not engine:
+            logger.error("No current engine found. This code must be run within a Toolkit environment.")
+        else:
+            logger.debug("Current engine name: {}".format(engine.name))
+            logger.debug("Engine apps: {}".format(engine.apps.keys()))
+            logger.debug("Engine commands: {}".format(engine.commands.keys()))
+
+            # Retrieve the desired app, e.g., the Shotgun Panel app
+            shotgun_panel_app = engine.apps.get("tk-multi-shotgunpanel")
+
+            if shotgun_panel_app:
+                logger.debug("Shotgun Panel app is loaded.")
+                try:
+                    if not hasattr(self, 'shotgun_panel_widget'):
+                        self.shotgun_panel_widget = shotgun_panel_app.create_panel_for_P4SG(self)
+                    if self.shotgun_panel_widget:
+                        # Assuming 'self.ui.panel_layout' is a valid Qt layout
+                        self.ui.panel_layout.addWidget(self.shotgun_panel_widget)
+                        logger.info("Shotgun panel widget added to the layout.")
+                    else:
+                        logger.error("Failed to retrieve the panel widget.")
+                except Exception as e:
+                    logger.error("Failed to create or add the Shotgun panel widget: {}".format(e))
+            else:
+                logger.warning("Shotgun Panel app is not loaded. Please check configuration.")
+    """
+    """
+    def _on_details_tab_changed(self, index):
+        # Check if the newly selected tab is the "Panel" tab
+        if self.ui.details_tab.tabText(index) == "Panel":
+            self._get_shotgun_panel_widget()
+    """
+
+    def _get_shotgun_panel_widget(self):
+        # Get the current engine
+        engine = sgtk.platform.current_engine()
+        if not engine:
+            logger.error("No current engine found. This code must be run within a Toolkit environment.")
+        else:
+            logger.debug("Current engine name: {}".format(engine.name))
+            logger.debug("Engine apps: {}".format(engine.apps.keys()))
+            logger.debug("Engine commands: {}".format(engine.commands.keys()))
+
+            # Retrieve the desired app, e.g., the Shotgun Panel app
+            shotgun_panel_app = engine.apps.get("tk-multi-shotgunpanel")
+
+            if shotgun_panel_app:
+                logger.debug("Shotgun Panel app is loaded.")
+                try:
+                    # Use create_panel() to get the panel widget.
+                    if not self.shotgun_panel_widget:
+                        self.shotgun_panel_widget = shotgun_panel_app.create_panel()
+                        #self.shotgun_panel_widget = shotgun_panel_app.create_panel_for_P4SG(self)
+                        #self.shotgun_panel_widget = shotgun_panel_app.create_widget_for_P4SG(self)
+                        if self.shotgun_panel_widget:
+                            # Assuming 'self.ui.panel_layout' is a valid Qt layout
+                            self.ui.panel_layout.addWidget(self.shotgun_panel_widget)
+                            logger.info("Shotgun panel widget added to the layout.")
+                        else:
+                            logger.error("Failed to retrieve the panel widget.")
+                except Exception as e:
+                    logger.error("Failed to create or add the Shotgun panel widget: {}".format(e))
+            else:
+                logger.warning("Shotgun Panel app is not loaded. Please check configuration.")
 
     def _run_function_once(self):
         try:
@@ -6508,7 +6591,7 @@ class AppDialog(QtGui.QWidget):
                 # self._add_log(msg, 2)
         return entity_path, entity_id, entity_type
 
-    def _create_current_user_task_filesystem_structure(self):
+    def _create_current_user_task_filesystem_structure_original(self):
         """ Create a folder structure for the current user's tasks """
         # Get the current user's ID
         try:
@@ -6539,26 +6622,26 @@ class AppDialog(QtGui.QWidget):
             fields = ["content", "entity", "entity.Shot", "entity.Asset"]
 
             tasks = self._app.shotgun.find("Task", filters, fields)
-            logger.debug("Current user tasks are {}".format(tasks))
+            # logger.debug("Current user tasks are {}".format(tasks))
             # Create folders for each entity associated with the tasks
             for task in tasks:
                 entity = task.get("entity", None)
-                logger.debug("User task entity is: {}".format(entity))
+                # logger.debug("User task entity is: {}".format(entity))
                 if entity:
                     entity_id = entity.get("id", None)
                     entity_type = entity.get("type", None)
                     if entity_type and entity_id:
                         try:
                             paths_from_entity = self._app.sgtk.paths_from_entity(entity_type, entity_id)
-                            logger.debug("paths_from_entity is: {}".format(paths_from_entity))
+                            #logger.debug("paths_from_entity is: {}".format(paths_from_entity))
                             if paths_from_entity and len(paths_from_entity) > 0:
                                 result = self._check_paths_exist(paths_from_entity)
                                 if not result:
                                     logger.debug("Paths do not exist for entity:{} on user system".format(entity))
-                                    logger.debug("Creating folder structure for entity:{} ...".format(entity))
+                                    logger.debug("Creating folder structure for entity: {} ...".format(entity))
                                     self._app.sgtk.create_filesystem_structure(entity_type, entity_id)
                                 else:
-                                    logger.debug("Paths exist for entity:{} on user system".format(entity))
+                                    logger.debug("Paths {} exist for entity: {} on user system".format(paths_from_entity, entity))
                             else:
                                 logger.debug("No paths exist for entity:{} on SG".format(entity))
                                 logger.debug("Creating folder structure for entity:{} ...".format(entity))
@@ -6573,6 +6656,55 @@ class AppDialog(QtGui.QWidget):
             logger.debug(msg)
             pass
 
+    def _create_current_user_task_filesystem_structure(self):
+        """Spawns a background thread to create a folder structure for the current user's tasks."""
+        thread = threading.Thread(target=self._task_operations)
+        thread.start()
+
+    def _task_operations(self):
+        """Handle the creation of folder structure in a background thread."""
+        try:
+            user = login.get_current_user(self._app.sgtk)
+            current_user_id = user.get("id", None)
+            if not current_user_id:
+                logger.debug("Could not get current user id")
+                return
+
+            project = self._app.context.project
+            if not project:
+                logger.debug("Could not get current project")
+                return
+
+            sg_status_list = ["ip", "rdy", "hld", "rev"]
+            filters = [
+                ["project", "is", project],
+                ["task_assignees", "is", {"type": "HumanUser", "id": current_user_id}],
+                ["sg_status_list", "in", sg_status_list],
+            ]
+            fields = ["content", "entity", "entity.Shot", "entity.Asset"]
+            tasks = self._app.sgtk.shotgun.find("Task", filters, fields)
+
+            for task in tasks:
+                entity = task.get("entity", None)
+                if entity:
+                    entity_id = entity.get("id", None)
+                    entity_type = entity.get("type", None)
+                    if entity_type and entity_id:
+                        self._create_or_verify_paths(entity_type, entity_id)
+
+        except Exception as e:
+            logger.error(f"Error creating file system structure: {e}")
+
+    def _create_or_verify_paths(self, entity_type, entity_id):
+        try:
+            paths_from_entity = self._app.sgtk.paths_from_entity(entity_type, entity_id)
+            if paths_from_entity and len(paths_from_entity) > 0:
+                if not self._check_paths_exist(paths_from_entity):
+                    self._app.sgtk.create_filesystem_structure(entity_type, entity_id)
+            else:
+                self._app.sgtk.create_filesystem_structure(entity_type, entity_id)
+        except Exception as e:
+            logger.error(f"Unable to create or verify file system structure for {entity_type} {entity_id}: {e}")
 
     def _check_paths_exist(self, paths):
         """

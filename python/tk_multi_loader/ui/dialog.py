@@ -557,7 +557,8 @@ class Ui_Dialog(object):
         self.file_history_view.setUniformItemSizes(True)
         self.file_history_view.setObjectName("file_history_view")
         #self.verticalLayout_3.addWidget(self.file_history_view)
-        self.details_tab.addTab(self.file_details, "Files")
+
+
         self.verticalLayout_6.addWidget(self.file_history_view)
         self.verticalLayout_3.addLayout(self.verticalLayout_6)
         self.horizontalLayout_3 = QtGui.QHBoxLayout()
@@ -568,6 +569,19 @@ class Ui_Dialog(object):
         self.verticalLayout_3.addLayout(self.horizontalLayout_3)
         self.verticalLayout_5.addWidget(self.splitter)
 
+        self.panel_details = QtGui.QGroupBox(self.splitter)
+        self.panel_details.setMinimumSize(QtCore.QSize(0, 0))
+        self.panel_details.setMaximumSize(QtCore.QSize(16777215, 16777215))
+        self.panel_details.setTitle("")
+        self.panel_details.setObjectName("details")
+        self.panel_layout = QtGui.QVBoxLayout(self.panel_details)
+        self.panel_layout.setSpacing(2)
+        self.panel_layout.setContentsMargins(4, 4, 4, 4)
+        self.panel_layout.setObjectName("panel_layout")
+
+
+        self.details_tab.addTab(self.file_details, "Files")
+        self.details_tab.addTab(self.panel_details, "Panel")
         # Entity details
         """
         self.entity_details = QtGui.QGroupBox(Dialog)
