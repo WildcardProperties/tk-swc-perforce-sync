@@ -582,6 +582,11 @@ class Ui_Dialog(object):
 
         self.details_tab.addTab(self.file_details, "Files")
         self.details_tab.addTab(self.panel_details, "Panel")
+
+        # Add this part to the setupUi method where appropriate
+
+
+
         # Entity details
         """
         self.entity_details = QtGui.QGroupBox(Dialog)

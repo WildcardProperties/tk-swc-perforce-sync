@@ -632,13 +632,8 @@ class AppDialog(QtGui.QWidget):
 
         ##########################################################################################
 
-    """
-    def _on_details_tab_changed(self, index):
-        # Check if the newly selected tab is the "Panel" tab
-        if self.ui.details_tab.tabText(index) == "Panel":
-            self._get_shotgun_panel_widget()
 
-    def _get_shotgun_panel_widget(self):
+    def _get_shotgun_panel_widget_new(self):
         # Get the current engine
         engine = sgtk.platform.current_engine()
         if not engine:
@@ -654,9 +649,20 @@ class AppDialog(QtGui.QWidget):
             if shotgun_panel_app:
                 logger.debug("Shotgun Panel app is loaded.")
                 try:
-                    if not hasattr(self, 'shotgun_panel_widget'):
-                        self.shotgun_panel_widget = shotgun_panel_app.create_panel_for_P4SG(self)
+                    # Use create_widget_for_P4SG() to get the panel widget without creating a new window.
+                    if not self.shotgun_panel_widget:
+                        self.shotgun_panel_widget = shotgun_panel_app.create_widget_for_P4SG(self)
+                        logger.debug(">>>>> self.shotgun_panel_widget: {}".format(self.shotgun_panel_widget))
+
                     if self.shotgun_panel_widget:
+                        logger.debug(">>>>> entity_data {}".format(self._entity_data))
+                        if self._entity_data:
+                            self._entity_path, entity_id, entity_type = self._get_entity_info(self._entity_data)
+                            logger.debug(">>>>> entity_id: {}, entity_type: {}".format(entity_id, entity_type))
+                            if entity_id and entity_type:
+                                logger.debug(">>>>> Navigate to entity: {}".format(entity_id))
+                                self.shotgun_panel_widget.navigate_to_entity(entity_type, entity_id)
+
                         # Assuming 'self.ui.panel_layout' is a valid Qt layout
                         self.ui.panel_layout.addWidget(self.shotgun_panel_widget)
                         logger.info("Shotgun panel widget added to the layout.")
@@ -666,13 +672,7 @@ class AppDialog(QtGui.QWidget):
                     logger.error("Failed to create or add the Shotgun panel widget: {}".format(e))
             else:
                 logger.warning("Shotgun Panel app is not loaded. Please check configuration.")
-    """
-    """
-    def _on_details_tab_changed(self, index):
-        # Check if the newly selected tab is the "Panel" tab
-        if self.ui.details_tab.tabText(index) == "Panel":
-            self._get_shotgun_panel_widget()
-    """
+
 
     def _get_shotgun_panel_widget(self):
         # Get the current engine
@@ -681,8 +681,8 @@ class AppDialog(QtGui.QWidget):
             logger.error("No current engine found. This code must be run within a Toolkit environment.")
         else:
             logger.debug("Current engine name: {}".format(engine.name))
-            logger.debug("Engine apps: {}".format(engine.apps.keys()))
-            logger.debug("Engine commands: {}".format(engine.commands.keys()))
+            # logger.debug("Engine apps: {}".format(engine.apps.keys()))
+            # logger.debug("Engine commands: {}".format(engine.commands.keys()))
 
             # Retrieve the desired app, e.g., the Shotgun Panel app
             shotgun_panel_app = engine.apps.get("tk-multi-shotgunpanel")
@@ -690,21 +690,37 @@ class AppDialog(QtGui.QWidget):
             if shotgun_panel_app:
                 logger.debug("Shotgun Panel app is loaded.")
                 try:
-                    # Use create_panel() to get the panel widget.
+                    # Use create_widget_for_P4SG() to get the panel widget without creating a new window.
                     if not self.shotgun_panel_widget:
-                        self.shotgun_panel_widget = shotgun_panel_app.create_panel()
-                        #self.shotgun_panel_widget = shotgun_panel_app.create_panel_for_P4SG(self)
-                        #self.shotgun_panel_widget = shotgun_panel_app.create_widget_for_P4SG(self)
-                        if self.shotgun_panel_widget:
-                            # Assuming 'self.ui.panel_layout' is a valid Qt layout
-                            self.ui.panel_layout.addWidget(self.shotgun_panel_widget)
-                            logger.info("Shotgun panel widget added to the layout.")
-                        else:
-                            logger.error("Failed to retrieve the panel widget.")
+                        self.shotgun_panel_widget = shotgun_panel_app.create_widget_for_P4SG(self.ui.panel_details)
+                        # logger.debug(">>>>> self.shotgun_panel_widget: {}".format(self.shotgun_panel_widget))
+
+                    if self.shotgun_panel_widget:
+                        logger.debug(">>>>> entity_data {}".format(self._entity_data))
+                        if self._entity_data:
+                            self._entity_path, entity_id, entity_type = self._get_entity_info(self._entity_data)
+                            # logger.debug(">>>>> entity_id: {}, entity_type: {}".format(entity_id, entity_type))
+                            if entity_id and entity_type:
+                                logger.debug(">>>>> Navigate to entity: {}".format(entity_id))
+                                self.shotgun_panel_widget.navigate_to_entity(entity_type, entity_id)
+                        """
+                        # Clear any existing widgets in the layout
+                        while self.ui.panel_layout.count():
+                            child = self.ui.panel_layout.takeAt(0)
+                            if child.widget():
+                                child.widget().deleteLater()
+
+                        # Add the panel widget to the layout
+                        self.ui.panel_layout.addWidget(self.shotgun_panel_widget)
+                        logger.info("Shotgun panel widget added to the layout.")
+                        """
+                    else:
+                        logger.error("Failed to retrieve the panel widget.")
                 except Exception as e:
                     logger.error("Failed to create or add the Shotgun panel widget: {}".format(e))
             else:
                 logger.warning("Shotgun Panel app is not loaded. Please check configuration.")
+
 
     def _run_function_once(self):
         try:
@@ -6823,6 +6839,11 @@ class AppDialog(QtGui.QWidget):
             self._populate_column_view_widget()
         if self.main_view_mode == self.MAIN_VIEW_SUBMITTED:
             self._populate_submitted_widget()
+
+        # if Show details is checked, populate the shotgun panel
+        #if self.ui.details_tab.isVisible():
+        #    logger.debug(">>>>>>>>>>  Populating shotgun panel widget")
+        self._get_shotgun_panel_widget()
 
         # self. _clean_sg_data()
 
