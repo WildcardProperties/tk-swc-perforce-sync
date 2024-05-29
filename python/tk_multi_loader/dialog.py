@@ -67,6 +67,7 @@ import time
 import tempfile
 
 logger = sgtk.platform.get_logger(__name__)
+import logging
 
 # import frameworks
 shotgun_model = sgtk.platform.import_framework(
@@ -565,6 +566,9 @@ class AppDialog(QtGui.QWidget):
         # self.default_changelist = "0"
         self._actions_change = self.default_changelist.get("Change")
         # self._actions_change = create_change(self._p4, "Perform actions")
+        #################################################
+        # Set logger
+        self._set_logger()
 
         #################################################
         # Perforce data
@@ -632,46 +636,37 @@ class AppDialog(QtGui.QWidget):
 
         ##########################################################################################
 
+    def _set_logger_original(self):
+        # Create custom log handler and add it to the ShotGrid logger
+        sg_log_handler = ShotGridLogHandler(self.ui.log_window)
+        sg_log_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+        logger = sgtk.platform.get_logger(__name__)
+        logger.addHandler(sg_log_handler)
+        logger.setLevel(logging.DEBUG)
 
-    def _get_shotgun_panel_widget_new(self):
-        # Get the current engine
-        engine = sgtk.platform.current_engine()
-        if not engine:
-            logger.error("No current engine found. This code must be run within a Toolkit environment.")
-        else:
-            logger.debug("Current engine name: {}".format(engine.name))
-            logger.debug("Engine apps: {}".format(engine.apps.keys()))
-            logger.debug("Engine commands: {}".format(engine.commands.keys()))
+        # Simulate some log messages
+        logger.debug("Debug message")
+        logger.info("Info message")
+        logger.warning("Warning message")
+        logger.error("Error message")
+        logger.critical("Critical message")
 
-            # Retrieve the desired app, e.g., the Shotgun Panel app
-            shotgun_panel_app = engine.apps.get("tk-multi-shotgunpanel")
+    def _set_logger(self):
+        # Create custom log handler and add it to the ShotGrid logger
+        sg_log_handler = ShotGridLogHandler(self.ui.log_window)
+        # sg_log_handler.setFormatter(logging.Formatter('%(levelname)s - %(message)s'))
+        sg_log_handler.setFormatter(logging.Formatter('%(message)s'))
+        logger = sgtk.platform.get_logger(__name__)
+        logger.addHandler(sg_log_handler)
+        logger.setLevel(logging.DEBUG)
 
-            if shotgun_panel_app:
-                logger.debug("Shotgun Panel app is loaded.")
-                try:
-                    # Use create_widget_for_P4SG() to get the panel widget without creating a new window.
-                    if not self.shotgun_panel_widget:
-                        self.shotgun_panel_widget = shotgun_panel_app.create_widget_for_P4SG(self)
-                        logger.debug(">>>>> self.shotgun_panel_widget: {}".format(self.shotgun_panel_widget))
-
-                    if self.shotgun_panel_widget:
-                        logger.debug(">>>>> entity_data {}".format(self._entity_data))
-                        if self._entity_data:
-                            self._entity_path, entity_id, entity_type = self._get_entity_info(self._entity_data)
-                            logger.debug(">>>>> entity_id: {}, entity_type: {}".format(entity_id, entity_type))
-                            if entity_id and entity_type:
-                                logger.debug(">>>>> Navigate to entity: {}".format(entity_id))
-                                self.shotgun_panel_widget.navigate_to_entity(entity_type, entity_id)
-
-                        # Assuming 'self.ui.panel_layout' is a valid Qt layout
-                        self.ui.panel_layout.addWidget(self.shotgun_panel_widget)
-                        logger.info("Shotgun panel widget added to the layout.")
-                    else:
-                        logger.error("Failed to retrieve the panel widget.")
-                except Exception as e:
-                    logger.error("Failed to create or add the Shotgun panel widget: {}".format(e))
-            else:
-                logger.warning("Shotgun Panel app is not loaded. Please check configuration.")
+        # Simulate some log messages
+        logger.info("Color codes:")
+        logger.debug("Debug message")
+        logger.info("Info message")
+        logger.warning("Warning message")
+        logger.error("Error message")
+        logger.critical("Critical message")
 
 
     def _get_shotgun_panel_widget(self):
@@ -680,47 +675,42 @@ class AppDialog(QtGui.QWidget):
         if not engine:
             logger.error("No current engine found. This code must be run within a Toolkit environment.")
         else:
-            logger.debug("Current engine name: {}".format(engine.name))
-            # logger.debug("Engine apps: {}".format(engine.apps.keys()))
-            # logger.debug("Engine commands: {}".format(engine.commands.keys()))
+            #logger.debug("Current engine name: {}".format(engine.name))
 
             # Retrieve the desired app, e.g., the Shotgun Panel app
             shotgun_panel_app = engine.apps.get("tk-multi-shotgunpanel")
 
             if shotgun_panel_app:
-                logger.debug("Shotgun Panel app is loaded.")
+                #logger.debug("Shotgun Panel app is loaded.")
                 try:
                     # Use create_widget_for_P4SG() to get the panel widget without creating a new window.
                     if not self.shotgun_panel_widget:
                         self.shotgun_panel_widget = shotgun_panel_app.create_widget_for_P4SG(self.ui.panel_details)
-                        # logger.debug(">>>>> self.shotgun_panel_widget: {}".format(self.shotgun_panel_widget))
 
                     if self.shotgun_panel_widget:
-                        logger.debug(">>>>> entity_data {}".format(self._entity_data))
+                        # logger.debug(">>>>> entity_data {}".format(self._entity_data))
                         if self._entity_data:
                             self._entity_path, entity_id, entity_type = self._get_entity_info(self._entity_data)
-                            # logger.debug(">>>>> entity_id: {}, entity_type: {}".format(entity_id, entity_type))
                             if entity_id and entity_type:
-                                logger.debug(">>>>> Navigate to entity: {}".format(entity_id))
+                                logger.debug("Navigate to entity ID # {}".format(entity_id))
                                 self.shotgun_panel_widget.navigate_to_entity(entity_type, entity_id)
-                        """
+
                         # Clear any existing widgets in the layout
                         while self.ui.panel_layout.count():
                             child = self.ui.panel_layout.takeAt(0)
                             if child.widget():
-                                child.widget().deleteLater()
+                                child.widget().setParent(None)  # Remove the widget from the layout without deleting it
 
                         # Add the panel widget to the layout
                         self.ui.panel_layout.addWidget(self.shotgun_panel_widget)
                         logger.info("Shotgun panel widget added to the layout.")
-                        """
+
                     else:
                         logger.error("Failed to retrieve the panel widget.")
                 except Exception as e:
                     logger.error("Failed to create or add the Shotgun panel widget: {}".format(e))
             else:
                 logger.warning("Shotgun Panel app is not loaded. Please check configuration.")
-
 
     def _run_function_once(self):
         try:
@@ -1393,7 +1383,7 @@ class AppDialog(QtGui.QWidget):
     def _on_column_view_set_search_query(self, search_filter):
         # Chech if we are in Column view mode
         if self.main_view_mode == self.MAIN_VIEW_COLUMN:
-            logger.debug(">>>>>>>  _on_column_view_set_search_query: search_filter: {}".format(search_filter))
+            logger.debug("search_filter: {}".format(search_filter))
             if len(search_filter) > 1:
                 self._column_view_search_filter = search_filter
             else:
@@ -1412,7 +1402,7 @@ class AppDialog(QtGui.QWidget):
             # Chech if we are in Column view mode
             if self.main_view_mode == self.MAIN_VIEW_COLUMN:
                 # log search string from self.ui.search_publishes
-                logger.debug(">>>>>>> Column view mode, search is active")
+                logger.debug("Column view mode, search is active")
         else:
             self.ui.search_publishes.setIcon(
                 QtGui.QIcon(QtGui.QPixmap(":/res/search.png"))
@@ -1420,7 +1410,7 @@ class AppDialog(QtGui.QWidget):
             self._search_widget.disable()
             if self.main_view_mode == self.MAIN_VIEW_COLUMN:
                 # log search string from self.ui.search_publishes
-                logger.debug(">>>>>>> Column view mode, search is disabled")
+                logger.debug("Column view mode, search is disabled")
                 self._column_view_search_filter = None
                 self._set_column_group()
 
@@ -1687,7 +1677,7 @@ class AppDialog(QtGui.QWidget):
                     self._create_description_file(files_in_changelist, description)
                 except:
                     pass
-                logger.debug(">>> change is: {}".format(change))
+                logger.debug("change is: {}".format(change))
                 engine = sgtk.platform.current_engine()
                 if engine:
                     app_command = engine.commands.get("Publish...")
@@ -1815,16 +1805,16 @@ class AppDialog(QtGui.QWidget):
             self._populate_pending_widget()
 
     def _after_publish_ui_close(self):
-        logger.debug(">>>> Checking if the publisher UI is closed...")
+        logger.debug("Checking if the publisher UI is closed...")
         # Setup a QTimer to periodically check the condition
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.check_publisher_ui_closed)
         self.timer.start(1000)  # Check every 1000 milliseconds (1 second)
 
     def check_publisher_ui_closed(self):
-        logger.debug(">>>> Checking if the publisher UI is closed through the timer...")
+        logger.debug("Checking if the publisher UI is closed through the timer...")
         if os.path.exists(self._publisher_is_closed_path):
-            logger.debug(">>>> Reading publisher is closed status file {}...".format(self._publisher_is_closed_path))
+            logger.debug("Reading publisher is closed status file {}...".format(self._publisher_is_closed_path))
             with open(self._publisher_is_closed_path, 'r') as infile:
                 first_line = infile.readline().strip()
 
@@ -1833,24 +1823,6 @@ class AppDialog(QtGui.QWidget):
 
             os.remove(self._publisher_is_closed_path)
             self.timer.stop()  # Stop the timer once the file is found and processed
-    def _after_publish_ui_close_original(self):
-        logger.debug(">>>> Checking if the publisher UI is closed...")
-        while not os.path.exists(self._publisher_is_closed_path):
-            time.sleep(2)  # Sleep for a second before checking again
-
-        # Check if the file exists and read it
-        if os.path.exists(self._publisher_is_closed_path):
-            logger.debug(">>>> Reading publisher is closed status file {}...".format(self._publisher_is_closed_path))
-
-            with open(self._publisher_is_closed_path, 'r') as infile:
-                first_line = infile.readline().strip()
-
-            # Check if the GUI was closed properly
-            if "GUI_IS_CLOSED" in first_line:
-                self._populate_pending_widget()
-
-            # Remove the file after reading
-            os.remove(self._publisher_is_closed_path)
 
     def _wait_for_ui_close(self):
         # Placeholder for logic to check if the UI window is closed
@@ -1872,28 +1844,28 @@ class AppDialog(QtGui.QWidget):
         """
         try:
             logger.debug(
-                ">>>> checking for publisher is_closed status file: {} ...".format(self._publisher_is_closed_path))
+                "checking for publisher is_closed status file: {} ...".format(self._publisher_is_closed_path))
 
             if not os.path.exists(self._publisher_is_closed_path):
-                logger.debug(">>>> publisher is_closed file does not exist")
+                logger.debug("publisher is_closed file does not exist")
                 return None
 
             with open(self._publisher_is_closed_path, 'r') as in_file:
                 for line in in_file:
                     line = line.rstrip()
-                    logger.debug(">>>> line: {}".format(line))
+                    # logger.debug(">>>> line: {}".format(line))
                     if ":::" in line:
                         parts = line.split(":::")
                         if len(parts) == 2:
                             base_file, status = parts
-                            logger.debug(">>>> publisher UI is closed status is: {}".format(status))
+                            logger.debug("publisher UI is closed status is: {}".format(status))
                             msg = "\n <span style='color:#2C93E2'>Updating the Pending View ...</span> \n"
                             self._add_log(msg, 2)
                             self._update_pending_view()
                             return status == 'True'
                         else:
                             # This handles the case where the split does not result in 2 parts
-                            logger.debug(">>>> Error: Line does not conform to expected format: '{}'".format(line))
+                            logger.debug("Error: Line does not conform to expected format: '{}'".format(line))
                             return False
                     else:
                         # Handle lines without delimiter or skip
@@ -1901,7 +1873,7 @@ class AppDialog(QtGui.QWidget):
                         logger.debug("Line without delimiter: {}".format(line))
                         return False
         except Exception as e:
-            logger.debug(">>>> Error reading publisher is closed file status {}".format(e))
+            logger.debug("Error reading publisher is closed file status {}".format(e))
             return False
 
     def _create_description_file(self, files_in_changelist, description):
@@ -2000,9 +1972,9 @@ class AppDialog(QtGui.QWidget):
         self._column_view_dict = {}
         self._standard_item_dict = {}
         
-        logger.debug(">>> Setting up Column View table ...")
+        logger.debug("Setting up Column View table ...")
         self._setup_column_view()
-        logger.debug(">>> Getting Perforce data...")
+        logger.debug("Getting Perforce data...")
         self._perforce_sg_data = self._get_perforce_sg_data()
         length = len(self._perforce_sg_data)
         if not self._perforce_sg_data:
@@ -2011,11 +1983,11 @@ class AppDialog(QtGui.QWidget):
             msg = "\n <span style='color:#2C93E2'>Populating the Column View with {} files. Please wait...</span> \n".format(
                 length)
             self._add_log(msg, 2)
-            logger.debug(">>> Getting Perforce file size...")
+            logger.debug("Getting Perforce file size...")
             self._perforce_sg_data = self._get_perforce_size(self._perforce_sg_data)
-            logger.debug(">>> Populating Column View table...")
+            logger.debug("Populating Column View table...")
 
-            logger.debug(">>> Updating Column View is complete")
+            logger.debug("Updating Column View is complete")
             for sg_item in self._perforce_sg_data:
                 # logger.debug("------------------------------------------")
                 #for k, v in sg_item.items():
@@ -2130,14 +2102,14 @@ class AppDialog(QtGui.QWidget):
                             entity_path = self._get_entity_path(entity)
 
                     if entity_path and local_directory:
-                        logger.debug(">>> entity_path: {}".format(entity_path))
-                        logger.debug(">>> local_directory: {}".format(local_directory))
+                        logger.debug("entity_path: {}".format(entity_path))
+                        logger.debug("local_directory: {}".format(local_directory))
                         folder = self._path_difference(entity_path, local_directory)
 
                     if local_directory and not entity_path:
                         # Get the parent directory of local_directory
                         folder = os.path.basename(local_directory)
-                        logger.debug(">>> No entity path found, we will use parent folder: {}".format(folder))
+                        logger.debug("No entity path found, we will use parent folder: {}".format(folder))
                     if folder and folder != "N/A":
                         # folder = "{}\\".format(difference_str)
                         new_sg_item["folder"] = folder
@@ -3050,13 +3022,13 @@ class AppDialog(QtGui.QWidget):
         # Normalize paths to use forward slashes and remove trailing slashes
         path1 = os.path.normpath(path1)
         path2 = os.path.normpath(path2)
-        logger.debug(">>>>>>>>>>>> path1: {}".format(path1))
-        logger.debug(">>>>>>>>>>>> path2: {}".format(path2))
+        #logger.debug(">>>>>>>>>>>> path1: {}".format(path1))
+        #logger.debug(">>>>>>>>>>>> path2: {}".format(path2))
         # Split paths into components
         components1 = path1.split(os.sep)
         components2 = path2.split(os.sep)
-        logger.debug(">>>>>>>>>>>> components1: {}".format(components1))
-        logger.debug(">>>>>>>>>>>> components2: {}".format(components2))
+        #logger.debug(">>>>>>>>>>>> components1: {}".format(components1))
+        #logger.debug(">>>>>>>>>>>> components2: {}".format(components2))
 
         # Find the common prefix
         common_prefix = []
@@ -3308,12 +3280,12 @@ class AppDialog(QtGui.QWidget):
         self._reset_submitted_widget()
         msg = "\n <span style='color:#2C93E2'>Updating data ...</span> \n"
         self._add_log(msg, 2)
-        logger.debug(">>>>>>>>>>  update_fstat_data...")
+        #logger.debug(">>>>>>>>>>  update_fstat_data...")
         self._update_fstat_data()
         # logger.debug(">>>>>>>>>>  Updating self._fstat_dict is: {}")
         # for key, sg_item in self._fstat_dict.items():
         #    logger.debug("{}:{}".format(key, sg_item))
-        logger.debug(">>>>>>>>>>  fix_fstat_dict...")
+        #logger.debug(">>>>>>>>>>  fix_fstat_dict...")
         self._fix_fstat_dict()
 
         length = len(self._fstat_dict)
@@ -3329,7 +3301,7 @@ class AppDialog(QtGui.QWidget):
             # Submitted Scroll Area
             self.ui.submitted_scroll.setWidget(publish_widget)
             # self.ui.submitted_scroll.setVisible(True)
-            logger.debug(">>> Updating submitted_tree_view is complete")
+            #logger.debug(">>> Updating submitted_tree_view is complete")
 
             msg = "\n <span style='color:#2C93E2'>Select files in the Submitted view then click <i>Fix Selected</i> or click <i>Fix All</i> to publish them using the <i>Shotgrid Publisher</i>...</span> \n"
             self._add_log(msg, 2)
@@ -3602,7 +3574,7 @@ class AppDialog(QtGui.QWidget):
                 # Get the entity
                 published_entities = self._app.shotgun.find(entity_type, filters, fields)
 
-                logger.debug(">>>>>>>>>>> Published entity: %s" % published_entities)
+                #logger.debug(">>>>>>>>>>> Published entity: %s" % published_entities)
                 for published_entity in published_entities:
                     # Get the parents
                     linked_assets = published_entity.get("parents", None)
@@ -3610,12 +3582,12 @@ class AppDialog(QtGui.QWidget):
                         for parent in linked_assets:
                             self.entity_parents.append(parent)
 
-                logger.debug(">>>>>>>>>>> Parents: %s" % self.entity_parents)
+                #logger.debug(">>>>>>>>>>> Parents: %s" % self.entity_parents)
                 for entity_parent in self.entity_parents:
                     entity_path, entity_id, entity_type = self._get_entity_info(entity_parent)
                     entity_parent["entity_path"] = entity_path
 
-                logger.debug(">>>>>>>>>>> Parents with paths: %s" % self.entity_parents)
+                #logger.debug(">>>>>>>>>>> Parents with paths: %s" % self.entity_parents)
 
     def _get_entity_parents(self, entity_data):
         """
@@ -3645,11 +3617,11 @@ class AppDialog(QtGui.QWidget):
                 # get the entity
                 published_entities = self._app.shotgun.find(entity_type, filters, fields)
 
-                logger.debug(">>>>>>>>>>> Published entity: %s" % published_entities)
+                #logger.debug(">>>>>>>>>>> Published entity: %s" % published_entities)
                 for published_entity in published_entities:
                     # get the asset parent
                     asset_parent = published_entity.get("sg_asset_parent", None)
-                    logger.debug(">>>>>>>>>>>sg_asset_parent: %s" % asset_parent)
+                    #logger.debug(">>>>>>>>>>>sg_asset_parent: %s" % asset_parent)
                     if asset_parent:
                         self.entity_parents.append(asset_parent)
                     # get the parents
@@ -3658,11 +3630,11 @@ class AppDialog(QtGui.QWidget):
                         for parent in linked_assets:
                             self.entity_parents.append(parent)
 
-                logger.debug(">>>>>>>>>>>Parents: %s" % self.entity_parents)
+                #logger.debug(">>>>>>>>>>>Parents: %s" % self.entity_parents)
                 for entity_parent in self.entity_parents:
                     entity_path, entity_id, entity_type = self._get_entity_info(entity_parent)
                     entity_parent["entity_path"] = entity_path
-                logger.debug(">>>>>>>>>>>Parents with paths: %s" % self.entity_parents)
+                logger.debug("Parents with paths: %s" % self.entity_parents)
 
 
     def _setup_entity_parent_and_children(self, entity_data):
@@ -3695,11 +3667,11 @@ class AppDialog(QtGui.QWidget):
                 # Get the children
                 self.entity_children = published_entity.get("sg_assets", None)
 
-                logger.debug(">>>>>>>>>>> Published entity: %s" % published_entity)
-                logger.debug(">>>>>>>>>>> Asset Parent: %s" % asset_parents)
-                logger.debug(">>>>>>>>>>> Linked Assets: %s" % linked_assets)
-                logger.debug(">>>>>>>>>>>Parents: %s" % self.entity_parents)
-                logger.debug(">>>>>>>>>>> Asset Children: %s" % self.entity_children)
+                #logger.debug(">>>>>>>>>>> Published entity: %s" % published_entity)
+                #logger.debug(">>>>>>>>>>> Asset Parent: %s" % asset_parents)
+                #logger.debug(">>>>>>>>>>> Linked Assets: %s" % linked_assets)
+                #logger.debug(">>>>>>>>>>>Parents: %s" % self.entity_parents)
+                #logger.debug(">>>>>>>>>>> Asset Children: %s" % self.entity_children)
 
                 self._populate_parents_tab(self.entity_parents)
                 self._populate_children_tab(self.entity_children)
@@ -4538,7 +4510,7 @@ class AppDialog(QtGui.QWidget):
         self._add_log(msg, 2)
         # Update the Pending view
         self._update_pending_view()
-        logger.debug(">>>>>>>>>>> Updating the publish view as well")
+        #logger.debug(">>>>>>>>>>> Updating the publish view as well")
         self._on_treeview_item_selected()
 
     def _on_submit_deleted_files(self):
@@ -4563,9 +4535,9 @@ class AppDialog(QtGui.QWidget):
                     if "#" in selected_row_data:
                         target_file = selected_row_data.split("#")[0]
                         target_file = target_file.strip()
-                        logger.debug(">>>>>>>>>>> action:{}".format(action))
-                        logger.debug(">>>>>>>>>>> change:{}".format(change))
-                        logger.debug(">>>>>>>>>>> target_file:{}".format(target_file))
+                        #logger.debug(">>>>>>>>>>> action:{}".format(action))
+                        #logger.debug(">>>>>>>>>>> change:{}".format(change))
+                        #logger.debug(">>>>>>>>>>> target_file:{}".format(target_file))
                         if action in ["delete"]:
                             if target_file not in selected_files_to_delete:
                                 delete_tuple = (change, target_file)
@@ -4647,7 +4619,7 @@ class AppDialog(QtGui.QWidget):
                     if "#" in selected_row_data:
                         target_file = selected_row_data.split("#")[0]
                         target_file = target_file.strip()
-                        logger.debug(">>>>>>>>>>> action:{}".format(action))
+                        #logger.debug(">>>>>>>>>>> action:{}".format(action))
                         if action not in ["delete"]:
                             sg_item = self._get_sg_data_from_source(source_index)
                             if target_file not in selected_files_to_submit:
@@ -4696,7 +4668,7 @@ class AppDialog(QtGui.QWidget):
             i = 0
             for change, target_file, action, sg_item in selected_tuples_to_publish:
                 entity, new_sg_item = self._get_entity_from_sg_item(sg_item)
-                logger.debug(">>>>>>>>>>> entity:{}".format(entity))
+                #logger.debug(">>>>>>>>>>> entity:{}".format(entity))
                 if entity:
                     if new_sg_item:
                         sg_item.update(new_sg_item)
@@ -4708,8 +4680,8 @@ class AppDialog(QtGui.QWidget):
                         file_to_publish = sg_item['path'].get('local_path', None)
                         msg = "({}/{})  Publishing file: {}#{}".format(i + 1, files_count, file_to_publish, rev)
                         self._add_log(msg, 4)
-                        logger.debug(">>>>>>>>>>> file_to_publish:{}".format(file_to_publish))
-                        logger.debug(">>>>>>>>>>> sg_item:{}".format(sg_item))
+                        #logger.debug(">>>>>>>>>>> file_to_publish:{}".format(file_to_publish))
+                        #logger.debug(">>>>>>>>>>> sg_item:{}".format(sg_item))
                         publisher = PublishItem(sg_item)
                         publish_result = publisher.commandline_publishing()
                         # publish_result = publisher.gui_publishing()
@@ -4744,7 +4716,7 @@ class AppDialog(QtGui.QWidget):
         if not sg_item:
             return None, None
 
-        logger.debug(">>>>> _get_entity_from_sg_item: sg_item: {}".format(sg_item))
+        #logger.debug(">>>>> _get_entity_from_sg_item: sg_item: {}".format(sg_item))
         sg_item_path = sg_item.get("path", None)
         if sg_item_path:
             local_path = sg_item_path.get("local_path", None)
@@ -4752,15 +4724,15 @@ class AppDialog(QtGui.QWidget):
             if local_path:
                 if not os.path.exists(local_path):
                     msg = "File does not exist: {}".format(local_path)
-                    logger.debug(">>>>> {}".format(msg))
+                    #logger.debug(">>>>> {}".format(msg))
                     # self.send_error_message(msg)
                     # return None, None
 
                 sg = sgtk.platform.current_bundle()
                 current_relative_path = self.fix_query_path(local_path)
-                logger.debug(">>>>> current_relative_path: {}".format(current_relative_path))
+                #logger.debug(">>>>> current_relative_path: {}".format(current_relative_path))
                 file_name = os.path.basename(local_path)
-                logger.debug(">>>>> file_name: {}".format(file_name))
+                #logger.debug(">>>>> file_name: {}".format(file_name))
                 local_path = local_path.replace("\\", "/")
 
                 # Search by file name
@@ -4773,9 +4745,10 @@ class AppDialog(QtGui.QWidget):
                                                   order=[{'field_name': 'version_number', 'direction': 'desc'}])
 
                 for published_file in published_files:
-                    logger.debug(">>>>> published_file: ")
+                    #logger.debug(">>>>> published_file: ")
                     for k, v in published_file.items():
-                        logger.debug(">>>>> {} : {}".format(k, v))
+                        #logger.debug(">>>>> {} : {}".format(k, v))
+                        pass
                     if "path" in published_file and "local_path" in published_file["path"]:
                         query_local_path = published_file["path"]["local_path"].replace("\\", "/")
                         if query_local_path.endswith(current_relative_path):
@@ -4810,20 +4783,20 @@ class AppDialog(QtGui.QWidget):
         if not sg_item or "path" not in sg_item:
             return None, None
 
-        logger.debug(f">>>>> Checking validity by path parts: sg_item: {sg_item}")
+        logger.debug(f"Checking validity by path parts: sg_item: {sg_item}")
         local_path = sg_item["path"].get("local_path", None)
         if not local_path or not os.path.exists(local_path):
             msg = f"File does not exist: {local_path}"
             logger.debug(f">>>>> {msg}")
             # self.send_error_message(msg)
             # return None, None
-        logger.debug(f">>>>> Checking validity by path parts: local_path: {local_path}")
+        logger.debug(f"Checking validity by path parts: local_path: {local_path}")
 
         sg = sgtk.platform.current_bundle()
 
         # Extract information from the file path using the extract_info_from_path method
         asset_info = self.extract_info_from_path(local_path)
-        logger.debug(f">>>>> Extracted asset info: {asset_info}")
+        logger.debug(f"Extracted asset info: {asset_info}")
 
         # Check if required information is extracted
         if not asset_info.get("project_tank_name") or not asset_info.get("code"):
@@ -4837,11 +4810,11 @@ class AppDialog(QtGui.QWidget):
         entity = sg.shotgun.find_one("Asset", filter_query, ['id', 'code', 'description', 'image', 'project'])
 
         if entity:
-            logger.debug(f">>>>> Retrieved entity: {entity}")
+            logger.debug(f"Retrieved entity: {entity}")
             return entity, None
 
         msg = f"Failed to retrieve the associated ShotGrid entity for the file located at {local_path}"
-        logger.debug(f">>>>> {msg}")
+        logger.debug(f"{msg}")
         return None, None
 
     def extract_info_from_path(self, local_path):
@@ -4860,10 +4833,10 @@ class AppDialog(QtGui.QWidget):
         sg_folder_name: Textures
         code: DinoDefense_UI_Textures
         """
-        logger.debug(f">>>>> Extracting info from path: local_path: {local_path}")
+        logger.debug(f"Extracting info from path: local_path: {local_path}")
         local_path = local_path.replace('//', '/', 1).replace("\\", "/")
         path_parts = local_path.split('/')  # Splitting the path using '/' as separator
-        logger.debug(f">>>>> path_parts: {path_parts}")
+        logger.debug(f"path_parts: {path_parts}")
 
         # Extracting asset information and constructing the 'code'
         asset_info = {
@@ -4906,14 +4879,15 @@ class AppDialog(QtGui.QWidget):
         # Publish depot files
         # Get the selected pending files
         other_data_to_publish, deleted_data_to_publish = self.pending_tree_view.get_selected_publish_items_by_action()
-        logger.debug(">>>>>>>>>>  other_data_to_publish: {}".format(other_data_to_publish))
-        logger.debug(">>>>>>>>>>  deleted_data_to_publish: {}".format(deleted_data_to_publish))
+        #logger.debug(">>>>>>>>>>  other_data_to_publish: {}".format(other_data_to_publish))
+        #logger.debug(">>>>>>>>>>  deleted_data_to_publish: {}".format(deleted_data_to_publish))
         if other_data_to_publish:
             msg = "\n <span style='color:#2C93E2'>Submitting other pending files...</span> \n"
             self._add_log(msg, 2)
             if other_data_to_publish:
+                pass
                 # self._publish_other_pending_data(other_data_to_publish)
-                logger.debug(">>>>>>>>>>  other_data_to_publish: {}".format(other_data_to_publish))
+                #logger.debug(">>>>>>>>>>  other_data_to_publish: {}".format(other_data_to_publish))
 
             msg = "\n <span style='color:#2C93E2'>Updating the Pending view ...</span> \n"
             self._add_log(msg, 2)
@@ -4934,8 +4908,8 @@ class AppDialog(QtGui.QWidget):
             self._add_log(msg, 2)
             for change, file_to_submit in selected_tuples_to_delete:
 
-                logger.debug(">>>>>>>>>>  file_to_submit: {}".format(file_to_submit))
-                logger.debug(">>>>>>>>>>  change: {}".format(change))
+                #logger.debug(">>>>>>>>>>  file_to_submit: {}".format(file_to_submit))
+                #logger.debug(">>>>>>>>>>  change: {}".format(change))
                 if change and file_to_submit:
                     try:
                         msg = "{}".format(file_to_submit)
@@ -4969,7 +4943,7 @@ class AppDialog(QtGui.QWidget):
                         msg = "{}".format(file_to_submit)
                         self._add_log(msg, 4)
                         submit_res = submit_single_file(self._p4, change, file_to_submit, action)
-                        logger.debug(">>>>>>>>>>  Result of submitting files: {}".format(submit_res))
+                        logger.debug("Result of submitting files: {}".format(submit_res))
                         if submit_res:
                             msg = "\n <span style='color:#2C93E2'>File submitted to Perforce:</span> \n".format(file_to_submit)
                             self._add_log(msg, 2)
@@ -5039,7 +5013,7 @@ class AppDialog(QtGui.QWidget):
                         msg = "{}".format(file_to_submit)
                         self._add_log(msg, 4)
                         submit_del_res = submit_change(self._p4, file_to_submit)
-                        logger.debug(">>>>>>>>>>  Result of deleting files: {}".format(submit_del_res))
+                        logger.debug("Result of deleting files: {}".format(submit_del_res))
                         if submit_del_res:
                             # Check if submit_del_res is a list
                             if isinstance(submit_del_res, list) and len(submit_del_res) > 0:
@@ -5056,11 +5030,11 @@ class AppDialog(QtGui.QWidget):
         """
         if deleted_data_to_publish:
             for sg_item in deleted_data_to_publish:
-                logger.debug(">>>>>>>>>>  sg_item {}".format(sg_item))
+                #logger.debug(">>>>>>>>>>  sg_item {}".format(sg_item))
                 file_path = sg_item['path'].get('local_path', None) if 'path' in sg_item else None
-                logger.debug(">>>>>>>>>>  file_path {}".format(file_path))
+                #logger.debug(">>>>>>>>>>  file_path {}".format(file_path))
                 target_context = self._find_task_context(file_path)
-                logger.debug(">>>>>>>>>>  target_context.entity {}".format(target_context.entity))
+                #logger.debug(">>>>>>>>>>  target_context.entity {}".format(target_context.entity))
                 if target_context.entity and file_path:
                     sg_item["entity"] = target_context.entity
 
@@ -5120,7 +5094,7 @@ class AppDialog(QtGui.QWidget):
         # Make the Shotgrid API call to search for versions
         versions = self._app.shotgun("Version", filters, fields, order=[{"field_name": "created_at", "direction": "asc"}])
 
-        logger.debug(">>>>>>>>>>   versions {}".format(versions))
+        logger.debug("versions {}".format(versions))
 
     def _on_fix_selected(self):
         """
@@ -5131,7 +5105,7 @@ class AppDialog(QtGui.QWidget):
         #self._get_submitted_publish_data()
 
         self._submitted_data_to_publish = self.submitted_tree_view.get_selected_publish_items()
-        logger.debug(">>>>>>>>>>   self._submitted_data_to_publish {}".format( self._submitted_data_to_publish))
+        #logger.debug(">>>>>>>>>>   self._submitted_data_to_publish {}".format( self._submitted_data_to_publish))
         #self._publish_submitted_data_using_publisher_ui()
         self._publish_submitted_data_using_command_line()
 
@@ -5164,7 +5138,7 @@ class AppDialog(QtGui.QWidget):
         if not os.path.exists(self._home_dir):
             os.makedirs(self._home_dir)
         self._publish_files_path = "{}/publish_files.txt".format(self._home_dir)
-        logger.debug(">>>>>>>>>>   self._publish_files_path {}".format(self._publish_files_path))
+        #logger.debug(">>>>>>>>>>   self._publish_files_path {}".format(self._publish_files_path))
         self._publish_files_description = "{}/publish_files_description.txt".format(self._home_dir)
         self._publisher_is_closed_path = "{}/publisher_is_closed.txt".format(self._home_dir)
 
@@ -5249,14 +5223,14 @@ class AppDialog(QtGui.QWidget):
 
 
     def _sync_entity_parents(self):
-        logger.debug(">>> getting entity parents")
-        logger.debug(">>> self._entity_data {}".format(self._entity_data))
+        logger.debug("Getting entity parents")
+        #logger.debug(">>> self._entity_data {}".format(self._entity_data))
 
         # logger.debug(">>> getting entity parents")
         self._get_entity_parents(self._entity_data)
         #logger.debug(">>> preparing entity parents published files")
         #self._prepare_entity_parents_published_files()
-        logger.debug(">>> syncing entity parents published files")
+        logger.debug("Syncing entity parents published files")
         self._sync_entity_parents_published_files()
 
     def _get_perforce_summary(self):
@@ -5305,7 +5279,7 @@ class AppDialog(QtGui.QWidget):
 
                         out_file.write('%s\n' % file_to_publish)
                         action = self._get_action(sg_item)
-                        logger.debug(">>>>>>>>>>  file_to_publish: {}".format(file_to_publish))
+                        #logger.debug(">>>>>>>>>>  file_to_publish: {}".format(file_to_publish))
                         #logger.debug(">>>>>>>>>>  action: {}".format(action))
                         if action:
                             action = self.action_dict.get(action, None)
@@ -5451,12 +5425,12 @@ class AppDialog(QtGui.QWidget):
 
     def _sync_file(self, file_name, i, total):
         # Sync file
-        logger.debug("--------->>>>>>  Syncing file: {}".format(file_name))
-        logger.debug("--------->>>>>>  i: {}".format(i))
-        logger.debug("--------->>>>>>  total: {}".format(total))
+        logger.debug("Syncing file: {}".format(file_name))
+        logger.debug("i: {}".format(i))
+        logger.debug("total: {}".format(total))
 
         p4_result = self._p4.run("sync", "-f", file_name + "#head")
-        logger.debug("--------->>>>>>  p4_result is: {}".format(p4_result))
+        logger.debug("p4_result is: {}".format(p4_result))
 
         if p4_result:
             # Update log
@@ -5487,7 +5461,7 @@ class AppDialog(QtGui.QWidget):
             count = 1
             while len(threads) > 0:
                 if threading.activeCount() <= max_threads:
-                    logger.debug("--------->>>>>>  count: {}".format(count))
+                    #logger.debug("--------->>>>>>  count: {}".format(count))
                     thread = threads.pop()
                     thread.start()
                     count += 1
@@ -5496,7 +5470,7 @@ class AppDialog(QtGui.QWidget):
             for thread in threads:
                 thread.join()
             #   #thread.wait()
-
+    """
     def _sync_file_threads(self, file_name):
         # Sync file
         logger.debug("--------->>>>>>  Syncing file: {}".format(file_name))
@@ -5513,6 +5487,7 @@ class AppDialog(QtGui.QWidget):
             self._add_progress_bar(progress_sum)
             #time.sleep(1)
         QtCore.QCoreApplication.processEvents()
+    """
 
     def _do_sync_files_ThreadPoolExecutor(self, files_to_sync):
 
@@ -5711,7 +5686,7 @@ class AppDialog(QtGui.QWidget):
     def run_sync(self):
         # Sync files
         p4_response = self._p4.run(self.sync_command)
-        logger.debug(">>>>>>> Result of syncing files ..." )
+        logger.debug("Result of syncing files ..." )
         for entry in p4_response:
             logger.debug("{}".format(entry))
 
@@ -5824,8 +5799,8 @@ class AppDialog(QtGui.QWidget):
         else:
             msg = "{}".format(msg)
         self.ui.log_window.append(msg)
-        if flag < 4:
-            logger.debug(msg)
+        #if flag < 4:
+        #    logger.debug(msg)
         self.ui.log_window.verticalScrollBar().setValue(self.ui.log_window.verticalScrollBar().maximum())
         QtCore.QCoreApplication.processEvents()
 
@@ -6585,7 +6560,7 @@ class AppDialog(QtGui.QWidget):
         Get entity path
         """
         entity_path, entity_id, entity_type = None, 0, None
-        logger.debug(">>>>>>>>>>>>>> entity_data is: {}".format(entity_data))
+        # logger.debug(">>>>>>>>>>>>>> entity_data is: {}".format(entity_data))
         if entity_data:
             entity_id = entity_data.get('id', 0)
             entity_type = entity_data.get('type', None)
@@ -6597,9 +6572,9 @@ class AppDialog(QtGui.QWidget):
                         entity_type = entity.get('type', None)
 
             entity_path = self._app.sgtk.paths_from_entity(entity_type, entity_id)
-            logger.debug(">>>>>>>>>>>>>> entity_id is: {}".format(entity_id))
-            logger.debug(">>>>>>>>>>>>>> entity_type is: {}".format(entity_type))
-            logger.debug(">>>>>>>>>>>>>> entity_path is: {}".format(entity_path))
+            # logger.debug(">>>>>>>>>>>>>> entity_id is: {}".format(entity_id))
+            # logger.debug(">>>>>>>>>>>>>> entity_type is: {}".format(entity_type))
+            # logger.debug(">>>>>>>>>>>>>> entity_path is: {}".format(entity_path))
 
             if entity_path and len(entity_path) > 0:
                 entity_path = entity_path[-1]
@@ -6738,7 +6713,7 @@ class AppDialog(QtGui.QWidget):
         """
         active_sg_status_list = ["ip", "rdy", "hld", "rev"]
         entity_path, entity_id, entity_type = None, 0, None
-        logger.debug(">>>>>>>>>>>>>> entity_data is: {}".format(entity_data))
+        # logger.debug(">>>>>>>>>>>>>> entity_data is: {}".format(entity_data))
         if entity_data:
             entity_id = entity_data.get('id', 0)
             entity_type = entity_data.get('type', None)
@@ -6753,10 +6728,10 @@ class AppDialog(QtGui.QWidget):
                         # Create SG file system structure
                         try:
                             sg_status = entity_data.get('sg_status_list', None)
-                            logger.debug(">>>>>>>>>>>>>> sg_status is: {}".format(sg_status))
+                            #logger.debug(">>>>>>>>>>>>>> sg_status is: {}".format(sg_status))
                             if sg_status in active_sg_status_list:
                                 entity_path = self._app.sgtk.paths_from_entity(entity_type, entity_id)
-                                logger.debug(">>>>>>>>>>>>>> current entity_path is: {}".format(entity_path))
+                                #logger.debug(">>>>>>>>>>>>>> current entity_path is: {}".format(entity_path))
                                 # self._app.sgtk.synchronize_filesystem_structure()
                                 # if not entity_path or len(entity_path) == 0 or not os.path.exists(entity_path[0]):
                                 msg = "\n <span style='color:#2C93E2'>Creating file system structure for entity: id:{}, name: {}, path:{} ...</span> \n".format(
@@ -6794,15 +6769,15 @@ class AppDialog(QtGui.QWidget):
                 new_name = "{}{}".format(entity_name, red_exclamation)
             if action == "success" and "!" in entity_name:
                 new_name = entity_name.replace("!", "")
-            logger.debug(">>>>>>>>>>>>>> new entity name is: {}".format(new_name))
+            #logger.debug(">>>>>>>>>>>>>> new entity name is: {}".format(new_name))
             # Update the entity name using sg.update()
 
             self._app.shotgun.update(entity_type, entity_id, {'code': new_name})
-            logger.debug(">>>>>>>>>>>>>> Reloading entity presets: {}".format(new_name))
+            #logger.debug(">>>>>>>>>>>>>> Reloading entity presets: {}".format(new_name))
             self._load_entity_presets()
         except Exception as e:
             # Handle any exceptions that may occur during the update
-            logger.debug(">>>>>>>>>>>>>> Unable to update entity name for {}: {}".format(entity_name, e))
+            logger.debug("Unable to update entity name for {}: {}".format(entity_name, e))
 
             pass
 
@@ -6810,7 +6785,7 @@ class AppDialog(QtGui.QWidget):
         """
         Slot triggered when someone changes the selection in a treeview.
         """
-        logger.debug(">>>>>>>>>>  view_mode is: {}".format(self.main_view_mode))
+        #logger.debug("view_mode is: {}".format(self.main_view_mode))
         self._fstat_dict = {}
         self._entity_data, item = self._reload_treeview()
 
@@ -6834,7 +6809,7 @@ class AppDialog(QtGui.QWidget):
         self._update_perforce_data()
         self.print_publish_data()
 
-        logger.debug(">>> main_view_mode is: {}".format(self.main_view_mode))
+        #logger.debug("main_view_mode is: {}".format(self.main_view_mode))
         if self.main_view_mode == self.MAIN_VIEW_COLUMN:
             self._populate_column_view_widget()
         if self.main_view_mode == self.MAIN_VIEW_SUBMITTED:
@@ -6883,7 +6858,7 @@ class AppDialog(QtGui.QWidget):
 
     def get_current_publish_data(self, entity_id, entity_type):
         self._sg_data = []
-        logger.debug(">>>>>>>>>>  entity_type: {}".format(entity_type))
+        logger.debug("Entity type is {}".format(entity_type))
         if entity_id and entity_type:
             filters = [[]]
             if entity_type == "Asset":
@@ -6920,7 +6895,7 @@ class AppDialog(QtGui.QWidget):
             logger.debug("Unable to get current publish data, entity_id or entity_type is None")
 
     def _update_perforce_data(self):
-        logger.debug(">>>>>>>>>>  _get_perforce_data: START")
+        #logger.debug(">>>>>>>>>>  _get_perforce_data: START")
         msg = "\n <span style='color:#2C93E2'>Retrieving Data from Perforce...</span> \n"
         self._add_log(msg, 2)
         self._get_perforce_data()
@@ -6943,9 +6918,9 @@ class AppDialog(QtGui.QWidget):
 
         #msg = "\n <span style='color:#2C93E2'>Soft refreshing data ...</span> \n"
         #self._add_log(msg, 2)
-        logger.debug(">>>>>>>>>>  publish_model.async_refresh...")
+        #logger.debug(">>>>>>>>>>  publish_model.async_refresh...")
         self._publish_model.async_refresh()
-        logger.debug(">>>>>>>>>>  _get_perforce_data: DONE")
+        #logger.debug(">>>>>>>>>>  _get_perforce_data: DONE")
 
 
     def print_publish_data(self):
@@ -7077,7 +7052,7 @@ class AppDialog(QtGui.QWidget):
             is_folder = item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
             if is_folder:
                 sg_item = shotgun_model.get_sg_data(model_index)
-                logger.debug(">>>>>>>>>>  sg_item is: {}".format(sg_item))
+                #logger.debug(">>>>>>>>>>  sg_item is: {}".format(sg_item))
                 if not sg_item:
                     msg = "\n <span style='color:#2C93E2'>Unable to get item data</span> \n"
                     self._add_log(msg, 2)
@@ -7111,7 +7086,7 @@ class AppDialog(QtGui.QWidget):
         try:
 
             uf = self._app.sgtk.get_command("unregister_folders")
-            logger.debug(">>>>>>>>>>  uf command is: {}".format(uf))
+            #logger.debug(">>>>>>>>>>  uf command is: {}".format(uf))
             message_list = []
 
             tk = sgtk.sgtk_from_entity(entity_type, entity_id)
@@ -7277,7 +7252,7 @@ class AppDialog(QtGui.QWidget):
 
         if selected_actions:
             self.perform_changelist_selection(selected_actions)
-        logger.debug(">>>>>>>>>>  publish_model.async_refresh...")
+        #logger.debug(">>>>>>>>>>  publish_model.async_refresh...")
         self._publish_model.async_refresh()
 
 
@@ -7327,8 +7302,8 @@ class AppDialog(QtGui.QWidget):
             # ["entity", "path_cache", "path", "version_number", "name", "description", "created_at", "created_by", "image", "published_file_type", "task","],
         )
 
-        logger.debug(">>>> entity_published_files: {}", entity_published_files)
-        logger.debug(">>>> entity_versions: {}", entity_versions)
+        #logger.debug(">>>> entity_published_files: {}", entity_published_files)
+        #logger.debug(">>>> entity_versions: {}", entity_versions)
 
 
 
@@ -7594,7 +7569,7 @@ class AppDialog(QtGui.QWidget):
         self._submitted_changes = {}
         self._submitted_data_to_publish = []
 
-        logger.debug("self._entity_path is: {}".format(self._entity_path))
+        logger.debug("Entity path is: {}".format(self._entity_path))
 
         if self._entity_path:
             self._item_path_dict[self._entity_path] += 1
@@ -7609,7 +7584,7 @@ class AppDialog(QtGui.QWidget):
 
         for key in self._item_path_dict:
             if key:
-                logger.debug(">>>>>>>>>>  key is: {}".format(key))
+                #logger.debug(">>>>>>>>>>  key is: {}".format(key))
                 key = self._convert_local_to_depot(key).rstrip('/')
                 fstat_list = self._p4.run_fstat('-Of', key + '/...')
                 self._get_submitted_changelists(key)
@@ -7900,3 +7875,80 @@ class MyLineEdit(QtWidgets.QLineEdit):
     def get_current_text(self):
         # logger.debug(">>>>>>>>>>  self._currentText is: {}".format(self._currentText))
         return self._currentText  # Accessor method to get the stored text
+
+class ShotGridLogHandlerOriginal(logging.Handler):
+    def __init__(self, log_window):
+        super().__init__()
+        self.log_window = log_window
+        self.log_queue = []
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.flush)
+        self.timer.start(100)  # Update log window every 100ms
+
+    def emit(self, record):
+        msg = self.format(record)
+        color = self.get_color(record.levelno)
+        formatted_msg = f'<span style="color: {color};">{msg}</span>'
+        self.log_queue.append(formatted_msg)
+
+    def flush(self):
+        if self.log_queue:
+            self.log_window.append(''.join(self.log_queue))
+            self.log_queue = []
+            self.log_window.verticalScrollBar().setValue(self.log_window.verticalScrollBar().maximum())
+            QtCore.QCoreApplication.processEvents()
+
+    def get_color(self, levelno):
+        if levelno == logging.DEBUG:
+            return 'grey'
+        elif levelno == logging.INFO:
+            return 'white'
+        elif levelno == logging.WARNING:
+            return 'yellow'
+        elif levelno == logging.ERROR:
+            return 'red'
+        elif levelno == logging.CRITICAL:
+            return 'orange'
+        return 'grey'
+class ShotGridLogHandler(logging.Handler):
+    def __init__(self, log_window):
+        super().__init__()
+        self.log_window = log_window
+        self.log_queue = []
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.flush)
+        self.timer.start(100)  # Update log window every 100ms
+
+    def is_debug_logging_disabled(self):
+        # find if shotgrid debug logging is disabled
+        return False
+
+    def emit(self, record):
+        if record.levelno == logging.DEBUG and self.is_debug_logging_disabled():
+            return  # Skip debug logs if debug logging is enabled
+
+        msg = self.format(record)
+        color = self.get_color(record.levelno)
+        formatted_msg = f'<span style="color: {color};">{msg}</span><br>'
+        self.log_queue.append(formatted_msg)
+
+    def flush(self):
+        if self.log_queue:
+            self.log_window.append(''.join(self.log_queue))
+            self.log_queue = []
+            self.log_window.verticalScrollBar().setValue(self.log_window.verticalScrollBar().maximum())
+            QtCore.QCoreApplication.processEvents()
+
+
+    def get_color(self, levelno):
+        if levelno == logging.DEBUG:
+            return '#A9A9A9'  # Dark Grey
+        elif levelno == logging.INFO:
+            return '#D3D3D3'  # Light Grey
+        elif levelno == logging.WARNING:
+            return '#FFD700'  # Dark Yellow
+        elif levelno == logging.ERROR:
+            return '#B22222'  # Dark Red
+        elif levelno == logging.CRITICAL:
+            return '#FF8C00'  # Dark Orange
+        return '#A9A9A9'  # Dark Grey

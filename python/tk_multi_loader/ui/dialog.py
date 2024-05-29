@@ -341,8 +341,8 @@ class Ui_Dialog(object):
         self.label_8.setMaximumHeight(5)
         self.verticalLayout.addWidget(self.label_8)
 
-        self.horizontalLayout_8 = QtGui.QHBoxLayout()
-        self.horizontalLayout_8.setObjectName("horizontalLayout_8")
+        self.log_window_container = QtGui.QHBoxLayout()
+        self.log_window_container.setObjectName("log_window_container")
         self.log_window = QtWidgets.QTextBrowser()
         self.log_window.verticalScrollBar().setValue(self.log_window.verticalScrollBar().maximum())
         self.log_window.setMinimumHeight(187)
@@ -351,8 +351,8 @@ class Ui_Dialog(object):
         # self.log_window.setMaximumWidth(630)
 
         # self.log_window.setMinimumSize(QtCore.QSize(100, 100))
-        self.horizontalLayout_8.addWidget(self.log_window)
-        self.verticalLayout.addLayout(self.horizontalLayout_8)
+        self.log_window_container.addWidget(self.log_window)
+        self.verticalLayout.addLayout(self.log_window_container)
 
         self.horizontalLayout_4 = QtGui.QHBoxLayout()
         # self.horizontalLayout_4.setContentsMargins(0, 4, 4, 4)
@@ -583,147 +583,6 @@ class Ui_Dialog(object):
         self.details_tab.addTab(self.file_details, "Files")
         self.details_tab.addTab(self.panel_details, "Panel")
 
-        # Add this part to the setupUi method where appropriate
-
-
-
-        # Entity details
-        """
-        self.entity_details = QtGui.QGroupBox(Dialog)
-        self.entity_details.setMinimumSize(QtCore.QSize(300, 0))
-        self.entity_details.setMaximumSize(QtCore.QSize(300, 16777215))
-        self.entity_details.setTitle("")
-        self.entity_details.setObjectName("details")
-        self.verticalLayout_3_2 = QtGui.QVBoxLayout(self.entity_details)
-        self.verticalLayout_3_2.setSpacing(2)
-        self.verticalLayout_3_2.setContentsMargins(4, 4, 4, 4)
-        self.verticalLayout_3_2.setObjectName("verticalLayout_3")
-        self.horizontalLayout_2 = QtGui.QHBoxLayout()
-        self.horizontalLayout_2.setObjectName("horizontalLayout")
-        spacerItem2 = QtGui.QSpacerItem(40, 20, QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
-        self.horizontalLayout_2.addItem(spacerItem2)
-        self.entity_details_image = QtGui.QLabel(self.entity_details)
-        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.entity_details_image.sizePolicy().hasHeightForWidth())
-        self.entity_details_image.setSizePolicy(sizePolicy)
-        self.entity_details_image.setMinimumSize(QtCore.QSize(256, 200))
-        self.entity_details_image.setMaximumSize(QtCore.QSize(256, 200))
-        self.entity_details_image.setScaledContents(True)
-        self.entity_details_image.setAlignment(QtCore.Qt.AlignCenter)
-        self.entity_details_image.setObjectName("details_image")
-        self.horizontalLayout_2.addWidget(self.entity_details_image)
-        spacerItem3 = QtGui.QSpacerItem(40, 20, QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
-        self.horizontalLayout_2.addItem(spacerItem3)
-        self.verticalLayout_3_2.addLayout(self.horizontalLayout_2)
-        self.horizontalLayout_5_2 = QtGui.QHBoxLayout()
-        self.horizontalLayout_5_2.setObjectName("horizontalLayout_5")
-        self.entity_details_header = QtGui.QLabel(self.entity_details)
-        self.entity_details_header.setAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
-        self.entity_details_header.setWordWrap(True)
-        self.entity_details_header.setObjectName("details_header")
-        self.horizontalLayout_5_2.addWidget(self.entity_details_header)
-        spacerItem4 = QtGui.QSpacerItem(40, 20, QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
-        self.horizontalLayout_5_2.addItem(spacerItem4)
-        self.verticalLayout_4 = QtGui.QVBoxLayout()
-        self.verticalLayout_4.setObjectName("verticalLayout_4")
-        """
-        """
-        self.entity_detail_playback_btn = QtGui.QToolButton(self.entity_details)
-        self.entity_detail_playback_btn.setMinimumSize(QtCore.QSize(55, 55))
-        self.entity_detail_playback_btn.setMaximumSize(QtCore.QSize(55, 55))
-        self.entity_detail_playback_btn.setText("")
-        icon4 = QtGui.QIcon()
-        icon4.addPixmap(QtGui.QPixmap(":/res/play_icon.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
-        self.entity_detail_playback_btn.setIcon(icon4)
-        self.entity_detail_playback_btn.setIconSize(QtCore.QSize(40, 40))
-        self.entity_detail_playback_btn.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
-        self.entity_detail_playback_btn.setObjectName("detail_playback_btn")
-        self.verticalLayout_4.addWidget(self.entity_detail_playback_btn)
-        """
-
-        """
-        self.entity_detail_actions_btn = QtGui.QToolButton(self.entity_details)
-        self.entity_detail_actions_btn.setMinimumSize(QtCore.QSize(55, 0))
-        self.entity_detail_actions_btn.setMaximumSize(QtCore.QSize(55, 16777215))
-        self.entity_detail_actions_btn.setPopupMode(QtGui.QToolButton.InstantPopup)
-        self.entity_detail_actions_btn.setToolButtonStyle(QtCore.Qt.ToolButtonTextOnly)
-        self.entity_detail_actions_btn.setObjectName("entity_detail_actions_btn")
-        self.verticalLayout_4.addWidget(self.entity_detail_actions_btn)
-        """
-        """
-        self.horizontalLayout_5_2.addLayout(self.verticalLayout_4)
-        self.verticalLayout_3_2.addLayout(self.horizontalLayout_5_2)
-
-        # Entity tabs
-        self.entity_tab = QtGui.QTabWidget(Dialog)
-        self.entity_tab.setObjectName("tab_widget")
-
-        # Entity parents tab
-        self.entity_parents_label = QtGui.QLabel(self.entity_details)
-        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Maximum)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.entity_parents_label.sizePolicy().hasHeightForWidth())
-        self.entity_parents_label.setSizePolicy(sizePolicy)
-        self.entity_parents_label.setStyleSheet("QLabel { padding-top: 14px}")
-        self.entity_parents_label.setAlignment(QtCore.Qt.AlignCenter)
-        self.entity_parents_label.setWordWrap(True)
-        self.entity_parents_label.setObjectName("entity_parents_label")
-        self.verticalLayout_3_2.addWidget(self.entity_parents_label)
-        self.entity_parents_view = QtGui.QListView(self.entity_details)
-        self.entity_parents_view.setVerticalScrollMode(QtGui.QAbstractItemView.ScrollPerPixel)
-        self.entity_parents_view.setHorizontalScrollMode(QtGui.QAbstractItemView.ScrollPerPixel)
-        self.entity_parents_view.setUniformItemSizes(True)
-        self.entity_parents_view.setObjectName("entity_parents_view")
-
-
-
-        # Entity children tab
-        self.entity_children_label = QtGui.QLabel(self.entity_details)
-        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Maximum)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.entity_children_label.sizePolicy().hasHeightForWidth())
-        self.entity_children_label.setSizePolicy(sizePolicy)
-        self.entity_children_label.setStyleSheet("QLabel { padding-top: 14px}")
-        self.entity_children_label.setAlignment(QtCore.Qt.AlignCenter)
-        self.entity_children_label.setWordWrap(True)
-        self.entity_children_label.setObjectName("entity_children_label")
-        self.verticalLayout_3_2.addWidget(self.entity_children_label)
-        self.entity_children_view = QtGui.QListView(self.entity_details)
-        self.entity_children_view.setVerticalScrollMode(QtGui.QAbstractItemView.ScrollPerPixel)
-        self.entity_children_view.setHorizontalScrollMode(QtGui.QAbstractItemView.ScrollPerPixel)
-        self.entity_children_view.setUniformItemSizes(True)
-        self.entity_children_view.setObjectName("entity_children_view")
-        """
-
-        """
-        self.sync_entity_files = QtGui.QToolButton(Dialog)
-        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Preferred)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.sync_entity_files.sizePolicy().hasHeightForWidth())
-        self.sync_entity_files.setSizePolicy(sizePolicy)
-        self.sync_entity_files.setMinimumSize(QtCore.QSize(80, 26))
-        self.sync_entity_files.setObjectName("Sync entity files")
-        #self.horizontalLayout_6.addWidget(self.sync_entity_files)
-        """
-        #self.entity_tab.addTab(self.entity_parents_view, "Parents")
-        #self.entity_tab.addTab(self.entity_children_view, "Children")
-        #self.verticalLayout_3_2.addWidget(self.entity_tab)
-        #self.verticalLayout_3_2.addWidget(self.sync_entity_files)
-
-
-        #self.details_tab.addTab(self.entity_details, "Entity")
-
-        # self.verticalLayout_3_2.setStretch(1, 1)
-        #self.horizontalLayout_3.addWidget(self.file_details)
-        #self.horizontalLayout_3.addWidget(self.details_tab)
-
-        #self.horizontalLayout_3.setStretch(0, 1)
-        #self.horizontalLayout_3.setStretch(1, 2)
 
         self.retranslateUi(Dialog)
         self.entity_preset_tabs.setCurrentIndex(-1)
