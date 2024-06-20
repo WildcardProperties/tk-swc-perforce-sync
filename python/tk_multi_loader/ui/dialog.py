@@ -599,6 +599,12 @@ class Ui_Dialog(object):
         Dialog.setTabOrder(self.submit_files, self.thumb_scale)
         Dialog.setTabOrder(self.thumb_scale, self.file_history_view)
 
+        self.sync_files.setEnabled(True)
+        self.sync_parents.setEnabled(True)
+        self.fix_selected.setEnabled(False)
+        self.fix_all.setEnabled(False)
+        self.submit_files.setEnabled(False)
+
     def retranslateUi(self, Dialog):
         Dialog.setWindowTitle(QtGui.QApplication.translate("Dialog", "Load items into your scene", None, QtGui.QApplication.UnicodeUTF8))
         self.navigation_home.setToolTip(QtGui.QApplication.translate("Dialog", "Clicking the <i>home button</i> will take you to the location that best matches your current work area.", None, QtGui.QApplication.UnicodeUTF8))

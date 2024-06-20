@@ -1466,6 +1466,12 @@ class AppDialog(QtGui.QWidget):
             self.ui.publish_view.setItemDelegate(self._publish_list_delegate)
             #self._show_thumb_scale(False)
             self.main_view_mode = self.MAIN_VIEW_LIST
+            self.ui.sync_files.setEnabled(True)
+            self.ui.sync_parents.setEnabled(True)
+            self.ui.fix_selected.setEnabled(False)
+            self.ui.fix_all.setEnabled(False)
+            self.ui.submit_files.setEnabled(False)
+
 
         elif mode == self.MAIN_VIEW_THUMB:
             self._turn_all_modes_off()
@@ -1483,6 +1489,11 @@ class AppDialog(QtGui.QWidget):
             self.ui.publish_view.setItemDelegate(self._publish_thumb_delegate)
             self._show_thumb_scale(True)
             self.main_view_mode = self.MAIN_VIEW_THUMB
+            self.ui.sync_files.setEnabled(True)
+            self.ui.sync_parents.setEnabled(True)
+            self.ui.fix_selected.setEnabled(False)
+            self.ui.fix_all.setEnabled(False)
+            self.ui.submit_files.setEnabled(False)
 
         elif mode == self.MAIN_VIEW_COLUMN:
             self._turn_all_modes_off()
@@ -1494,6 +1505,11 @@ class AppDialog(QtGui.QWidget):
             self.main_view_mode = self.MAIN_VIEW_COLUMN
             self.ui.publish_view.setItemDelegate(self._publish_list_delegate)
             self._populate_column_view_widget()
+            self.ui.sync_files.setEnabled(True)
+            self.ui.sync_parents.setEnabled(True)
+            self.ui.fix_selected.setEnabled(False)
+            self.ui.fix_all.setEnabled(False)
+            self.ui.submit_files.setEnabled(False)
 
         elif mode == self.MAIN_VIEW_SUBMITTED:
             self._turn_all_modes_off()
@@ -1507,9 +1523,19 @@ class AppDialog(QtGui.QWidget):
 
             self.main_view_mode = self.MAIN_VIEW_SUBMITTED
             self._populate_submitted_widget()
+            self.ui.sync_files.setEnabled(False)
+            self.ui.sync_parents.setEnabled(False)
+            self.ui.fix_selected.setEnabled(True)
+            self.ui.fix_all.setEnabled(True)
+            self.ui.submit_files.setEnabled(False)
 
         elif mode == self.MAIN_VIEW_PENDING:
             self._populate_pending_widget()
+            self.ui.sync_files.setEnabled(False)
+            self.ui.sync_parents.setEnabled(False)
+            self.ui.fix_selected.setEnabled(False)
+            self.ui.fix_all.setEnabled(False)
+            self.ui.submit_files.setEnabled(True)
         else:
             raise TankError("Undefined view mode!")
 
