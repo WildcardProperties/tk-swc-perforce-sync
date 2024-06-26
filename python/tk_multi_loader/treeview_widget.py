@@ -67,79 +67,25 @@ class SWCTreeView(QtWidgets.QTreeView):
             if index != current_index:
                 model.select(index, QtCore.QItemSelectionModel.Deselect)
 
-    def adjust_selection_mode_old4(self, index):
-        """
-        Adjusts the selection mode and clears the selection if the clicked item is of a different type (parent or child).
-        """
-        is_parent = not index.parent().isValid()
-
-        # Clear the current selection if the new selection is of a different type
-        current_selection = self.selectionModel().selectedIndexes()
-        if current_selection:
-            # Check if the current selection type differs from the clicked item type
-            is_currently_parent = not current_selection[0].parent().isValid()
-            if is_parent != is_currently_parent:
-                self.clear_selection_except_current(index)
-
-        # Set the selection mode
-        if is_parent:
-            self.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
-        else:
-            self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
-
-        # Select the clicked item
-        self.selectionModel().select(index, QtCore.QItemSelectionModel.Select)
-
-    def adjust_selection_mode_old3(self, index):
-        """
-        Adjusts the selection mode based on the clicked item and updates the selection.
-        If a parent item is clicked, it clears the selection and selects the parent.
-        If a child item is clicked, it keeps the existing child selections and ensures
-        the last selected item is visible.
-        """
-        is_parent = not index.parent().isValid()
-
-        # Set the selection mode
-        if is_parent:
-            # Clear the selection only if the clicked item is a parent
-            self.clearSelection()
-            self.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
-        else:
-            # For child items, maintain existing selections (if any)
-            self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
-
-        # Ensure the clicked item is included in the selection
-        self.selectionModel().select(index, QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows)
-
-        # Scroll to the last selected item to bring it into focus
-        self.scrollTo(index, QtWidgets.QAbstractItemView.PositionAtCenter)
-
-
-    def adjust_selection_mode_old(self, index):
-        """
-        Adjusts the selection mode and clears the selection if the clicked item is of a different type (parent or child).
-        """
-        is_parent = not index.parent().isValid()
-
-        # Clear the current selection if the new selection is of a different type
-        current_selection = self.selectionModel().selectedIndexes()
-        if current_selection:
-            # Check if the current selection type differs from the clicked item type
-            is_currently_parent = not current_selection[0].parent().isValid()
-            if is_parent != is_currently_parent:
-                self.clearSelection()
-
-        # Set the selection mode
-        if is_parent:
-            self.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
-        else:
-            self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
-
-        # Select the clicked item
-        self.selectionModel().select(index, QtCore.QItemSelectionModel.Select)
-
-
     def adjust_selection_mode(self, index):
+        """
+        Adjusts the selection mode based on whether the clicked item is a parent or a child.
+        """
+        is_parent = not index.parent().isValid()
+        if self.mode == "submitted":
+            if is_parent:
+                self.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+            else:
+                self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        elif self.mode == "pending":
+            if is_parent:
+                self.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+            else:
+                # self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+                self.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+
+
+    def adjust_selection_mode_pending(self, index):
         """
         Adjusts the selection mode based on whether the clicked item is a parent or a child.
         """
@@ -148,7 +94,8 @@ class SWCTreeView(QtWidgets.QTreeView):
         if is_parent:
             self.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         else:
-            self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+            self.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+            # self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
 
     def set_mode(self, mode):
         self.mode = mode

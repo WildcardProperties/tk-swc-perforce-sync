@@ -59,6 +59,7 @@ from .publish_files_ui import PublishFilesUI
 
 from .perforce_change import create_change, add_to_change, submit_change, submit_and_delete_file, submit_single_file, submit_and_delete_file_list
 from .treeview_widget import TreeViewWidget, SWCTreeView
+from .submit_changelist_widget import SubmitChangelistWidget
 from .changelist_selection_operation import ChangelistSelection
 from collections import defaultdict, OrderedDict
 import os
@@ -616,6 +617,8 @@ class AppDialog(QtGui.QWidget):
             "ztl": "ZBrush Document",
             "json": "JSON File",
             "pkl": "Python Pickle",
+            "aep": " Adobe After Effects",
+            "webm": "WebM Format",
         }
         ##########################################################################################
         # Filesystem for cureent user tasks:
@@ -946,6 +949,8 @@ class AppDialog(QtGui.QWidget):
                             sg_item = fstat_list[0]
                             sg_item['description'] = default_changelist.get("Description", None)
                             sg_item['p4_user'] = default_changelist.get('User', None)
+                            sg_item['client'] = default_changelist.get('client', None)
+                            sg_item['time'] = default_changelist.get('time', None)
                             # sg_item['change'] = default_changelist.get('Change', None)
                             # sg_item['status'] = default_changelist.get("Status", None)
                             # sg_item['Published'] = False
@@ -1002,6 +1007,8 @@ class AppDialog(QtGui.QWidget):
                         sg_item['headTime'] = change_list.get('time', None)
                         sg_item['p4_user'] = change_list.get('user', None)
                         sg_item['description'] = change_list.get('desc', None)
+                        sg_item['client'] = change_list.get('client', None)
+                        sg_item['time'] = change_list.get('time', None)
                         # Add info sg_item
                         self._change_dict[key].append(sg_item)
 
@@ -1575,6 +1582,11 @@ class AppDialog(QtGui.QWidget):
 
         #msg = "\n <span style='color:#2C93E2'>Choose the files you want to publish from the Pending view and then initiate the publishing process using the Shotgrid Publisher by clicking 'Submit Files'.</span> \n"
         self._add_log(msg, 2)
+        self.ui.sync_files.setEnabled(False)
+        self.ui.sync_parents.setEnabled(False)
+        self.ui.fix_selected.setEnabled(False)
+        self.ui.fix_all.setEnabled(False)
+        self.ui.submit_files.setEnabled(True)
 
 
     def _create_pending_view_context_menu(self):
@@ -4526,12 +4538,125 @@ class AppDialog(QtGui.QWidget):
             if default_action:
                 default_action.trigger()
 
+    def get_p4(self):
+        return self._p4
+
     def _on_submit_files(self):
+        """
+        When someone clicks on the "Submit Files" button
+        Show the SubmitChangelist Widget
+        """
+        change_sg_item = self._get_submit_changelist_widget_data()
+
+        submitter_widget = SubmitChangelistWidget(self)
+
+        logger.debug(">>>>>>>>>>> Submit Widget Dict:{}".format(self._submit_widget_dict))
+        if change_sg_item and self._submit_widget_dict:
+            submitter_widget.populate_file_table(self._p4, change_sg_item, self._submit_widget_dict)
+        # submitter_widget.submit_button.clicked.connect(lambda: self._on_submit_changelist(submitter_widget))
+        submitter_widget.show()
+
+    def _get_submit_changelist_widget_data(self):
+        """
+        When someone clicks on the "Submit Files" button
+        Show the SubmitChangelist Widget
+        """
+        selected_indexes = self._pending_view_widget.selectionModel().selectedRows()
+        selected_depot_files = []
+        self._submit_widget_dict = {}
+        change_sg_item = None
+
+        for selected_index in selected_indexes:
+            try:
+                source_index = self._pending_view_model.mapToSource(selected_index)
+                change = self._get_change_data_from_source(source_index)
+                logger.debug("-----------------------------------------------")
+                logger.debug(">>>>>>>>>>> change:{}".format(change))
+                change_key = str(change)
+                children = self._change_dict.get(change_key, None)
+                #logger.debug(">>>>>>>>>>>change dict:")
+                #for k, v in self._change_dict.items():
+                #    logger.debug("Change:{} values:{}".format(k, v))
+
+                if children:
+                    for sg_item in children:
+                        logger.debug(">>>>>>>>>>> sg_item:{}".format(sg_item))
+                        if sg_item:
+                            if 'depotFile' in sg_item:
+                                depot_file = sg_item.get('depotFile', None)
+                                if depot_file and depot_file not in selected_depot_files:
+                                    selected_depot_files.append(depot_file)
+                                    file_info = {}
+                                    file_name, folder, file_type = self._extract_file_info(depot_file)
+                                    action = self._get_action(sg_item)
+                                    file_info["file"] = file_name
+                                    file_info["folder"] = folder
+                                    file_info["type"] = file_type
+                                    file_info["sg_item"] = sg_item
+                                    file_info["pending_action"] = action
+                                    file_info["resolve_status"] = "N/A"
+                                    key = (file_name, folder)
+                                    self._submit_widget_dict[key] = file_info
+                            if 'changeListInfo' in sg_item:
+                                change_sg_item = sg_item
+                                change_sg_item["change"] = change
+
+            except Exception as e:
+                logger.debug("Error getting file info: {}".format(e))
+
+        return change_sg_item
+
+    def _extract_file_info(self, target_file):
+        # Get file name, extension and folder
+        file_name = os.path.basename(target_file)
+        folder = os.path.dirname(target_file)
+        extension = os.path.splitext(file_name)[1]
+        extension = extension[1:] if extension else "N/A"
+        # logger.debug(">>>>>>>>>>> Extension:{}".format(extension))
+        type = self.settings.get(extension, "N/A")
+        # logger.debug(">>>>>>>>>>> Type:{}".format(type))
+        return file_name, folder, type
+
+    def _on_submit_changelist(self, submitter_widget):
+        """
+        Callback for the submit button in the SubmitChangelistWidget
+        """
+        description = submitter_widget.changelist_description.toPlainText()
+        selected_files = []
+        for row in range(submitter_widget.files_table_widget.rowCount()):
+            if submitter_widget.files_table_widget.item(row, 0).checkState() == QtCore.Qt.Checked:
+                file_info = {
+                    "file": submitter_widget.files_table_widget.item(row, 1).text(),
+                    "folder": submitter_widget.files_table_widget.item(row, 2).text(),
+                    "resolve_status": submitter_widget.files_table_widget.item(row, 3).text(),
+                    "type": submitter_widget.files_table_widget.item(row, 4).text(),
+                    "pending_action": submitter_widget.files_table_widget.item(row, 5).text(),
+                }
+                selected_files.append(file_info)
+
+        if not description:
+            QtGui.QMessageBox.warning(submitter_widget, "Warning", "Changelist description cannot be empty.")
+            return
+
+        if not selected_files:
+            QtGui.QMessageBox.warning(submitter_widget, "Warning", "No files selected for submission.")
+            return
+
+        # Here you would add the logic to submit the changelist with the selected files and description
+        print(f"Submitting changelist with description: {description}")
+        print("Files to be submitted:")
+        for file_info in selected_files:
+            print(f"- {file_info}")
+
+        # Close the dialog after submission
+        submitter_widget.accept()
+
+    def _on_submit_files_original(self):
         """
                 When someone clicks on the "Submit Files" button
         """
-        self._on_submit_deleted_files()
-        self._on_submit_other_files()
+        self.on_submit_deleted_files()
+        self.on_submit_other_files()
         msg = "\n <span style='color:#2C93E2'>Updating the Pending view ...</span> \n"
         self._add_log(msg, 2)
         # Update the Pending view
@@ -4539,7 +4664,7 @@ class AppDialog(QtGui.QWidget):
         #logger.debug(">>>>>>>>>>> Updating the publish view as well")
         self._on_treeview_item_selected()
 
-    def _on_submit_deleted_files(self):
+    def on_submit_deleted_files(self, change_sg_item, file_info_deleted):
         """
         When someone clicks on the "Submit Files" button
         Send pending files to the Shotgrid Publisher.
@@ -4547,54 +4672,22 @@ class AppDialog(QtGui.QWidget):
         selected_files_to_delete = []
         selected_tuples_to_delete = []
         selected_tuples_to_publish = []
-
-        selected_indexes = self._pending_view_widget.selectionModel().selectedRows()
-        for selected_index in selected_indexes:
+        change = change_sg_item.get("change", None)
+        for file_info in file_info_deleted:
             target_file = None
             try:
-                source_index = self._pending_view_model.mapToSource(selected_index)
-                selected_row_data = self._get_pending_data_from_source(source_index)
-                action = self._get_action_data_from_source(source_index)
-                change = self._get_change_data_from_source(source_index)
-                sg_item = self._get_sg_data_from_source(source_index)
-                if selected_row_data:
-                    if "#" in selected_row_data:
-                        target_file = selected_row_data.split("#")[0]
-                        target_file = target_file.strip()
-                        #logger.debug(">>>>>>>>>>> action:{}".format(action))
-                        #logger.debug(">>>>>>>>>>> change:{}".format(change))
-                        #logger.debug(">>>>>>>>>>> target_file:{}".format(target_file))
-                        if action in ["delete"]:
-                            if target_file not in selected_files_to_delete:
-                                delete_tuple = (change, target_file)
-                                publish_tuple = (change, target_file, action, sg_item)
-                                selected_files_to_delete.append(target_file)
-                                selected_tuples_to_delete.append(delete_tuple)
-                                selected_tuples_to_publish.append(publish_tuple)
-                    else:
-                        # Parent row
-                        if change and not action:
-                            key = str(change)
-                            # logger.debug(">>>>>>>>>>>_on_submit_deleted_files: change :{}".format(change))
-                            # logger.debug(">>>>>>>>>>>_on_submit_deleted_files:  self._change_dict[change]:{}".format(self._change_dict.get(key, None)))
-                            children = self._change_dict.get(key, None)
-                            if children:
-                                for sg_item in children:
-                                    target_file = sg_item.get("depotFile", None)
-                                    action = self._get_action(sg_item)
-                                    if target_file and action and action in ["delete"]:
-                                        target_file = target_file.split("#")[0]
-                                        target_file = target_file.strip()
-                                        if target_file not in selected_files_to_delete:
-                                            delete_tuple = (change, target_file)
-                                            publish_tuple = (change, target_file, action, sg_item)
-                                            selected_files_to_delete.append(target_file)
-                                            selected_tuples_to_delete.append(delete_tuple)
-                                            selected_tuples_to_publish.append(publish_tuple)
+                action = file_info_deleted.get("pending_action", None)
+                sg_item = file_info_deleted.get("sg_item", None)
+                if sg_item:
+                    target_file = sg_item.get("depotFile", None)
 
-
-                # logger.debug(">>>>>>>>>>> selected_files_to_delete:{}".format(selected_files_to_delete))
-                #vlogger.debug(">>>>>>>>>>> selected_tuples_to_delete:{}".format(selected_tuples_to_delete))
+                    if action in ["delete"]:
+                        if target_file not in selected_files_to_delete:
+                            delete_tuple = (change, target_file)
+                            publish_tuple = (change, target_file, action, sg_item)
+                            selected_files_to_delete.append(target_file)
+                            selected_tuples_to_delete.append(delete_tuple)
+                            selected_tuples_to_publish.append(publish_tuple)
 
             except Exception as e:
                 logger.debug("Error deleting file {}: {}".format(target_file, e))
@@ -4617,7 +4710,6 @@ class AppDialog(QtGui.QWidget):
                     self._publish_pending_data_using_command_line(selected_tuples_to_publish)
                     self._delete_pending_data(selected_tuples_to_delete)
 
-
                 msg = "\n <span style='color:#2C93E2'>Updating the Pending view ...</span> \n"
                 self._add_log(msg, 2)
                 # Update the Pending view
@@ -4626,51 +4718,27 @@ class AppDialog(QtGui.QWidget):
             msg = "\n <span style='color:#2C93E2'>Please select files marked for deletion in the Pending view...</span> \n"
             self._add_log(msg, 2)
 
-    def _on_submit_other_files(self):
+    def on_submit_other_files(self, change_sg_item, file_info_other):
         """
         When someone clicks on the "Submit Files" button
         Send pending files to the Shotgrid Publisher.
         """
         selected_files_to_submit = []
         selected_tuples_to_submit = []
-        selected_indexes = self._pending_view_widget.selectionModel().selectedRows()
-        for selected_index in selected_indexes:
+        change = change_sg_item.get("change", None)
+        for file_info in file_info_other:
             try:
-                source_index = self._pending_view_model.mapToSource(selected_index)
-                selected_row_data = self._get_pending_data_from_source(source_index)
-                action = self._get_action_data_from_source(source_index)
-                change = self._get_change_data_from_source(source_index)
+                target_file = None
+                action = file_info.get("pending_action", None)
+                sg_item = file_info.get("sg_item", None)
+                if sg_item:
+                    target_file = sg_item.get("depotFile", None)
 
-                if selected_row_data:
-                    if "#" in selected_row_data:
-                        target_file = selected_row_data.split("#")[0]
-                        target_file = target_file.strip()
-                        #logger.debug(">>>>>>>>>>> action:{}".format(action))
-                        if action not in ["delete"]:
-                            sg_item = self._get_sg_data_from_source(source_index)
-                            if target_file not in selected_files_to_submit:
-                                submit_tuple = (change, target_file, action, sg_item)
-                                selected_files_to_submit.append(target_file)
-                                selected_tuples_to_submit.append(submit_tuple)
-                    else:
-                        # Parent row
-                        if change and not action:
-                            key = str(change)
-                            # logger.debug(">>>>>>>>>>>_on_submit_deleted_files: change :{}".format(change))
-                            # logger.debug(">>>>>>>>>>>_on_submit_deleted_files:  self._change_dict[change]:{}".format(self._change_dict.get(key, None)))
-                            children = self._change_dict.get(key, None)
-                            if children:
-                                for sg_item in children:
-                                    target_file = sg_item.get("depotFile", None)
-                                    action = self._get_action(sg_item)
-                                    if target_file and action and action not in ["delete"]:
-                                        target_file = target_file.split("#")[0]
-                                        target_file = target_file.strip()
-                                        if target_file not in selected_files_to_submit:
-                                            submit_tuple = (change, target_file, action, sg_item)
-                                            selected_files_to_submit.append(target_file)
-                                            selected_tuples_to_submit.append(submit_tuple)
-
+                    if target_file and action not in ["delete"]:
+                        if target_file not in selected_files_to_submit:
+                            submit_tuple = (change, target_file, action, sg_item)
+                            selected_files_to_submit.append(target_file)
+                            selected_tuples_to_submit.append(submit_tuple)
 
             except Exception as e:
                 logger.debug("{}".format(e))
@@ -4679,8 +4747,6 @@ class AppDialog(QtGui.QWidget):
 
             self._submit_other_pending_data(selected_tuples_to_submit)
             self._publish_pending_data_using_command_line(selected_tuples_to_submit)
-
-
 
     def _publish_pending_data_using_command_line(self, selected_tuples_to_publish):
         """
