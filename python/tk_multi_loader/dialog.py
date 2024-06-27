@@ -187,7 +187,7 @@ class AppDialog(QtGui.QWidget):
         self.ui.submitted_mode.clicked.connect(self._on_submitted_mode_clicked)
         self.ui.pending_mode.clicked.connect(self._on_pending_mode_clicked)
 
-        self.update_pending_view_signal.connect(self._update_pending_view)
+        self.update_pending_view_signal.connect(self.update_pending_view)
         ###########################################
         # Shotgun Panel
         #
@@ -637,6 +637,8 @@ class AppDialog(QtGui.QWidget):
             logger.debug(e)
             pass
 
+        ##########################################################################################
+        self.submitter_widget = None
         ##########################################################################################
 
     def _set_logger_original(self):
@@ -1683,6 +1685,8 @@ class AppDialog(QtGui.QWidget):
         selected_files_to_delete = []
         selected_actions_to_move = []
         selected_files_to_move = []
+        engine = sgtk.platform.current_engine()
+        logger.debug(">>>>>>>>>>> engine is: {}".format(engine))
 
         # First, gather all the files that are to be reverted
         selected_indexes = self._pending_view_widget.selectionModel().selectedRows()
@@ -1872,7 +1876,7 @@ class AppDialog(QtGui.QWidget):
 
         msg = "\n <span style='color:#2C93E2'>Updating the Pending View ...</span> \n"
         self._add_log(msg, 2)
-        self._update_pending_view()
+        self.update_pending_view()
 
 
 
@@ -1899,7 +1903,7 @@ class AppDialog(QtGui.QWidget):
                             logger.debug("publisher UI is closed status is: {}".format(status))
                             msg = "\n <span style='color:#2C93E2'>Updating the Pending View ...</span> \n"
                             self._add_log(msg, 2)
-                            self._update_pending_view()
+                            self.update_pending_view()
                             return status == 'True'
                         else:
                             # This handles the case where the split does not result in 2 parts
@@ -3348,7 +3352,7 @@ class AppDialog(QtGui.QWidget):
         null_widget = SWCTreeView()
         self.ui.submitted_scroll.setWidget(null_widget)
 
-    def _update_pending_view(self):
+    def update_pending_view(self):
         """
         Shows the pending view
         """
@@ -4541,20 +4545,31 @@ class AppDialog(QtGui.QWidget):
     def get_p4(self):
         return self._p4
 
+    def _clear_pending_view_widget(self):
+        """
+        Clears the pending view widget to reset its state.
+        """
+        if self.submitter_widget:
+            self.submitter_widget.clearSelection()
+            self.submitter_widget.setModel(None)
+
+
     def _on_submit_files(self):
         """
         When someone clicks on the "Submit Files" button
         Show the SubmitChangelist Widget
         """
-        change_sg_item = self._get_submit_changelist_widget_data()
+        # Clear the pending view widget before using it again
+        #self._clear_pending_view_widget()
+        self.change_sg_item = self._get_submit_changelist_widget_data()
+        if self.change_sg_item and self._submit_widget_dict:
+            self.submitter_widget = SubmitChangelistWidget(parent=self, myp4=self._p4, chane_item=self.change_sg_item, file_dict=self._submit_widget_dict)
+            logger.debug(">>>>>>>>>>> Submit Widget Dict:{}".format(self._submit_widget_dict))
 
-        submitter_widget = SubmitChangelistWidget(self)
-
-        logger.debug(">>>>>>>>>>> Submit Widget Dict:{}".format(self._submit_widget_dict))
-        if change_sg_item and self._submit_widget_dict:
-            submitter_widget.populate_file_table(self._p4, change_sg_item, self._submit_widget_dict)
-        # submitter_widget.submit_button.clicked.connect(lambda: self._on_submit_changelist(submitter_widget))
-        submitter_widget.show()
+            self.submitter_widget.show()
+        else:
+            msg = "\n <span style='color:#2C93E2'>No files selected for submission.</span> \n"
+            self._add_log(msg, 2)
 
     def _get_submit_changelist_widget_data(self):
         """
@@ -4660,7 +4675,7 @@ class AppDialog(QtGui.QWidget):
         msg = "\n <span style='color:#2C93E2'>Updating the Pending view ...</span> \n"
         self._add_log(msg, 2)
         # Update the Pending view
-        self._update_pending_view()
+        self.update_pending_view()
         #logger.debug(">>>>>>>>>>> Updating the publish view as well")
         self._on_treeview_item_selected()
 
@@ -4713,7 +4728,7 @@ class AppDialog(QtGui.QWidget):
                 msg = "\n <span style='color:#2C93E2'>Updating the Pending view ...</span> \n"
                 self._add_log(msg, 2)
                 # Update the Pending view
-                # self._update_pending_view()
+                # self.update_pending_view()
         else:
             msg = "\n <span style='color:#2C93E2'>Please select files marked for deletion in the Pending view...</span> \n"
             self._add_log(msg, 2)
@@ -4984,7 +4999,7 @@ class AppDialog(QtGui.QWidget):
             msg = "\n <span style='color:#2C93E2'>Updating the Pending view ...</span> \n"
             self._add_log(msg, 2)
             # Update the Pending view
-            self._update_pending_view()
+            self.update_pending_view()
         else:
             msg = "\n <span style='color:#2C93E2'>Please select files in the Pending view...</span> \n"
             self._add_log(msg, 2)
@@ -5079,7 +5094,7 @@ class AppDialog(QtGui.QWidget):
 
             msg = "\n <span style='color:#2C93E2'>Updating the Pending View ...</span> \n"
             self._add_log(msg, 2)
-            self._update_pending_view()
+            self.update_pending_view()
 
 
 
@@ -5410,7 +5425,7 @@ class AppDialog(QtGui.QWidget):
 
             msg = "\n <span style='color:#2C93E2'>Updating the Pending View ...</span> \n"
             self._add_log(msg, 2)
-            self._update_pending_view()
+            self.update_pending_view()
 
         else:
             msg = "\n <span style='color:#2C93E2'>Check files in the Pending view to publish using the Shotgrid Publisher</span> \n"

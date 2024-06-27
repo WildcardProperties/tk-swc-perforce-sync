@@ -11,17 +11,14 @@ class SubmitChangelistWidget(QtWidgets.QDialog):
     Widget to submit and edit a changelist
     """
 
-    def __init__(self, parent=None, myp4=None, chane_item=None, file_dict=None):
+    def __init__(self, parent=None):
         super(SubmitChangelistWidget, self).__init__(parent)
 
         # Setup the UI
         self.setObjectName('submit_changelist_widget')
         self.setMinimumSize(1000, 618)
         self.setWindowTitle('Submit Changelist')
-        self.parent = parent
-        self.p4 = myp4
-        self.change_sg_item = chane_item
-        self.submit_widget_dict = file_dict
+        self.p4 = None
 
         # Main Layout
         self.main_layout = QtWidgets.QVBoxLayout()
@@ -79,7 +76,7 @@ class SubmitChangelistWidget(QtWidgets.QDialog):
         self.files_table_widget = QtWidgets.QTableWidget(0, 6)  # Adjusted for 6 columns (including checkbox)
         self.files_table_widget.setHorizontalHeaderLabels(
             ['', 'File', 'In Folder', 'Resolve Status', 'Type', 'Pending Action'])
-
+        #self.populate_file_table({})
 
         # Adjust column resizing to fit content and stretch
         header = self.files_table_widget.horizontalHeader()
@@ -96,18 +93,18 @@ class SubmitChangelistWidget(QtWidgets.QDialog):
         # Buttons
         self.select_all_button = QtWidgets.QPushButton('Select All')
         self.select_all_button.setFixedWidth(100)
-        self.select_all_button.setFixedHeight(22.5)
+        self.select_all_button.setFixedHeight(22.5)  
         self.select_all_button.clicked.connect(self.select_all)
 
         self.select_none_button = QtWidgets.QPushButton('Select None')
         self.select_none_button.setFixedWidth(100)
-        self.select_none_button.setFixedHeight(22.5)
+        self.select_none_button.setFixedHeight(22.5)  
         self.select_none_button.clicked.connect(self.select_none)
 
         self.submit_button = QtWidgets.QPushButton('Submit')
         self.submit_button.setToolTip('Submit the selected files in the changelist')
         self.submit_button.setFixedWidth(100)
-        self.submit_button.setFixedHeight(22.5)
+        self.submit_button.setFixedHeight(22.5)  
         self.submit_button.clicked.connect(self.submit_changelist)
 
         self.save_button = QtWidgets.QPushButton('Save')
@@ -119,7 +116,7 @@ class SubmitChangelistWidget(QtWidgets.QDialog):
         self.cancel_button = QtWidgets.QPushButton('Cancel')
         self.cancel_button.setToolTip('Cancel the operation')
         self.cancel_button.setFixedWidth(100)
-        self.cancel_button.setFixedHeight(22.5)
+        self.cancel_button.setFixedHeight(22.5)  
         self.cancel_button.clicked.connect(self.cancel_action)
 
         # Button Layout
@@ -136,25 +133,27 @@ class SubmitChangelistWidget(QtWidgets.QDialog):
         self.setLayout(self.main_layout)
 
         self.update_buttons_state()
-        self.populate_file_table()
+        self.submit_widget_dict = {}
+        self.change_sg_item = {}
 
-
-    def populate_file_table(self):
+    def populate_file_table(self, p4, change_sg_item, file_info_dict):
         """
         Populate the table widget with the files to submit.
         """
-        #self.files_table_widget.setRowCount(0)  # Clear existing rows
+        self.files_table_widget.setRowCount(0)  # Clear existing rows
+        self.submit_widget_dict = file_info_dict
+        self.change_sg_item = change_sg_item
+        self.p4 = p4
 
-
-        description = self.change_sg_item.get("description", "")
-        user = self.change_sg_item.get("p4_user", "")
-        head_time = self.change_sg_item.get("headTime", "")
-        change_time = self.change_sg_item.get("time", "")
+        description = change_sg_item.get("description", "")
+        user = change_sg_item.get("p4_user", "")
+        head_time = change_sg_item.get("headTime", "")
+        change_time = change_sg_item.get("time", "")
         # logger.debug(f"head_time:{head_time}, change_time:{change_time}")
         date_time = self._fix_timestamp(head_time)
         # logger.debug(f"date_time:{date_time}")
-        change = self.change_sg_item.get("change", "")
-        workspace = self.change_sg_item.get("client", "")
+        change = change_sg_item.get("change", "")
+        workspace = change_sg_item.get("client", "")
         self.changelist_description.setText(description)
         self.user_value.setText(user)
 
@@ -166,14 +165,14 @@ class SubmitChangelistWidget(QtWidgets.QDialog):
         has_files = False
         if description:
             description_length = len(description)
-        if self.submit_widget_dict:
-            has_files = len(self.submit_widget_dict.values()) > 0
+        if file_info_dict:
+            has_files = len(file_info_dict.values()) > 0
 
         self.submit_button.setEnabled(description_length >= 5 and has_files)
         self.save_button.setEnabled(description_length >= 5)
 
         row_position = 0
-        for key, file_info in self.submit_widget_dict.items():
+        for key, file_info in file_info_dict.items():
             # logger.debug(">>>>>>>>>>> file_info:{}".format(file_info))
 
             self.files_table_widget.insertRow(row_position)
@@ -189,6 +188,7 @@ class SubmitChangelistWidget(QtWidgets.QDialog):
             self.files_table_widget.setItem(row_position, 3, QtWidgets.QTableWidgetItem(file_info["resolve_status"]))
             self.files_table_widget.setItem(row_position, 4, QtWidgets.QTableWidgetItem(file_info["type"]))
             self.files_table_widget.setItem(row_position, 5, QtWidgets.QTableWidgetItem(file_info["pending_action"]))
+
 
             row_position += 1
 
@@ -289,33 +289,23 @@ class SubmitChangelistWidget(QtWidgets.QDialog):
 
         if file_info_deleted:
             logger.debug(">>>>>>>>>>> Submitting files for deletion:{}".format(file_info_deleted))
-            self.parent.on_submit_deleted_files(self.change_sg_item, file_info_deleted)
+            self.parent().on_submit_deleted_files(self.change_sg_item, file_info_deleted)
         if file_info_other:
             logger.debug(">>>>>>>>>>> Submitting other files:{}".format(file_info_other))
-            self.parent.on_submit_other_files(self.change_sg_item, file_info_other)
+            self.parent().on_submit_other_files(self.change_sg_item, file_info_other)
         if not file_info_deleted and not file_info_other:
             logger.debug(">>>>>>>>>>> No files to submit")
         if file_info_deleted or file_info_other:
             msg = "\n <span style='color:#2C93E2'>Updating the Pending view ...</span> \n"
-            self.parent._add_log(msg, 2)
+            self.parent()._add_log(msg, 2)
             # Update the Pending view
-            self.parent._populate_pending_widget()
+            self.parent()._update_pending_view()
             # logger.debug(">>>>>>>>>>> Updating the publish view as well")
-            self.parent._on_treeview_item_selected()
+            self.parent()._on_treeview_item_selected()
 
         # Close the dialog after submission
         self.accept()
 
-    def _get_submit_changelist_widget_data(self):
-        """
-        Retrieve data from the submit changelist widget
-        """
-        if self._pending_view_widget is not None and self._pending_view_widget.selectionModel() is not None:
-            selected_indexes = self._pending_view_widget.selectionModel().selectedRows()
-            return selected_indexes
-        else:
-            logger.error("Pending view widget or its selection model is already deleted.")
-            return []
 
     def cancel_action(self):
         """
@@ -343,10 +333,9 @@ class SubmitChangelistWidget(QtWidgets.QDialog):
             self.p4.save_change(changelist_spec)
             logger.debug(f"Changelist {change} saved with description: {description}")
             msg = "\n <span style='color:#2C93E2'>Updating the Pending view ...</span> \n"
-            self.parent._add_log(msg, 2)
+            self.parent()._add_log(msg, 2)
             # Update the Pending view
-            # self.parent.update_pending_view()
-            self.parent._populate_pending_widget()
+            self.parent()._update_pending_view()
         except Exception as e:
             logger.error(f"Failed to save changelist {change}: {e}")
             QtWidgets.QMessageBox.critical(self, "Error", f"Failed to save changelist: {e}")
@@ -354,3 +343,4 @@ class SubmitChangelistWidget(QtWidgets.QDialog):
 
         # Close the dialog after saving
         self.accept()
+
