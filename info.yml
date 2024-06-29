@@ -154,3 +154,4 @@ frameworks:
     - {"name": "tk-swc-framework-shotgunutils", "version": "v5.x.x", "minimum_version": "v5.2.1"}
     - {"name": "tk-framework-qtwidgets", "version": "v2.x.x"}
     - {"name": "tk-framework-perforce", "version": "v0.x.x"}
+    - {"name": "tk-framework-swc", "version": "v1.x.x"}

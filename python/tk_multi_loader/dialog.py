@@ -89,6 +89,10 @@ shotgun_globals = sgtk.platform.import_framework(
     "tk-swc-framework-shotgunutils", "shotgun_globals"
 )
 
+swc_fw = sgtk.platform.import_framework(
+    "tk-framework-swc", "Context_Utils"
+)
+
 ShotgunModelOverlayWidget = overlay_widget.ShotgunModelOverlayWidget
 
 
@@ -120,8 +124,6 @@ class AppDialog(QtGui.QWidget):
         :param parent:          The parent QWidget for this control
         """
        #QtGui.QWidget.__init__(self, parent)
-
-
         self._action_manager = action_manager
 
         # The loader app can be invoked from other applications with a custom
@@ -4890,73 +4892,20 @@ class AppDialog(QtGui.QWidget):
         if not sg_item or "path" not in sg_item:
             return None, None
 
-        logger.debug(f"Checking validity by path parts: sg_item: {sg_item}")
+        logger.debug(f">>>>> Checking validity by path parts: sg_item: {sg_item}")
+
         local_path = sg_item["path"].get("local_path", None)
-        if not local_path or not os.path.exists(local_path):
-            msg = f"File does not exist: {local_path}"
-            logger.debug(f">>>>> {msg}")
-            # self.send_error_message(msg)
-            # return None, None
-        logger.debug(f"Checking validity by path parts: local_path: {local_path}")
+        
+        try:
+            target_context = swc_fw.find_task_context(local_path)
+        except(AttributeError):
+            logger.debug(f">>>>> {AttributeError}")  
 
-        sg = sgtk.platform.current_bundle()
-
-        # Extract information from the file path using the extract_info_from_path method
-        asset_info = self.extract_info_from_path(local_path)
-        logger.debug(f"Extracted asset info: {asset_info}")
-
-        # Check if required information is extracted
-        if not asset_info.get("project_tank_name") or not asset_info.get("code"):
-            logger.debug("Unable to extract necessary information from the file path.")
-            return None, None
-
-        # Constructing the filter query based on the extracted information
-        # Adjust this query as per your requirement and available fields in ShotGrid
-        filter_query = [['project.Project.tank_name', 'is', asset_info["project_tank_name"]],
-                        ['code', 'is', asset_info["code"]]]
-        entity = sg.shotgun.find_one("Asset", filter_query, ['id', 'code', 'description', 'image', 'project'])
-
-        if entity:
-            logger.debug(f"Retrieved entity: {entity}")
+        if target_context:
+            entity = target_context
             return entity, None
-
-        msg = f"Failed to retrieve the associated ShotGrid entity for the file located at {local_path}"
-        logger.debug(f"{msg}")
+        
         return None, None
-
-    def extract_info_from_path(self, local_path):
-        """
-        Extract information from the file path.
-        This function parses the local_path to extract various asset-related information,
-        such as the project tank name, asset library, asset type, asset section, and folder name.
-        The 'code' is also constructed from these extracted parts.
-
-        Example:
-        Extracting info from path: local_path: Z:/ArkDepot/Mods/DinoDefense/Content/UI/Textures/_raw/TXR/backdrop.png
-        Project Tank Name: ArkDepot
-        sg_asset_library: DinoDefense
-        sg_asset_type: Content
-        sg_asset_section: UI
-        sg_folder_name: Textures
-        code: DinoDefense_UI_Textures
-        """
-        logger.debug(f"Extracting info from path: local_path: {local_path}")
-        local_path = local_path.replace('//', '/', 1).replace("\\", "/")
-        path_parts = local_path.split('/')  # Splitting the path using '/' as separator
-        logger.debug(f"path_parts: {path_parts}")
-
-        # Extracting asset information and constructing the 'code'
-        asset_info = {
-            "project_tank_name": path_parts[1],  # Extracting project tank name
-            "sg_asset_library": path_parts[3],  # Extracting asset library
-            "sg_asset_type": path_parts[4],  # Extracting asset type
-            "sg_asset_section": path_parts[5],  # Extracting asset section
-            "sg_folder_name": path_parts[6]  # Extracting folder name
-        }
-        asset_info["code"] = "_".join(
-            [asset_info["sg_asset_library"], asset_info["sg_asset_section"], asset_info["sg_folder_name"]])
-
-        return asset_info
 
     def fix_query_path_1(self, current_relative_path):
         # Normalize the current relative path to ensure consistent path separators
