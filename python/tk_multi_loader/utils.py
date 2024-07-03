@@ -11,6 +11,7 @@
 import sgtk
 from sgtk.platform.qt import QtCore, QtGui
 import os
+logger = sgtk.platform.get_logger(__name__)
 
 
 class ResizeEventFilter(QtCore.QObject):
@@ -386,3 +387,97 @@ def get_action_icon(action):
         else:
             return p4_file_add_icon, p4_file_add_path
     return None, None
+
+def check_validity_by_path_parts(swc_fw, sg_item):
+    """
+    Check if the filepath leads to a valid ShotGrid entity
+    :param sg_item: ShotGrid item information
+    :return: entity and published file info if found, None otherwise
+    """
+    target_context = None
+    if not sg_item or "path" not in sg_item:
+        return None, None
+
+    logger.debug(f">>>>> Checking validity by path parts: sg_item: {sg_item}")
+
+    local_path = sg_item["path"].get("local_path", None)
+
+    try:
+        target_context = swc_fw.find_task_context(local_path)
+    except(AttributeError):
+        logger.debug(f">>>>> {AttributeError}")
+
+    if target_context:
+        entity = target_context
+        return entity, None
+
+    return None, None
+
+def check_validity_by_published_file(sg_item):
+    """
+    Check if the filepath leads to a valid shotgrid entity
+    :param sg_item: Shotgrid item information
+    :return: entity and published file info if found, None otherwise
+    """
+    if not sg_item:
+        return None, None
+
+    logger.debug(">>>>> Checking validity by published file: sg_item: {}".format(sg_item))
+
+    if "path" in sg_item:
+        local_path = sg_item["path"].get("local_path", None)
+        logger.debug(">>>>> Checking validity by published file: local_path: {}".format(local_path))
+        if local_path:
+
+            if not os.path.exists(local_path):
+                msg = "File does not exist locally: {}".format(local_path)
+                logger.debug(">>>>> {}".format(msg))
+                # self.send_error_message(msg)
+                # return None, None
+
+            sg = sgtk.platform.current_bundle()
+            logger.debug(">>>>> local_path: {}".format(local_path))
+            current_relative_path = fix_query_path(local_path)
+            logger.debug(">>>>>>>>>>>>>> current_relative_path: {}".format(current_relative_path))
+            file_name = os.path.basename(local_path)
+            logger.debug(">>>>> file_name: {}".format(file_name))
+            local_path = local_path.replace("\\", "/")
+
+            # Search by file name
+            filter_query = [['path_cache', 'contains', current_relative_path]]
+            fields = ["entity", "path_cache", "path", "version_number", "name",
+                      "description", "created_at", "created_by", "image",
+                      "published_file_type", "task", "task.Task.content", "task.Task.sg_status_list"]
+
+            published_files = sg.shotgun.find("PublishedFile", filter_query, fields,
+                                              order=[{'field_name': 'version_number', 'direction': 'desc'}])
+
+            for published_file in published_files:
+                logger.debug(">>>>> published_file: ")
+                for k, v in published_file.items():
+                    logger.debug(">>>>> {} : {}".format(k, v))
+                if "path" in published_file and "local_path" in published_file["path"]:
+                    query_local_path = published_file["path"]["local_path"].replace("\\", "/")
+                    if query_local_path.endswith(current_relative_path):
+                        entity = published_file.get("entity", None)
+                        if entity:
+                            return entity, published_file
+
+            msg = "Failed to retrieve the associated Shotgrid entity for the file located at {}".format(local_path)
+            logger.debug(">>>>> {}".format(msg))
+
+    return None, None
+
+
+def fix_query_path(current_relative_path):
+    # Normalize the current relative path to ensure consistent path separators
+    normalized_path = os.path.normpath(current_relative_path)
+
+    # Split the path into drive and the rest
+    drive, path_without_drive = os.path.splitdrive(normalized_path)
+
+    # Remove leading slashes (if any) from the path without the drive
+    trimmed_path = path_without_drive.lstrip(os.sep)
+    trimmed_path = trimmed_path.replace("\\", "/")
+
+    return trimmed_path
