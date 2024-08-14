@@ -645,21 +645,6 @@ class AppDialog(QtGui.QWidget):
         self.submitter_widget = None
         ##########################################################################################
 
-    def _set_logger_original(self):
-        # Create custom log handler and add it to the ShotGrid logger
-        sg_log_handler = ShotGridLogHandler(self.ui.log_window)
-        sg_log_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-        logger = sgtk.platform.get_logger(__name__)
-        logger.addHandler(sg_log_handler)
-        logger.setLevel(logging.DEBUG)
-
-        # Simulate some log messages
-        logger.debug("Debug message")
-        logger.info("Info message")
-        logger.warning("Warning message")
-        logger.error("Error message")
-        logger.critical("Critical message")
-
     def _set_logger(self):
         # Create custom log handler and add it to the ShotGrid logger
         sg_log_handler = ShotGridLogHandler(self.ui.log_window)
@@ -669,6 +654,10 @@ class AppDialog(QtGui.QWidget):
         logger.addHandler(sg_log_handler)
         logger.setLevel(logging.DEBUG)
 
+        sgtk_logger = logging.getLogger("sgtk")
+        sgtk_logger.addHandler(sg_log_handler)
+        sgtk_logger.setLevel(logging.DEBUG)
+
         # Simulate some log messages
         logger.info("Color codes:")
         logger.debug("Debug message")
@@ -676,6 +665,41 @@ class AppDialog(QtGui.QWidget):
         logger.warning("Warning message")
         logger.error("Error message")
         logger.critical("Critical message")
+
+    def _set_logger_new(self):
+        # Create custom log handler and add it to the ShotGrid logger
+        sg_log_handler = ShotGridLogHandler(self.ui.log_window)
+        sg_log_handler.setFormatter(logging.Formatter('%(message)s'))
+
+        # Attach the custom handler to all relevant loggers
+        # Root logger
+        root_logger = logging.getLogger()
+        root_logger.addHandler(sg_log_handler)
+        root_logger.setLevel(logging.DEBUG)
+
+        # ShotGrid logger
+        sg_logger = sgtk.platform.get_logger(__name__)
+        sg_logger.addHandler(sg_log_handler)
+        sg_logger.setLevel(logging.DEBUG)
+
+        # Iterate over all existing loggers and attach the handler
+        for logger_name in logging.root.manager.loggerDict:
+            logger = logging.getLogger(logger_name)
+            logger.addHandler(sg_log_handler)
+            logger.setLevel(logging.DEBUG)
+
+        # Optional: Remove other handlers if you want to only show logs in your custom handler
+        for handler in root_logger.handlers[:]:
+            if handler != sg_log_handler:
+                root_logger.removeHandler(handler)
+
+        # Simulate some log messages for testing
+        sg_logger.info("Color codes:")
+        sg_logger.debug("Debug message")
+        sg_logger.info("Info message")
+        sg_logger.warning("Warning message")
+        sg_logger.error("Error message")
+        sg_logger.critical("Critical message")
 
 
     def _get_shotgun_panel_widget(self):
@@ -7831,41 +7855,8 @@ class MyLineEdit(QtWidgets.QLineEdit):
         # logger.debug(">>>>>>>>>>  self._currentText is: {}".format(self._currentText))
         return self._currentText  # Accessor method to get the stored text
 
+
 class ShotGridLogHandlerOriginal(logging.Handler):
-    def __init__(self, log_window):
-        super().__init__()
-        self.log_window = log_window
-        self.log_queue = []
-        self.timer = QtCore.QTimer()
-        self.timer.timeout.connect(self.flush)
-        self.timer.start(100)  # Update log window every 100ms
-
-    def emit(self, record):
-        msg = self.format(record)
-        color = self.get_color(record.levelno)
-        formatted_msg = f'<span style="color: {color};">{msg}</span>'
-        self.log_queue.append(formatted_msg)
-
-    def flush(self):
-        if self.log_queue:
-            self.log_window.append(''.join(self.log_queue))
-            self.log_queue = []
-            self.log_window.verticalScrollBar().setValue(self.log_window.verticalScrollBar().maximum())
-            QtCore.QCoreApplication.processEvents()
-
-    def get_color(self, levelno):
-        if levelno == logging.DEBUG:
-            return 'grey'
-        elif levelno == logging.INFO:
-            return 'white'
-        elif levelno == logging.WARNING:
-            return 'yellow'
-        elif levelno == logging.ERROR:
-            return 'red'
-        elif levelno == logging.CRITICAL:
-            return 'orange'
-        return 'grey'
-class ShotGridLogHandler(logging.Handler):
     def __init__(self, log_window):
         super().__init__()
         self.log_window = log_window
@@ -7894,6 +7885,46 @@ class ShotGridLogHandler(logging.Handler):
             self.log_window.verticalScrollBar().setValue(self.log_window.verticalScrollBar().maximum())
             QtCore.QCoreApplication.processEvents()
 
+
+    def get_color(self, levelno):
+        if levelno == logging.DEBUG:
+            return '#A9A9A9'  # Dark Grey
+        elif levelno == logging.INFO:
+            return '#D3D3D3'  # Light Grey
+        elif levelno == logging.WARNING:
+            return '#FFD700'  # Dark Yellow
+        elif levelno == logging.ERROR:
+            return '#B22222'  # Dark Red
+        elif levelno == logging.CRITICAL:
+            return '#FF8C00'  # Dark Orange
+        return '#A9A9A9'  # Dark Grey
+class ShotGridLogHandler(logging.Handler):
+    def __init__(self, log_window):
+        super().__init__()
+        self.log_window = log_window
+        self.log_queue = []
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.flush)
+        self.timer.start(100)  # Update log window every 100ms
+
+    def is_debug_logging_disabled(self):
+        # find if shotgrid debug logging is disabled
+        return False
+    def emit(self, record):
+        #if record.levelno == logging.DEBUG and self.is_debug_logging_disabled():
+        #    return  # Skip debug logs if debug logging is enabled
+
+        msg = self.format(record)
+        color = self.get_color(record.levelno)
+        formatted_msg = f'<span style="color: {color};">{msg}</span><br>'
+        self.log_queue.append(formatted_msg)
+
+    def flush(self):
+        if self.log_queue:
+            self.log_window.append(''.join(self.log_queue))
+            self.log_queue = []
+            self.log_window.verticalScrollBar().setValue(self.log_window.verticalScrollBar().maximum())
+            QtCore.QCoreApplication.processEvents()
 
     def get_color(self, levelno):
         if levelno == logging.DEBUG:
