@@ -4716,13 +4716,18 @@ class AppDialog(QtGui.QWidget):
         selected_tuples_to_delete = []
         selected_tuples_to_publish = []
         change = change_sg_item.get("change", None)
+        logger.debug(">>>>>>> on_submit_deleted_files: change:{}".format(change))
         for file_info in file_info_deleted:
             target_file = None
             try:
-                action = file_info_deleted.get("pending_action", None)
-                sg_item = file_info_deleted.get("sg_item", None)
+                action = file_info.get("pending_action", None)
+                logger.debug(">>>>>>> on_submit_deleted_files: action:{}".format(action))
+
+                sg_item = file_info.get("sg_item", None)
+                logger.debug(">>>>>>> on_submit_deleted_files: sg_item:{}".format(sg_item))
                 if sg_item:
                     target_file = sg_item.get("depotFile", None)
+                    logger.debug(">>>>>>> on_submit_deleted_files: target_file:{}".format(target_file))
 
                     if action in ["delete"]:
                         if target_file not in selected_files_to_delete:
