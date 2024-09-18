@@ -249,20 +249,19 @@ class SubmitChangelistWidget(QtWidgets.QDialog):
         file_info_other = []
         description = self.changelist_description.toPlainText()
         selected_files = []
+        if not description:
+            QtWidgets.QMessageBox.warning(self, "Warning", "Changelist description cannot be empty.")
+            return
+
         for row in range(self.files_table_widget.rowCount()):
             if self.files_table_widget.item(row, 0).checkState() == QtCore.Qt.Checked:
                 file_info = {
                     "file": self.files_table_widget.item(row, 1).text(),
                     "folder": self.files_table_widget.item(row, 2).text(),
-                    #"resolve_status": self.files_table_widget.item(row, 3).text(),
-                    #"type": self.files_table_widget.item(row, 4).text(),
-                    #"pending_action": self.files_table_widget.item(row, 5).text(),
                 }
                 selected_files.append(file_info)
 
-        if not description:
-            QtWidgets.QMessageBox.warning(self, "Warning", "Changelist description cannot be empty.")
-            return
+
 
         if not selected_files:
             QtWidgets.QMessageBox.warning(self, "Warning", "No files selected for submission.")
@@ -278,6 +277,9 @@ class SubmitChangelistWidget(QtWidgets.QDialog):
                 key = (file_name, folder)
                 if key in self.submit_widget_dict:
                     full_file_info = self.submit_widget_dict[key]
+                    if "sg_item" in full_file_info:
+                        full_file_info["sg_item"]["description"] = description
+                    #full_file_info["description"] = description
                     if full_file_info:
                         action = full_file_info.get("pending_action", None)
                         if action == "delete":

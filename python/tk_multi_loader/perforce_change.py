@@ -212,7 +212,7 @@ def submit_single_file(p4, change, filepath, action):
         log.debug(msg)
 
 
-def submit_and_delete_file(p4, change, filepath):
+def submit_and_delete_file_original(p4, change, filepath):
     """
     Submit the specified change and then completely delete the file in Perforce.
     """
@@ -237,6 +237,35 @@ def submit_and_delete_file(p4, change, filepath):
         msg = "Perforce error: %s" % (p4.errors[0] if p4.errors else e)
         log.debug(msg)
 
+
+    return submit_result, msg
+
+def submit_and_delete_file(p4, change, filepath):
+    """
+    Submit the specified file deletion using the provided changelist or create a new one if the changelist is committed.
+    """
+    submit_result, msg = None, None  # Initialize as None
+    try:
+        # Fetch the existing changelist (using the passed 'change' argument)
+        change_spec = p4.fetch_change(change)
+
+        # Check if the changelist is committed
+        if 'submittedChange' in change_spec:
+            # If the changelist is already committed, create a new pending changelist
+            log.debug("Changelist {} is committed. Creating a new pending changelist.".format(change))
+            new_change_spec = p4.fetch_change()
+            new_change_spec['Description'] = "Deleting file: {}".format(filepath)
+            change = p4.save_change(new_change_spec)[0].split()[1]  # Extract the new changelist number
+
+        # Mark files for deletion
+        p4.run('delete', filepath)
+
+        # Submit the changelist (either the new one or the original if not committed)
+        submit_result = p4.run_submit('-c', change)
+
+    except Exception as e:
+        msg = "Perforce error: %s" % (p4.errors[0] if p4.errors else e)
+        log.debug(msg)
 
     return submit_result, msg
 

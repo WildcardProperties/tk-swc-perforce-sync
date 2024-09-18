@@ -1579,6 +1579,44 @@ class AppDialog(QtGui.QWidget):
         self.ui.publish_view.selectionModel().clear()
         self._settings_manager.store("main_view_mode", mode)
 
+    def _set_thump_view_mode(self):
+        self._turn_all_modes_off()
+        self.ui.publish_view.setVisible(True)
+
+        self.ui.list_mode.setIcon(
+            QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_card.png"))
+        )
+
+        self.ui.thumbnail_mode.setIcon(
+            QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_thumb_active.png"))
+        )
+        self.ui.thumbnail_mode.setChecked(True)
+        self.ui.publish_view.setViewMode(QtGui.QListView.IconMode)
+        self.ui.publish_view.setItemDelegate(self._publish_thumb_delegate)
+        self._show_thumb_scale(True)
+        self.main_view_mode = self.MAIN_VIEW_THUMB
+        self.ui.sync_files.setEnabled(True)
+        self.ui.sync_parents.setEnabled(True)
+        self.ui.fix_selected.setEnabled(False)
+        self.ui.fix_all.setEnabled(False)
+        self.ui.submit_files.setEnabled(False)
+
+    def _set_column_view_mode(self):
+        self._turn_all_modes_off()
+        self.ui.column_view.setVisible(True)
+        # self.ui.perforce_scroll.setVisible(True)
+        self.ui.column_mode.setIcon(self.active_column_view_icon)
+        self.ui.column_mode.setChecked(True)
+
+        self.main_view_mode = self.MAIN_VIEW_COLUMN
+        self.ui.publish_view.setItemDelegate(self._publish_list_delegate)
+        self._populate_column_view_widget()
+        self.ui.sync_files.setEnabled(True)
+        self.ui.sync_parents.setEnabled(True)
+        self.ui.fix_selected.setEnabled(False)
+        self.ui.fix_all.setEnabled(False)
+        self.ui.submit_files.setEnabled(False)
+
     def _populate_pending_widget(self):
         msg = "\n <span style='color:#2C93E2'>Populating the pending view. Please wait...</span> \n"
         self._add_log(msg, 2)
@@ -4807,11 +4845,13 @@ class AppDialog(QtGui.QWidget):
             files_count = len(selected_tuples_to_publish)
             i = 0
             for change, target_file, action, sg_item in selected_tuples_to_publish:
+                description = sg_item.get("description", None)
                 entity, new_sg_item = self._get_entity_from_sg_item(sg_item)
                 #logger.debug(">>>>>>>>>>> entity:{}".format(entity))
                 if entity:
                     if new_sg_item:
                         sg_item.update(new_sg_item)
+                        sg_item["description"] = description
                     else:
                         sg_item["entity"] = entity
                     if 'path' in sg_item:
@@ -5201,6 +5241,12 @@ class AppDialog(QtGui.QWidget):
             #    self._entity_presets[p].model.hard_refresh()
             self._setup_file_details_panel([])
             # self._get_perforce_summary()
+
+            if self.main_view_mode == self.MAIN_VIEW_COLUMN:
+                # self._populate_column_view_widget()
+                self._set_thump_view_mode()
+                # time.sleep(1)
+                # self._set_column_view_mode()
 
             msg = "\n <span style='color:#2C93E2'>Reloading data is complete</span> \n"
             self._add_log(msg, 2)
