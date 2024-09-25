@@ -210,7 +210,7 @@ class SubmitChangelistWidget(QtWidgets.QDialog):
             sg_timestamp =str(sg_timestamp.strftime('%Y-%m-%d %H:%M:%S'))
             #sg_timestamp = str(sg_timestamp)
         except Exception as e:
-            logger.debug("Failed to convert timestamp: %s" % e)
+            # logger.debug("Failed to convert timestamp: %s" % e)
             sg_timestamp = ""
         return sg_timestamp
 
