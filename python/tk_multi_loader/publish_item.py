@@ -179,15 +179,17 @@ class PublishItem():
         # ctx = tk.context_from_path(self.publish_path)
         ctx = tk.context_from_entity(entity_type, entity_id)
 
-        logger.debug(">>>>>>>>>>>> entity is: {}".format(entity))
+        # logger.debug(">>>>>>>>>>>> entity is: {}".format(entity))
 
-        logger.debug(">>>>>>>>>>>> tk is: {}".format(tk))
-        logger.debug(">>>>>>>>>>>> context is: {}".format(ctx))
+        # logger.debug(">>>>>>>>>>>> tk is: {}".format(tk))
+        # logger.debug(">>>>>>>>>>>> context is: {}".format(ctx))
+        """
         if self.sg_item:
             logger.debug(">>>>>>>>>>>> sg_item to be published, begin: ")
             for k, v in self.sg_item.items():
                 logger.debug("{}: {}".format(k, v))
             logger.debug(">>>>>>>>>>>> End of sg_item to be published")
+        """
 
         publish_time = self.get_publish_time()
         publish_type = self.get_publish_type(self.publish_path)
@@ -203,14 +205,6 @@ class PublishItem():
         thumbnail_url = self.get_thumbnail()
 
 
-        """
-        if thumbnail_url:
-            # Download the image and attach it to the published file
-            image_path = os.path.join(self.app.ensure_folder_exists(self.app.get_publish_thumbnail_folder()),
-                                      published_file_name + ".png")
-            logger.debug(">>>>>>> image_path: {}".format(image_path))
-            request.urlretrieve(thumbnail_url, image_path)
-        """
 
         #publish_dependencies_paths = self.get_publish_dependencies(settings, item)
         publish_user = self.get_publish_user()
@@ -260,7 +254,7 @@ class PublishItem():
             if thumbnail_url:
                 # Download the thumbnail image and save it to a local temporary file
                 temp_thumbnail_path = os.path.join(tempfile.gettempdir(), "temp_thumbnail.png")
-                logger.debug(">>>>>>> temp_thumbnail_path: {}".format(temp_thumbnail_path))
+                # logger.debug(">>>>>>> temp_thumbnail_path: {}".format(temp_thumbnail_path))
                 try:
                     import requests
                     response = requests.get(thumbnail_url)
@@ -287,9 +281,9 @@ class PublishItem():
             id = sg_publish_result.get("id", None)
             if id and updated_data:
                 update_res = self.app.shotgun.update("PublishedFile", id, updated_data)
-                logger.debug("Updated published file: %s", update_res)
+                # logger.debug("Updated published file: %s", update_res)
 
-            logger.debug("updated_data: {}".format(updated_data))
+            # logger.debug("updated_data: {}".format(updated_data))
             id = sg_publish_result.get("id", None)
             if id and updated_data:
                 update_res = self.app.shotgun.update("PublishedFile", id, updated_data)

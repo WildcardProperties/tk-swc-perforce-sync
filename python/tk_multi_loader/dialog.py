@@ -2039,6 +2039,9 @@ class AppDialog(QtGui.QWidget):
             if change and change != "default":
                 change = int(change)
                 return change
+            if change == "default":
+                return change
+
         return 0
 
 
@@ -4630,7 +4633,7 @@ class AppDialog(QtGui.QWidget):
         self.change_sg_item = self._get_submit_changelist_widget_data()
         if self.change_sg_item and self._submit_widget_dict:
             self.submitter_widget = SubmitChangelistWidget(parent=self, myp4=self._p4, chane_item=self.change_sg_item, file_dict=self._submit_widget_dict)
-            logger.debug(">>>>>>>>>>> Submit Widget Dict:{}".format(self._submit_widget_dict))
+            #logger.debug(">>>>>>>>>>> Submit Widget Dict:{}".format(self._submit_widget_dict))
 
             self.submitter_widget.show()
         else:
@@ -4651,8 +4654,8 @@ class AppDialog(QtGui.QWidget):
             try:
                 source_index = self._pending_view_model.mapToSource(selected_index)
                 change = self._get_change_data_from_source(source_index)
-                logger.debug("-----------------------------------------------")
-                logger.debug(">>>>>>>>>>> change:{}".format(change))
+                # logger.debug("-----------------------------------------------")
+                # logger.debug(">>>>>>>>>>> change:{}".format(change))
                 change_key = str(change)
                 children = self._change_dict.get(change_key, None)
                 #logger.debug(">>>>>>>>>>>change dict:")
@@ -4661,7 +4664,7 @@ class AppDialog(QtGui.QWidget):
 
                 if children:
                     for sg_item in children:
-                        logger.debug(">>>>>>>>>>> sg_item:{}".format(sg_item))
+                        # logger.debug(">>>>>>>>>>> sg_item:{}".format(sg_item))
                         if sg_item:
                             if 'depotFile' in sg_item:
                                 depot_file = sg_item.get('depotFile', None)
@@ -4754,18 +4757,18 @@ class AppDialog(QtGui.QWidget):
         selected_tuples_to_delete = []
         selected_tuples_to_publish = []
         change = change_sg_item.get("change", None)
-        logger.debug(">>>>>>> on_submit_deleted_files: change:{}".format(change))
+        # logger.debug(">>>>>>> on_submit_deleted_files: change:{}".format(change))
         for file_info in file_info_deleted:
             target_file = None
             try:
                 action = file_info.get("pending_action", None)
-                logger.debug(">>>>>>> on_submit_deleted_files: action:{}".format(action))
+                # logger.debug(">>>>>>> on_submit_deleted_files: action:{}".format(action))
 
                 sg_item = file_info.get("sg_item", None)
-                logger.debug(">>>>>>> on_submit_deleted_files: sg_item:{}".format(sg_item))
+                # logger.debug(">>>>>>> on_submit_deleted_files: sg_item:{}".format(sg_item))
                 if sg_item:
                     target_file = sg_item.get("depotFile", None)
-                    logger.debug(">>>>>>> on_submit_deleted_files: target_file:{}".format(target_file))
+                    # logger.debug(">>>>>>> on_submit_deleted_files: target_file:{}".format(target_file))
 
                     if action in ["delete"]:
                         if target_file not in selected_files_to_delete:
@@ -4779,7 +4782,7 @@ class AppDialog(QtGui.QWidget):
                 logger.debug("Error deleting file {}: {}".format(target_file, e))
 
         if selected_files_to_delete:
-            logger.debug("_on_submit_deleted_files: selected_files_to_delete: {}".format(selected_files_to_delete))
+            # logger.debug("_on_submit_deleted_files: selected_files_to_delete: {}".format(selected_files_to_delete))
 
             # Convert list of files into a string, to show in the confirmation dialog
             files_str = "\n".join(selected_files_to_delete)
@@ -4838,7 +4841,7 @@ class AppDialog(QtGui.QWidget):
         """
         Publish Depot Data
         """
-        logger.debug(">>>>>>> _publish_pending_data_using_command_line: selected_tuples_to_publish:{}".format(selected_tuples_to_publish))
+        # logger.debug(">>>>>>> _publish_pending_data_using_command_line: selected_tuples_to_publish:{}".format(selected_tuples_to_publish))
         if selected_tuples_to_publish:
             msg = "\n <span style='color:#2C93E2'>Publishing pending files in shotgrid</span> \n"
             self._add_log(msg, 2)

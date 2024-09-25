@@ -100,10 +100,10 @@ class SWCTreeView(QtWidgets.QTreeView):
     def set_mode(self, mode):
         self.mode = mode
         if self.mode == "submitted":
-            logger.debug("Submitted mode ...")
+            # logger.debug("Submitted mode ...")
             self.collapseAll()
         elif self.mode == "pending":
-            logger.debug("Pending mode ...")
+            # logger.debug("Pending mode ...")
             self.expandAll()
 
     def single_selection(self):
