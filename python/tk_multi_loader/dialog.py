@@ -1752,7 +1752,7 @@ class AppDialog(QtGui.QWidget):
         selected_actions_to_move = []
         selected_files_to_move = []
         engine = sgtk.platform.current_engine()
-        logger.debug(">>>>>>>>>>> engine is: {}".format(engine))
+        # logger.debug(">>>>>>>>>>> engine is: {}".format(engine))
 
         # First, gather all the files that are to be reverted
         selected_indexes = self._pending_view_widget.selectionModel().selectedRows()
@@ -7075,7 +7075,7 @@ class AppDialog(QtGui.QWidget):
 
                     self._submitted_data_to_publish.append(sg_item)
 
-    def _on_publish_folder_action(self, action):
+    def _on_publish_folder_action_original(self, action):
         selected_indexes = self.ui.publish_view.selectionModel().selectedIndexes()
         for model_index in selected_indexes:
             proxy_model = model_index.model()
@@ -7111,7 +7111,7 @@ class AppDialog(QtGui.QWidget):
                     msg = "\n <span style='color:#CC3333'>No entities specified!</span> \n"
                     self._add_log(msg, 2)
 
-    def _unregister_folders(self, entity_type, entity_id):
+    def _unregister_folders_original(self, entity_type, entity_id):
         """
         Unregister folders for the specified entity
         """
@@ -7150,7 +7150,7 @@ class AppDialog(QtGui.QWidget):
 
 
 
-    def _create_filesystem_structure_for_folder(self, entity_type, entity_id, paths_not_on_disk):
+    def _create_filesystem_structure_for_folder_original(self, entity_type, entity_id, paths_not_on_disk):
         if len(paths_not_on_disk) == 0:
             msg = "\n <span style='color:#2C93E2'>No folders would be generated on disk for this item!</span> \n"
             self._add_log(msg, 2)
@@ -7185,7 +7185,7 @@ class AppDialog(QtGui.QWidget):
                         self._add_log(path, 3)
 
 
-    def _preview_filesystem_structure(self, entity_type, entity_id, verbose_mode=True):
+    def _preview_filesystem_structure_original(self, entity_type, entity_id, verbose_mode=True):
         paths = []
         paths_not_on_disk = []
         try:
@@ -7231,6 +7231,189 @@ class AppDialog(QtGui.QWidget):
                         self._add_log(msg, 2)
 
             return paths_not_on_disk
+
+
+    def _on_publish_folder_action(self, action):
+        selected_indexes = self.ui.publish_view.selectionModel().selectedIndexes()
+        threads = []
+        errors = []
+
+        def thread_function(entity_type, entity_id):
+            try:
+                result = self._handle_folder_creation(entity_type, entity_id)
+                self._add_log(result, 2)
+            except Exception as e:
+                errors.append(f"Error when creating folders for entity {entity_type} {entity_id}: {e}")
+
+        for model_index in selected_indexes:
+            proxy_model = model_index.model()
+            source_index = proxy_model.mapToSource(model_index)
+            item = source_index.model().itemFromIndex(source_index)
+
+            is_folder = item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
+            if is_folder:
+                sg_item = shotgun_model.get_sg_data(model_index)
+                if not sg_item:
+                    msg = "\n <span style='color:#2C93E2'>Unable to get item data</span> \n"
+                    self._add_log(msg, 2)
+                    continue
+
+                entity_type = sg_item.get('type', None)
+                entity_id = sg_item.get('id', None)
+                if entity_type and entity_id:
+                    if action == "preview":
+                        msg = "\n <span style='color:#2C93E2'>Generating a preview of the folders, please stand by...</span> \n"
+                        self._add_log(msg, 2)
+                        self._preview_filesystem_structure(entity_type, entity_id, verbose_mode=True)
+                    elif action == "create":
+                        msg = "\n <span style='color:#2C93E2'>Creating folders, please stand by...</span> \n"
+                        self._add_log(msg, 2)
+
+                        # Start a new thread for each folder creation task
+                        thread = threading.Thread(target=thread_function, args=(entity_type, entity_id))
+                        threads.append(thread)
+                        thread.start()
+                    elif action == "unregister":
+                        msg = "\n <span style='color:#2C93E2'>Unregistering folders, please stand by...</span> \n"
+                        self._add_log(msg, 2)
+                        self._unregister_folders(entity_type, entity_id)
+                else:
+                    msg = "\n <span style='color:#CC3333'>No entities specified!</span> \n"
+                    self._add_log(msg, 2)
+
+        # Wait for all threads to finish
+        for thread in threads:
+            thread.join()
+
+        # Handle errors after all threads have finished
+        if errors:
+            for error in errors:
+                msg = f"\n <span style='color:#CC3333'>{error}</span> \n"
+                self._add_log(msg, 2)
+
+    def _unregister_folders(self, entity_type, entity_id):
+        try:
+            uf = self._app.sgtk.get_command("unregister_folders")
+            message_list = []
+
+            tk = sgtk.sgtk_from_entity(entity_type, entity_id)
+            if entity_type == "Task":
+                parent_entity = self._app.shotgun.find_one("Task",
+                                                           [["id", "is", entity_id]],
+                                                           ["entity"]).get("entity")
+                result = uf.execute({"entity": {"type": parent_entity["type"], "id": parent_entity["id"]}})
+                message_list.append(result)
+            else:
+                result = uf.execute({"entity": {"type": entity_type, "id": entity_id}})
+                message_list.append(result)
+            tk.synchronize_filesystem_structure()
+
+        except Exception as e:
+            msg = "\n <span style='color:#CC3333'>Error when unregistering folders: {}</span> \n".format(e)
+            self._add_log(msg, 2)
+        else:
+            if message_list:
+                msg = "\n <span style='color:#2C93E2'>Unregistered Folders:</span> \n"
+                self._add_log(msg, 2)
+                for message in message_list:
+                    self._add_log(message, 3)
+
+    def _create_filesystem_structure_for_folder(self, entity_type, entity_id, paths_not_on_disk):
+        if len(paths_not_on_disk) == 0:
+            msg = "\n <span style='color:#2C93E2'>No folders would be generated on disk for this item!</span> \n"
+            self._add_log(msg, 2)
+            return
+
+        paths_created = []
+        try:
+            tk = sgtk.sgtk_from_entity(entity_type, entity_id)
+            entities_processed = self._app.sgtk.create_filesystem_structure(entity_type, entity_id)
+            tk.synchronize_filesystem_structure()
+
+            for path in paths_not_on_disk:
+                if os.path.exists(path):
+                    paths_created.append(path)
+
+            if len(paths_created) > 0:
+                if len(paths_created) == 1:
+                    msg = "\n <span style='color:#2C93E2'>The following folder has been created on disk:</span> \n".format(
+                        len(paths_created))
+                else:
+                    msg = "\n <span style='color:#2C93E2'>The following folders have been created on disk:</span> \n".format(
+                        len(paths_created))
+                self._add_log(msg, 2)
+                for path in paths_created:
+                    self._add_log(path, 3)
+
+        except Exception as e:
+            msg = "\n <span style='color:#CC3333'>Error when creating folders!, {}</span> \n".format(e)
+            self._add_log(msg, 2)
+
+    def _preview_filesystem_structure(self, entity_type, entity_id, verbose_mode=True):
+        paths = []
+        paths_not_on_disk = []
+        try:
+            paths.extend(
+                self._app.sgtk.preview_filesystem_structure(entity_type, entity_id)
+            )
+        except Exception as e:
+            msg = "\n <span style='color:#CC3333'>Error when previewing folders!, {}</span> \n".format(e)
+            self._add_log(msg, 2)
+        else:
+            if len(paths) == 0:
+                msg = "\n <span style='color:#2C93E2'>*No folders would be generated on disk for this item!*</span> \n"
+                self._add_log(msg, 2)
+            else:
+                for path in paths:
+                    path.replace(r"\_", r"\\_")
+                    if not os.path.exists(path):
+                        paths_not_on_disk.append(path)
+                self._add_log("", 3)
+
+                if paths_not_on_disk:
+                    if verbose_mode:
+                        if len(paths_not_on_disk) == 1:
+                            msg = "\n <span style='color:#2C93E2'>The following folder is not currently present on the disk and will be created:</span> \n".format(
+                                len(paths_not_on_disk))
+                        else:
+                            msg = "\n <span style='color:#2C93E2'>The following folders are not currently present on the disk and will be created:</span> \n".format(
+                                len(paths_not_on_disk))
+                        self._add_log(msg, 2)
+                        for path in paths_not_on_disk:
+                            self._add_log(path, 3)
+                        self._add_log("", 3)
+                if paths and not paths_not_on_disk:
+                    if verbose_mode:
+                        msg = "\n <span style='color:#2C93E2'>All folders are currently present on the disk and will not be created!</span> \n"
+                        self._add_log(msg, 2)
+
+            return paths_not_on_disk
+
+    def _handle_folder_creation(self, entity_type, entity_id):
+        paths_not_on_disk = self._preview_filesystem_structure(entity_type, entity_id, verbose_mode=False)
+        if len(paths_not_on_disk) == 0:
+            return "\n <span style='color:#2C93E2'>No folders would be generated on disk for this item!</span> \n"
+
+        paths_created = []
+        try:
+            tk = sgtk.sgtk_from_entity(entity_type, entity_id)
+            entities_processed = self._app.sgtk.create_filesystem_structure(entity_type, entity_id)
+            tk.synchronize_filesystem_structure()
+
+            for path in paths_not_on_disk:
+                if os.path.exists(path):
+                    paths_created.append(path)
+
+            if len(paths_created) > 0:
+                if len(paths_created) == 1:
+                    return "\n <span style='color:#2C93E2'>The following folder has been created on disk:</span> \n" + '\n'.join(
+                        paths_created)
+                else:
+                    return "\n <span style='color:#2C93E2'>The following folders have been created on disk:</span> \n" + '\n'.join(
+                        paths_created)
+
+        except Exception as e:
+            raise Exception(f"Error when creating folders for entity {entity_type} {entity_id}: {e}")
 
     def _add_plural(self, word, items):
         """
