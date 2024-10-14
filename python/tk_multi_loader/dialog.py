@@ -4837,7 +4837,7 @@ class AppDialog(QtGui.QWidget):
             self._submit_other_pending_data(selected_tuples_to_submit)
             self._publish_pending_data_using_command_line(selected_tuples_to_submit)
 
-    def _publish_pending_data_using_command_line(self, selected_tuples_to_publish):
+    def _publish_pending_data_using_command_line_original(self, selected_tuples_to_publish):
         """
         Publish Depot Data
         """
@@ -4879,6 +4879,68 @@ class AppDialog(QtGui.QWidget):
             msg = "\n <span style='color:#2C93E2'>Publishing files is complete</span> \n"
             self._add_log(msg, 2)
 
+        else:
+            msg = "\n <span style='color:#2C93E2'>No need to publish any file</span> \n"
+            self._add_log(msg, 2)
+
+    import threading
+
+    def _publish_file_thread(self, change, target_file, action, sg_item, log_callback, get_entity_callback):
+        """
+        Function to publish a file in a separate thread.
+        """
+        try:
+            description = sg_item.get("description", None)
+            entity, new_sg_item = get_entity_callback(sg_item)
+
+            if entity:
+                if new_sg_item:
+                    sg_item.update(new_sg_item)
+                    sg_item["description"] = description
+                else:
+                    sg_item["entity"] = entity
+
+                if 'path' in sg_item:
+                    rev = sg_item.get("version_number") or sg_item.get("headRev") or 1
+                    file_to_publish = sg_item['path'].get('local_path', None)
+                    log_callback(f"Publishing file: {file_to_publish}#{rev}", 4)
+
+                    publisher = PublishItem(sg_item)
+                    publish_result = publisher.commandline_publishing()
+
+                    if publish_result:
+                        log_callback(f"New data is: {publish_result}", 4)
+            else:
+                log_callback(f"Unable to find the entity associated with the file: {target_file}", 4)
+
+        except Exception as e:
+            log_callback(f"Error publishing file {target_file}: {str(e)}", 4)
+
+    def _publish_pending_data_using_command_line(self, selected_tuples_to_publish):
+        """
+        Publish Depot Data using threading for speedup.
+        """
+        if selected_tuples_to_publish:
+            msg = "\n <span style='color:#2C93E2'>Publishing pending files in Shotgrid</span> \n"
+            self._add_log(msg, 2)
+
+            # List to store active threads
+            threads = []
+
+            # Create a thread for each file to publish
+            for change, target_file, action, sg_item in selected_tuples_to_publish:
+                thread = threading.Thread(target=self._publish_file_thread,
+                                          args=(change, target_file, action, sg_item, self._add_log,
+                                                self._get_entity_from_sg_item))
+                threads.append(thread)
+                thread.start()
+
+            # Wait for all threads to finish
+            for thread in threads:
+                thread.join()
+
+            msg = "\n <span style='color:#2C93E2'>Publishing files is complete</span> \n"
+            self._add_log(msg, 2)
         else:
             msg = "\n <span style='color:#2C93E2'>No need to publish any file</span> \n"
             self._add_log(msg, 2)
@@ -4926,7 +4988,7 @@ class AppDialog(QtGui.QWidget):
 
 
 
-    def _delete_pending_data(self, selected_tuples_to_delete):
+    def _delete_pending_data_original(self, selected_tuples_to_delete):
         """
         Publish Depot Data in the Pending view that needs to be deleted.
         """
@@ -4953,6 +5015,45 @@ class AppDialog(QtGui.QWidget):
                             self._add_log(msg, 2)
                     except Exception as e:
                         logger.debug("Error deleting file {}: {}".format(file_to_submit, e))
+
+    def _delete_file_thread(self, p4, change, file_to_submit, log_callback):
+        """
+        Function to delete a file in a separate thread.
+        """
+        try:
+            submit_result, perforce_msg = submit_and_delete_file(p4, change, file_to_submit)
+            if submit_result and not perforce_msg:
+                log_callback(f"File deleted from Perforce: {file_to_submit}", 2)
+            else:
+                log_callback(f"Error deleting file {file_to_submit}: {perforce_msg}", 4)
+        except Exception as e:
+            log_callback(f"Error deleting file {file_to_submit}: {str(e)}", 4)
+
+    def _delete_pending_data(self, selected_tuples_to_delete):
+        """
+        Delete Depot Data in the Pending view that needs to be deleted.
+        """
+        if selected_tuples_to_delete:
+            msg = "\n <span style='color:#2C93E2'>Submitting files for deletion...</span> \n"
+            self._add_log(msg, 2)
+
+            # List to store active threads
+            threads = []
+
+            # Create a thread for each file to delete
+            for change, file_to_submit in selected_tuples_to_delete:
+                # Create a thread for each deletion
+                thread = threading.Thread(target=self._delete_file_thread,
+                                          args=(self._p4, change, file_to_submit, self._add_log))
+                threads.append(thread)
+                thread.start()
+
+            # Wait for all threads to finish
+            for thread in threads:
+                thread.join()
+
+            msg = "\n <span style='color:#2C93E2'>File deletion completed.</span> \n"
+            self._add_log(msg, 2)
 
     def _submit_other_pending_data(self, selected_data_to_submit):
         """
