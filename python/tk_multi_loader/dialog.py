@@ -5118,10 +5118,6 @@ class AppDialog(QtGui.QWidget):
             self.update_pending_view()
 
 
-
-
-
-
     def _publish_delete_pending_data(self, deleted_data_to_publish):
         """
         Publish Depot Data in the Pending view that needs to be deleted.
@@ -5152,7 +5148,7 @@ class AppDialog(QtGui.QWidget):
 
             self._publish_deleted_data_using_command_line(deleted_data_to_publish)
 
-    def _publish_deleted_data_using_command_line(self, deleted_data_to_publish):
+    def _publish_deleted_data_using_command_line_original(self, deleted_data_to_publish):
         """
         Publish Pending view Depot Data that needs to be deleted using the command line.
         """
@@ -5166,31 +5162,6 @@ class AppDialog(QtGui.QWidget):
                 if target_context.entity and file_path:
                     sg_item["entity"] = target_context.entity
 
-
-                    """
-                    # Extract the base name without extension
-                    base_name = os.path.splitext(os.path.basename(file_path))[0]
-
-                    # See how many prior versions there are
-                    filters = [
-                        ['entity', 'is', target_context.entity],
-                        ["code", "contains", base_name],
-                    ]
-
-                    # prior_versions = self._app.shotgun.find("Version", filters, ['code', 'sg_version_number', 'version_number'])
-                    published_files = self._app.shotgun.find("PublishedFile", filters,
-                                                            ['code', 'path_cache', 'path', 'sg_version_number', 'version_number'])
-                    # Hide all prior versions
-                    for published_file in published_files:
-                        logger.debug(">>>>>>>>>>  published_file {}".format(published_file))
-                        publish_id = published_file["id"]
-                        # Todo: find a way to hide the published file
-                        # self._app.shotgun.update("PublishedFile", publish_id, {"sg_status_list": "hid"})
-                        # self._app.shotgun.update("PublishedFile", publish_id, {"is_published": False})
-                        # New custom field "sg_hidden"
-                        # sg.update("PublishedFile", published_file_id, {"sg_hidden": True})
-                        pass
-                    """
                     # Publish the file to Shotgrid with a new version number and "delete" action
 
                     publisher = PublishItem(sg_item)
@@ -5204,6 +5175,47 @@ class AppDialog(QtGui.QWidget):
             msg = "\n <span style='color:#2C93E2'>No need to publish any file that is marked for deletion</span> \n"
             self._add_log(msg, 2)
 
+
+    def _publish_deleted_data_using_command_line(self, deleted_data_to_publish):
+        """
+        Publish Pending view Depot Data that needs to be deleted using the command line, with threading for speedup.
+        """
+        if deleted_data_to_publish:
+            # List to store active threads
+            threads = []
+
+            for sg_item in deleted_data_to_publish:
+                file_path = sg_item['path'].get('local_path', None) if 'path' in sg_item else None
+                target_context = self._find_task_context(file_path)
+
+                if target_context.entity and file_path:
+                    sg_item["entity"] = target_context.entity
+
+                    # Create a thread for each delete task
+                    thread = threading.Thread(target=self._delete_one_file_thread,
+                                              args=(sg_item, file_path))
+                    threads.append(thread)
+                    thread.start()
+
+            # Wait for all threads to finish
+            for thread in threads:
+                thread.join()
+
+            msg = "\n <span style='color:#2C93E2'>Publishing files marked for delete is complete</span> \n"
+            self._add_log(msg, 2)
+        else:
+            msg = "\n <span style='color:#2C93E2'>No need to publish any file that is marked for deletion</span> \n"
+            self._add_log(msg, 2)
+
+    def _delete_one_file_thread(self, sg_item, file_path):
+        """
+        Delete a single file in a thread.
+        """
+        # Publish the file to Shotgrid with a new version number and "delete" action
+        publisher = PublishItem(sg_item)
+        publish_result = publisher.commandline_publishing()
+        if publish_result:
+            logger.debug("New data is: {}".format(publish_result))
 
     def _get_published_files(self, sg_item):
 
@@ -5462,7 +5474,7 @@ class AppDialog(QtGui.QWidget):
 
 
 
-    def _publish_submitted_data_using_command_line(self):
+    def _publish_submitted_data_using_command_line_original(self):
         """
         Publish Depot Data
         """
@@ -5506,6 +5518,61 @@ class AppDialog(QtGui.QWidget):
 
         self._submitted_data_to_publish = []
 
+
+    def _publish_submitted_data_using_command_line(self):
+        """
+        Publish Depot Data using threading for speedup.
+        """
+        selected_item = self._get_selected_entity()
+        sg_entity = shotgun_model.get_sg_data(selected_item)
+
+        if self._submitted_data_to_publish:
+            msg = "\n <span style='color:#2C93E2'>Publishing all unpublished files in the depot associated with this entity to Shotgrid ...</span> \n"
+            self._add_log(msg, 2)
+            files_count = len(self._submitted_data_to_publish)
+
+            # List to store active threads
+            threads = []
+
+            # Create and start threads for publishing each file
+            for i, sg_item in enumerate(self._submitted_data_to_publish):
+                sg_item["entity"] = sg_entity
+                if 'path' in sg_item:
+                    rev = sg_item.get("version_number") or sg_item.get("headRev") or 1
+                    file_to_publish = sg_item['path'].get('local_path', None)
+                    msg = "({}/{})  Publishing file: {}#{}".format(i + 1, files_count, file_to_publish, rev)
+                    self._add_log(msg, 4)
+
+                    # Create a thread for each publish task
+                    thread = threading.Thread(target=self._publish_one_file_thread,
+                                              args=(sg_item, file_to_publish, rev))
+                    threads.append(thread)
+                    thread.start()
+
+            # Wait for all threads to finish
+            for thread in threads:
+                thread.join()
+
+            msg = "\n <span style='color:#2C93E2'>Publishing files is complete</span> \n"
+            self._add_log(msg, 2)
+            msg = "\n <span style='color:#2C93E2'>Reloading data</span> \n"
+            self._add_log(msg, 2)
+            # self._reload_treeview()
+
+        else:
+            msg = "\n <span style='color:#2C93E2'>No need to publish any file</span> \n"
+            self._add_log(msg, 2)
+
+        self._submitted_data_to_publish = []
+
+    def _publish_one_file_thread(self, sg_item, file_to_publish, rev):
+        """
+        Publish a single file in a thread.
+        """
+        publisher = PublishItem(sg_item)
+        publish_result = publisher.commandline_publishing()
+        if publish_result:
+            logger.debug("New data is: {}".format(publish_result))
 
     def _create_key(self, file_path):
         return file_path.replace("\\", "").replace("/", "").lower() if file_path else None
