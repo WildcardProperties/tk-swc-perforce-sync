@@ -11,7 +11,7 @@
 # not expressly granted therein are reserved by Shotgun Software Inc.
 
 # The path to output all built .py files to:
-UI_PYTHON_PATH=../python/tk_multi_loader/ui
+UI_PYTHON_PATH=../python/tk_swc_perforce_sync/ui
 PYTHON_BASE="/Applications/Shotgun.app/Contents/Resources/Python"
 
 # Remove any problematic profiles from pngs.

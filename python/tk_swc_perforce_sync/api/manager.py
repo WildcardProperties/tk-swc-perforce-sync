@@ -67,9 +67,9 @@ class LoaderManager(object):
         :param ui_area: Indicates which part of the UI the request is coming from.
                         Currently one of:
 
-                        - :class:`tk_multi_loader.LoaderManager.UI_AREA_MAIN`
-                        - :class:`tk_multi_loader.LoaderManager.UI_AREA_DETAILS`
-                        - :class:`tk_multi_loader.LoaderManager.UI_AREA_HISTORY`
+                        - :class:`tk_swc_perforce_sync.LoaderManager.UI_AREA_MAIN`
+                        - :class:`tk_swc_perforce_sync.LoaderManager.UI_AREA_DETAILS`
+                        - :class:`tk_swc_perforce_sync.LoaderManager.UI_AREA_HISTORY`
 
         :return: List of dictionaries, each with keys name, params, caption and description
         """
@@ -138,9 +138,9 @@ class LoaderManager(object):
         :param ui_area: Indicates which part of the UI the request is coming from.
                         Currently one of:
 
-                        - :class:`tk_multi_loader.LoaderManager.UI_AREA_MAIN`
-                        - :class:`tk_multi_loader.LoaderManager.UI_AREA_DETAILS`
-                        - :class:`tk_multi_loader.LoaderManager.UI_AREA_HISTORY`
+                        - :class:`tk_swc_perforce_sync.LoaderManager.UI_AREA_MAIN`
+                        - :class:`tk_swc_perforce_sync.LoaderManager.UI_AREA_DETAILS`
+                        - :class:`tk_swc_perforce_sync.LoaderManager.UI_AREA_HISTORY`
 
         :return: Dictionary where the keys are the action names and the values contain the list of available actions.
             One action will be defined for each publish.

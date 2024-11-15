@@ -71,7 +71,7 @@ directly via the configured loader app like this:
     # create a new loader manager instance
     manager = loader_app.create_loader_manager()
 
-.. py:currentmodule:: tk_multi_loader.api
+.. py:currentmodule:: tk_swc_perforce_sync.api
 
 .. autoclass:: LoaderManager
     :members:

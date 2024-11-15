@@ -27,15 +27,15 @@ class MultiLoader(sgtk.platform.Application):
         if not self.engine.has_ui:
             return
 
-        tk_multi_loader = self.import_module("tk_multi_loader")
+        tk_swc_perforce_sync = self.import_module("tk_swc_perforce_sync")
 
         # the manager class provides the interface for loading. We store a
         # reference to it to enable the create_loader_action_manager method exposed on
         # the application itself
-        self._manager_class = tk_multi_loader.LoaderManager
+        self._manager_class = tk_swc_perforce_sync.LoaderManager
 
         # register command
-        cb = lambda: tk_multi_loader.show_dialog(self)
+        cb = lambda: tk_swc_perforce_sync.show_dialog(self)
         menu_caption = "%s..." % self.get_setting("menu_name")
         menu_options = {
             "short_name": self.get_setting("menu_name").replace(" ", "_"),
@@ -75,15 +75,15 @@ class MultiLoader(sgtk.platform.Application):
                                         contain a much more complete list of fields from the
                                         Shotgun PublishedFile entity
         """
-        tk_multi_loader = self.import_module("tk_multi_loader")
-        return tk_multi_loader.open_publish_browser(self, title, action, publish_types)
+        tk_swc_perforce_sync = self.import_module("tk_swc_perforce_sync")
+        return tk_swc_perforce_sync.open_publish_browser(self, title, action, publish_types)
 
     def create_loader_manager(self):
         """
-        Create and return a :class:`tk_multi_loader.LoaderManager` instance.
-        See the :class:`tk_multi_loader.LoaderManager` docs for details on
+        Create and return a :class:`tk_swc_perforce_sync.LoaderManager` instance.
+        See the :class:`tk_swc_perforce_sync.LoaderManager` docs for details on
         how it can be used to automate your loading workflows.
 
-        :returns: A :class:`tk_multi_loader.LoaderManager` instance
+        :returns: A :class:`tk_swc_perforce_sync.LoaderManager` instance
         """
         return self._manager_class(self)
