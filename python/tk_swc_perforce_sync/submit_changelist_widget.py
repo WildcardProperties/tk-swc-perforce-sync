@@ -1,12 +1,17 @@
 import os
-from sgtk.platform.qt import QtCore, QtGui
-from tank.platform.qt5 import QtWidgets
+from sgtk.platform.qt import QtCore
+for name, cls in QtCore.__dict__.items():
+    if isinstance(cls, type): globals()[name] = cls
+
+from sgtk.platform.qt import QtGui
+for name, cls in QtGui.__dict__.items():
+    if isinstance(cls, type): globals()[name] = cls
 import datetime
 from tank_vendor import shotgun_api3
 import sgtk
 logger = sgtk.platform.get_logger(__name__)
 
-class SubmitChangelistWidget(QtWidgets.QDialog):
+class SubmitChangelistWidget(QDialog):
     """
     Widget to submit and edit a changelist
     """
@@ -24,35 +29,35 @@ class SubmitChangelistWidget(QtWidgets.QDialog):
         self.submit_widget_dict = file_dict
 
         # Main Layout
-        self.main_layout = QtWidgets.QVBoxLayout()
+        self.main_layout = QVBoxLayout()
 
         # Top Layout
-        self.top_layout = QtWidgets.QGridLayout()
+        self.top_layout = QGridLayout()
         self.top_layout.setHorizontalSpacing(5)  # Adjust horizontal spacing
         self.top_layout.setVerticalSpacing(5)  # Adjust vertical spacing
         self.main_layout.addLayout(self.top_layout)
 
         # Changelist Info (Static Labels)
-        self.changelist_label = QtWidgets.QLabel('Changelist:')
-        self.changelist_value = QtWidgets.QLabel('')
+        self.changelist_label = QLabel('Changelist:')
+        self.changelist_value = QLabel('')
 
-        self.date_label = QtWidgets.QLabel('Date:')
-        self.date_value = QtWidgets.QLabel('')
+        self.date_label = QLabel('Date:')
+        self.date_value = QLabel('')
 
-        self.workspace_label = QtWidgets.QLabel('Workspace:')
-        self.workspace_value = QtWidgets.QLabel('')
+        self.workspace_label = QLabel('Workspace:')
+        self.workspace_value = QLabel('')
 
-        self.user_label = QtWidgets.QLabel('User:')
-        self.user_value = QtWidgets.QLabel('')
+        self.user_label = QLabel('User:')
+        self.user_value = QLabel('')
 
-        self.top_layout.addWidget(self.changelist_label, 0, 0, QtCore.Qt.AlignRight)
-        self.top_layout.addWidget(self.changelist_value, 0, 1, QtCore.Qt.AlignLeft)
-        self.top_layout.addWidget(self.date_label, 1, 0, QtCore.Qt.AlignRight)
-        self.top_layout.addWidget(self.date_value, 1, 1, QtCore.Qt.AlignLeft)
-        self.top_layout.addWidget(self.workspace_label, 0, 2, QtCore.Qt.AlignRight)
-        self.top_layout.addWidget(self.workspace_value, 0, 3, QtCore.Qt.AlignLeft)
-        self.top_layout.addWidget(self.user_label, 1, 2, QtCore.Qt.AlignRight)
-        self.top_layout.addWidget(self.user_value, 1, 3, QtCore.Qt.AlignLeft)
+        self.top_layout.addWidget(self.changelist_label, 0, 0, Qt.AlignRight)
+        self.top_layout.addWidget(self.changelist_value, 0, 1, Qt.AlignLeft)
+        self.top_layout.addWidget(self.date_label, 1, 0, Qt.AlignRight)
+        self.top_layout.addWidget(self.date_value, 1, 1, Qt.AlignLeft)
+        self.top_layout.addWidget(self.workspace_label, 0, 2, Qt.AlignRight)
+        self.top_layout.addWidget(self.workspace_value, 0, 3, Qt.AlignLeft)
+        self.top_layout.addWidget(self.user_label, 1, 2, Qt.AlignRight)
+        self.top_layout.addWidget(self.user_value, 1, 3, Qt.AlignLeft)
 
         # Adjust column stretch to make the pairs closer
         self.top_layout.setColumnStretch(0, 0)
@@ -61,12 +66,12 @@ class SubmitChangelistWidget(QtWidgets.QDialog):
         self.top_layout.setColumnStretch(3, 1)
 
         # Spacer to create a one-line space between "Date:" and "Description:"
-        self.spacer_label = QtWidgets.QLabel('')
+        self.spacer_label = QLabel('')
         self.main_layout.addWidget(self.spacer_label)
 
         # Changelist Description
-        self.changelist_desc_label = QtWidgets.QLabel('Description:')
-        self.changelist_description = QtWidgets.QTextEdit()
+        self.changelist_desc_label = QLabel('Description:')
+        self.changelist_description = QTextEdit()
         self.changelist_description.setPlaceholderText("Enter changelist description here...")
         self.changelist_description.setFixedHeight(100)  # Make description area height about half
         self.changelist_description.textChanged.connect(self.update_buttons_state)
@@ -75,55 +80,55 @@ class SubmitChangelistWidget(QtWidgets.QDialog):
         self.main_layout.addWidget(self.changelist_description)
 
         # File Table
-        self.files_label = QtWidgets.QLabel('Files to Submit:')
-        self.files_table_widget = QtWidgets.QTableWidget(0, 6)  # Adjusted for 6 columns (including checkbox)
+        self.files_label = QLabel('Files to Submit:')
+        self.files_table_widget = QTableWidget(0, 6)  # Adjusted for 6 columns (including checkbox)
         self.files_table_widget.setHorizontalHeaderLabels(
             ['', 'File', 'In Folder', 'Resolve Status', 'Type', 'Pending Action'])
 
 
         # Adjust column resizing to fit content and stretch
         header = self.files_table_widget.horizontalHeader()
-        header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)  # Checkbox column
-        header.setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeToContents)  # File column
-        header.setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeToContents)  # In Folder column
-        header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents)  # Resolve Status column
-        header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeToContents)  # Type column
-        header.setSectionResizeMode(5, QtWidgets.QHeaderView.Stretch)  # Pending Action column
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)  # Checkbox column
+        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)  # File column
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)  # In Folder column
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)  # Resolve Status column
+        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)  # Type column
+        header.setSectionResizeMode(5, QHeaderView.Stretch)  # Pending Action column
 
         self.main_layout.addWidget(self.files_label)
         self.main_layout.addWidget(self.files_table_widget)
 
         # Buttons
-        self.select_all_button = QtWidgets.QPushButton('Select All')
+        self.select_all_button = QPushButton('Select All')
         self.select_all_button.setFixedWidth(100)
         self.select_all_button.setFixedHeight(22.5)
         self.select_all_button.clicked.connect(self.select_all)
 
-        self.select_none_button = QtWidgets.QPushButton('Select None')
+        self.select_none_button = QPushButton('Select None')
         self.select_none_button.setFixedWidth(100)
         self.select_none_button.setFixedHeight(22.5)
         self.select_none_button.clicked.connect(self.select_none)
 
-        self.submit_button = QtWidgets.QPushButton('Submit')
+        self.submit_button = QPushButton('Submit')
         self.submit_button.setToolTip('Submit the selected files in the changelist')
         self.submit_button.setFixedWidth(100)
         self.submit_button.setFixedHeight(22.5)
         self.submit_button.clicked.connect(self.submit_changelist)
 
-        self.save_button = QtWidgets.QPushButton('Save')
+        self.save_button = QPushButton('Save')
         self.save_button.setToolTip('Save the changelist description')
         self.save_button.setFixedWidth(100)
         self.save_button.setFixedHeight(22.5)
         self.save_button.clicked.connect(self.save_changelist)
 
-        self.cancel_button = QtWidgets.QPushButton('Cancel')
+        self.cancel_button = QPushButton('Cancel')
         self.cancel_button.setToolTip('Cancel the operation')
         self.cancel_button.setFixedWidth(100)
         self.cancel_button.setFixedHeight(22.5)
         self.cancel_button.clicked.connect(self.cancel_action)
 
         # Button Layout
-        self.button_layout = QtWidgets.QHBoxLayout()
+        self.button_layout = QHBoxLayout()
         self.button_layout.addWidget(self.select_all_button)
         self.button_layout.addWidget(self.select_none_button)
         self.button_layout.addStretch()  # Add stretch to push buttons to the right
@@ -179,16 +184,16 @@ class SubmitChangelistWidget(QtWidgets.QDialog):
             self.files_table_widget.insertRow(row_position)
 
             # Create checkbox item
-            checkbox_item = QtWidgets.QTableWidgetItem()
-            checkbox_item.setFlags(QtCore.Qt.ItemIsUserCheckable | QtCore.Qt.ItemIsEnabled)
-            checkbox_item.setCheckState(QtCore.Qt.Checked)
+            checkbox_item = QTableWidgetItem()
+            checkbox_item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
+            checkbox_item.setCheckState(Qt.Checked)
             self.files_table_widget.setItem(row_position, 0, checkbox_item)
 
-            self.files_table_widget.setItem(row_position, 1, QtWidgets.QTableWidgetItem(file_info["file"]))
-            self.files_table_widget.setItem(row_position, 2, QtWidgets.QTableWidgetItem(file_info["folder"]))
-            self.files_table_widget.setItem(row_position, 3, QtWidgets.QTableWidgetItem(file_info["resolve_status"]))
-            self.files_table_widget.setItem(row_position, 4, QtWidgets.QTableWidgetItem(file_info["type"]))
-            self.files_table_widget.setItem(row_position, 5, QtWidgets.QTableWidgetItem(file_info["pending_action"]))
+            self.files_table_widget.setItem(row_position, 1, QTableWidgetItem(file_info["file"]))
+            self.files_table_widget.setItem(row_position, 2, QTableWidgetItem(file_info["folder"]))
+            self.files_table_widget.setItem(row_position, 3, QTableWidgetItem(file_info["resolve_status"]))
+            self.files_table_widget.setItem(row_position, 4, QTableWidgetItem(file_info["type"]))
+            self.files_table_widget.setItem(row_position, 5, QTableWidgetItem(file_info["pending_action"]))
 
             row_position += 1
 
@@ -219,7 +224,7 @@ class SubmitChangelistWidget(QtWidgets.QDialog):
         Enable or disable the submit and save buttons based on the description length and file selection.
         """
         description_length = len(self.changelist_description.toPlainText())
-        has_files = any(self.files_table_widget.item(row, 0).checkState() == QtCore.Qt.Checked for row in
+        has_files = any(self.files_table_widget.item(row, 0).checkState() == Qt.Checked for row in
                         range(self.files_table_widget.rowCount()))
 
         self.submit_button.setEnabled(description_length >= 5 and has_files)
@@ -230,7 +235,7 @@ class SubmitChangelistWidget(QtWidgets.QDialog):
         Select all files by checking all checkboxes in the table.
         """
         for row in range(self.files_table_widget.rowCount()):
-            self.files_table_widget.item(row, 0).setCheckState(QtCore.Qt.Checked)
+            self.files_table_widget.item(row, 0).setCheckState(Qt.Checked)
         self.update_buttons_state()
 
     def select_none(self):
@@ -238,7 +243,7 @@ class SubmitChangelistWidget(QtWidgets.QDialog):
         Deselect all files by unchecking all checkboxes in the table.
         """
         for row in range(self.files_table_widget.rowCount()):
-            self.files_table_widget.item(row, 0).setCheckState(QtCore.Qt.Unchecked)
+            self.files_table_widget.item(row, 0).setCheckState(Qt.Unchecked)
         self.update_buttons_state()
 
     def submit_changelist(self):
@@ -250,11 +255,11 @@ class SubmitChangelistWidget(QtWidgets.QDialog):
         description = self.changelist_description.toPlainText()
         selected_files = []
         if not description:
-            QtWidgets.QMessageBox.warning(self, "Warning", "Changelist description cannot be empty.")
+            QMessageBox.warning(self, "Warning", "Changelist description cannot be empty.")
             return
 
         for row in range(self.files_table_widget.rowCount()):
-            if self.files_table_widget.item(row, 0).checkState() == QtCore.Qt.Checked:
+            if self.files_table_widget.item(row, 0).checkState() == Qt.Checked:
                 file_info = {
                     "file": self.files_table_widget.item(row, 1).text(),
                     "folder": self.files_table_widget.item(row, 2).text(),
@@ -264,7 +269,7 @@ class SubmitChangelistWidget(QtWidgets.QDialog):
 
 
         if not selected_files:
-            QtWidgets.QMessageBox.warning(self, "Warning", "No files selected for submission.")
+            QMessageBox.warning(self, "Warning", "No files selected for submission.")
             return
 
         # Here you would add the logic to submit the changelist with the selected files and description
@@ -335,7 +340,7 @@ class SubmitChangelistWidget(QtWidgets.QDialog):
         logger.debug(f"Saving changelist with description: {description} and change: {change}")
 
         if not description:
-            QtWidgets.QMessageBox.warning(self, "Warning", "Changelist description cannot be empty.")
+            QMessageBox.warning(self, "Warning", "Changelist description cannot be empty.")
             return
 
         # Save the changelist description using Perforce client
@@ -351,7 +356,7 @@ class SubmitChangelistWidget(QtWidgets.QDialog):
             self.parent._populate_pending_widget()
         except Exception as e:
             logger.error(f"Failed to save changelist {change}: {e}")
-            QtWidgets.QMessageBox.critical(self, "Error", f"Failed to save changelist: {e}")
+            QMessageBox.critical(self, "Error", f"Failed to save changelist: {e}")
             return
 
         # Close the dialog after saving

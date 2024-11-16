@@ -1,5 +1,10 @@
-from sgtk.platform.qt import QtCore, QtGui
-from tank.platform.qt5 import QtWidgets
+from sgtk.platform.qt import QtCore
+for name, cls in QtCore.__dict__.items():
+    if isinstance(cls, type): globals()[name] = cls
+
+from sgtk.platform.qt import QtGui
+for name, cls in QtGui.__dict__.items():
+    if isinstance(cls, type): globals()[name] = cls
 from collections import OrderedDict
 import datetime
 from .date_time import create_publish_timestamp
@@ -13,7 +18,7 @@ logger = sgtk.platform.get_logger(__name__)
 
 #from tank.platform.qt5.QtWidgets import QTreeWidgetItemIterator
 
-class SWCTreeView(QtWidgets.QTreeView):
+class SWCTreeView(QTreeView):
     def __init__(self, parent=None, myp4=None, mode=None):
         super().__init__(parent)
 
@@ -22,18 +27,18 @@ class SWCTreeView(QtWidgets.QTreeView):
         self.mode = mode
         self.setAcceptDrops(True)
         self.setDragEnabled(True)
-        self.setDragDropMode(QtWidgets.QTreeView.InternalMove)
+        self.setDragDropMode(QTreeView.InternalMove)
 
-        #self.setMinimumSize(QtCore.QSize(1200, 500))
+        #self.setMinimumSize(QSize(1200, 500))
 
-        self.setMinimumSize(QtCore.QSize(10000, 600))
-        self.setMaximumSize(QtCore.QSize(10000, 1500))
-        self.setEditTriggers(QtGui.QAbstractItemView.NoEditTriggers)
+        self.setMinimumSize(QSize(10000, 600))
+        self.setMaximumSize(QSize(10000, 1500))
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
 
         # self.setProperty("showDropIndicator", False)
         self.setProperty("showDropIndicator", True)
-        self.setIconSize(QtCore.QSize(20, 20))
-        self.setStyleSheet("QtWidgets.QTreeView::item { padding: 1px; }")
+        self.setIconSize(QSize(20, 20))
+        self.setStyleSheet("QTreeView::item { padding: 1px; }")
         self.setUniformRowHeights(True)
         self.setSelectionMode(self.selectionMode().ExtendedSelection)
         # self.setSelectionMode(self.selectionMode().MultiSelection)
@@ -43,11 +48,11 @@ class SWCTreeView(QtWidgets.QTreeView):
         self.setAcceptDrops(True)
         self.setDragEnabled(True)
         self.setDropIndicatorShown(True)
-        # self.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.AllEditTriggers)
-        self.setDragDropMode(QtWidgets.QAbstractItemView.DragDropMode.InternalMove)
-        self.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection)
-        #self.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
-        # self.setDefaultDropAction(QtCore.Qt.MoveAction)
+        # self.setEditTriggers(QAbstractItemView.EditTrigger.AllEditTriggers)
+        self.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        #self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        # self.setDefaultDropAction(Qt.MoveAction)
 
         # Connect the clicked signal to a custom method
         self.clicked.connect(self.adjust_selection_mode)
@@ -65,7 +70,7 @@ class SWCTreeView(QtWidgets.QTreeView):
         model = self.selectionModel()
         for index in model.selectedIndexes():
             if index != current_index:
-                model.select(index, QtCore.QItemSelectionModel.Deselect)
+                model.select(index, QItemSelectionModel.Deselect)
 
     def adjust_selection_mode(self, index):
         """
@@ -74,15 +79,15 @@ class SWCTreeView(QtWidgets.QTreeView):
         is_parent = not index.parent().isValid()
         if self.mode == "submitted":
             if is_parent:
-                self.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+                self.setSelectionMode(QAbstractItemView.SingleSelection)
             else:
-                self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+                self.setSelectionMode(QAbstractItemView.ExtendedSelection)
         elif self.mode == "pending":
             if is_parent:
-                self.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+                self.setSelectionMode(QAbstractItemView.SingleSelection)
             else:
-                # self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
-                self.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+                # self.setSelectionMode(QAbstractItemView.ExtendedSelection)
+                self.setSelectionMode(QAbstractItemView.SingleSelection)
 
 
     def adjust_selection_mode_pending(self, index):
@@ -92,10 +97,10 @@ class SWCTreeView(QtWidgets.QTreeView):
         is_parent = not index.parent().isValid()
 
         if is_parent:
-            self.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+            self.setSelectionMode(QAbstractItemView.SingleSelection)
         else:
-            self.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
-            # self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+            self.setSelectionMode(QAbstractItemView.SingleSelection)
+            # self.setSelectionMode(QAbstractItemView.ExtendedSelection)
 
     def set_mode(self, mode):
         self.mode = mode
@@ -107,10 +112,10 @@ class SWCTreeView(QtWidgets.QTreeView):
             self.expandAll()
 
     def single_selection(self):
-        self.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
 
     def multi_selection(self):
-        self.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
 
     def dropEvent(self, event):
         if event.mimeData().hasUrls():  # Handle external file drops
@@ -169,9 +174,9 @@ class SWCTreeView(QtWidgets.QTreeView):
             if event.source() == self:
                 # Retrieve the new parent's data (changelist number)
                 target_index = self.indexAt(event.pos())
-                target_data = target_index.data(QtCore.Qt.DisplayRole)
+                target_data = target_index.data(Qt.DisplayRole)
                 logger.debug("<<<<<<<  New parent data (changelist number): {}".format(target_data))
-                #change = target_index.data(QtCore.Qt.ToolTipRole)
+                #change = target_index.data(Qt.ToolTipRole)
                 target_changelist = target_index.data(QtCore.Qt.UserRole)
                 target_changelist = str(target_changelist)
                 logger.debug("<<<<<<<  parent change is: {}".format(target_changelist))
@@ -179,7 +184,7 @@ class SWCTreeView(QtWidgets.QTreeView):
 
                 # Retrieve the source item's data (depot file path)
                 for source_index in self.selectedIndexes():
-                    source_data = source_index.data(QtCore.Qt.DisplayRole)
+                    source_data = source_index.data(Qt.DisplayRole)
                     source_changelist = source_index.data(QtCore.Qt.UserRole)
                     source_changelist = str(source_changelist)
 
@@ -205,7 +210,7 @@ class SWCTreeView(QtWidgets.QTreeView):
 
     def dragEnterEvent(self, event):
         if event.source() == self:
-            event.setDropAction(QtCore.Qt.MoveAction)
+            event.setDropAction(Qt.MoveAction)
             event.accept()
         elif event.mimeData().hasUrls():  # Check for external file drops
             logger.debug("Drag event with URLs detected.")
@@ -260,26 +265,26 @@ class SWCTreeView(QtWidgets.QTreeView):
         perform_action = ChangelistSelection(self.p4, selected_actions=selected_actions, parent=self.parent)
         perform_action.show()
 
-class ChangeItem( QtGui.QStandardItem):
+class ChangeItem( QStandardItem):
     def __init__(self, parent=None, key=None, data=None, icon=None, enabled=None):
         super().__init__(parent)
         self.key = key
 
         self.setFlags(
-            (self.flags() | QtCore.Qt.ItemFlag.ItemIsDropEnabled) & ~QtCore.Qt.ItemFlag.ItemIsDragEnabled
+            (self.flags() | Qt.ItemFlag.ItemIsDropEnabled) & ~Qt.ItemFlag.ItemIsDragEnabled
         )
 
         msg = "Changelist# {}".format(self.key)
         self.setToolTip(msg)
         self.setData(key, QtCore.Qt.UserRole)
-        self.setSizeHint(QtCore.QSize(0, 25))
+        self.setSizeHint(QSize(0, 25))
         self.setEditable(False)
         self.setText(data)
         self.setIcon(icon)
         #self.setDropEnabled(enabled)
         self.setEnabled(enabled)
 
-class DepotItem( QtGui.QStandardItem):
+class DepotItem( QStandardItem):
     def __init__(self, parent=None, key=None, data=None, icon=None, enabled=False, size_hint=25):
         super().__init__(parent)
 
@@ -287,20 +292,20 @@ class DepotItem( QtGui.QStandardItem):
         self.setIcon(icon)
         self.setFlags(
             (
-                self.flags() | QtCore.Qt.ItemFlag.ItemIsDragEnabled) & ~QtCore.Qt.ItemFlag.ItemIsDropEnabled
+                self.flags() | Qt.ItemFlag.ItemIsDragEnabled) & ~Qt.ItemFlag.ItemIsDropEnabled
         )
         #self.setData(key, QtCore.Qt.UserRole)
-        self.setSizeHint(QtCore.QSize(0, 25))
+        self.setSizeHint(QSize(0, 25))
         self.setTextAlignment(
-            QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+            Qt.AlignLeading | Qt.AlignLeft | Qt.AlignVCenter)
         self.setText(data)
         self.setEnabled(enabled)
 
-class TreeViewWidget(QtWidgets.QWidget):
+class TreeViewWidget(QWidget):
     """
     TreeView Widget
     """
-    selected_item_signal = QtCore.Signal(QtCore.QModelIndex)
+    selected_item_signal = QtCore.Signal(QModelIndex)
     def __init__(self, data_dict=None, sorted=False, mode=None, p4=None, parent=None):
         super(TreeViewWidget, self).__init__()
         self.data_dict = {}
@@ -312,13 +317,13 @@ class TreeViewWidget(QtWidgets.QWidget):
         self._app = sgtk.platform.current_bundle()
 
         # set up layout
-        self.main_layout = QtWidgets.QVBoxLayout()
+        self.main_layout = QVBoxLayout()
 
         # major widgets
 
         self.tree_view = SWCTreeView(myp4=self.p4, parent=self.parent, mode=self.mode)
         self.tree_view.set_mode(self.mode)
-        self.model = QtGui.QStandardItemModel()
+        self.model = QStandardItemModel()
         self.proxymodel = QtGui.QSortFilterProxyModel()
         self.proxymodel.setSourceModel(self.model)
         self.tree_view.setModel(self.proxymodel)
@@ -334,24 +339,24 @@ class TreeViewWidget(QtWidgets.QWidget):
             os.path.join(os.path.dirname(__file__), "..", "..")
         )
         submitted_image_path = os.path.join(self.repo_root, "icons/mode_switch_submitted_active.png")
-        self.submitted_icon = QtGui.QIcon(QtGui.QPixmap(submitted_image_path))
+        self.submitted_icon = QIcon(QPixmap(submitted_image_path))
 
         pending_image_path = os.path.join(self.repo_root, "icons/mode_switch_pending_active.png")
-        self.pending_icon = QtGui.QIcon(QtGui.QPixmap(pending_image_path))
+        self.pending_icon = QIcon(QPixmap(pending_image_path))
 
         p4_file_add_path = os.path.join(self.repo_root, "icons/p4_file_add.png")
-        self.p4_file_add_icon = QtGui.QIcon(QtGui.QPixmap(p4_file_add_path))
+        self.p4_file_add_icon = QIcon(QPixmap(p4_file_add_path))
 
         p4_file_edit_path = os.path.join(self.repo_root, "icons/p4_file_edit.png")
-        self.p4_file_edit_icon = QtGui.QIcon(QtGui.QPixmap(p4_file_edit_path))
+        self.p4_file_edit_icon = QIcon(QPixmap(p4_file_edit_path))
 
         p4_file_delete_path = os.path.join(self.repo_root, "icons/p4_file_delete.png")
-        self.p4_file_delete_icon = QtGui.QIcon(QtGui.QPixmap(p4_file_delete_path))
+        self.p4_file_delete_icon = QIcon(QPixmap(p4_file_delete_path))
 
     def set_mode(self):
         self.tree_view.set_mode(self.mode)
 
-        #self.pending_icon = QtGui.QIcon(":/res/pending.png")
+        #self.pending_icon = QIcon(":/res/pending.png")
     def single_selection(self):
         self.tree_view.single_selection()
 
@@ -529,16 +534,16 @@ class TreeViewWidget(QtWidgets.QWidget):
             if key:
                 logger.debug("<<<<<<<  key: {}".format(key))
                 key_str = str(key)
-                change_item = QtGui.QStandardItem(key_str)
+                change_item = QStandardItem(key_str)
                 # change_item must allow drops, but cannot be dragged
                 change_item.setFlags(
-                    (change_item.flags() | QtCore.Qt.ItemFlag.ItemIsDropEnabled) & ~QtCore.Qt.ItemFlag.ItemIsDragEnabled
+                    (change_item.flags() | Qt.ItemFlag.ItemIsDropEnabled) & ~Qt.ItemFlag.ItemIsDragEnabled
                 )
 
                 msg = "Changelist# {}".format(key)
                 change_item.setToolTip(msg)
                 change_item.setData(key, QtCore.Qt.UserRole)
-                change_item.setSizeHint(QtCore.QSize(0, 25))
+                change_item.setSizeHint(QSize(0, 25))
                 change_item.setEditable(False)
                 self.model.appendRow([change_item])
 
@@ -572,11 +577,11 @@ class TreeViewWidget(QtWidgets.QWidget):
                                         depot_str = "{}{}".format(depot_path, revision)
                                     else:
                                         depot_str = "{}#{}".format(depot_path, head_rev)
-                                depot_item = QtGui.QStandardItem(depot_str)
+                                depot_item = QStandardItem(depot_str)
                                 # depot_item can be dragged, but must not accept drops
                                 depot_item.setFlags(
                                     (
-                                                depot_item.flags() | QtCore.Qt.ItemFlag.ItemIsDragEnabled) & ~QtCore.Qt.ItemFlag.ItemIsDropEnabled
+                                                depot_item.flags() | Qt.ItemFlag.ItemIsDragEnabled) & ~Qt.ItemFlag.ItemIsDropEnabled
                                 )
                                 depot_item.setIcon(action_icon)
                                 depot_item.setData(key, QtCore.Qt.UserRole)
@@ -584,7 +589,7 @@ class TreeViewWidget(QtWidgets.QWidget):
                                 depot_item.setSizeHint(self.tree_view.sizeHint())
 
                                 depot_item.setTextAlignment(
-                                    QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+                                    Qt.AlignLeading | Qt.AlignLeft | Qt.AlignVCenter)
                                 change_item.appendRow(depot_item)
 
                                 if is_published:
@@ -625,10 +630,10 @@ class TreeViewWidget(QtWidgets.QWidget):
             if key:
                 #logger.debug("<<<<<<<  key: {}".format(key))
                 key_str = str(key)
-                change_item = QtGui.QStandardItem(key_str)
+                change_item = QStandardItem(key_str)
                 # change_item must allow drops, but cannot be dragged
                 change_item.setFlags(
-                    (change_item.flags() | QtCore.Qt.ItemFlag.ItemIsDropEnabled) & ~QtCore.Qt.ItemFlag.ItemIsDragEnabled
+                    (change_item.flags() | Qt.ItemFlag.ItemIsDropEnabled) & ~Qt.ItemFlag.ItemIsDragEnabled
                 )
 
                 msg = "Right-click the selected changelist '{}' and choose 'Publish...' to publish it in Shotgrid.".format(
@@ -637,7 +642,7 @@ class TreeViewWidget(QtWidgets.QWidget):
                 change_item.setData(key, QtCore.Qt.UserRole)
                 change_item.setData(key, QtCore.Qt.UserRole + 2)
 
-                change_item.setSizeHint(QtCore.QSize(0, 25))
+                change_item.setSizeHint(QSize(0, 25))
                 change_item.setEditable(False)
                 self.model.appendRow([change_item])
 
@@ -672,10 +677,10 @@ class TreeViewWidget(QtWidgets.QWidget):
                                         depot_str = "{} {}".format(depot_path, revision)
                                     else:
                                         depot_str = "{}#{}".format(depot_path, head_rev)
-                                depot_item = QtGui.QStandardItem(depot_str)
+                                depot_item = QStandardItem(depot_str)
                                 # depot_item can be dragged, but must not accept drops
                                 depot_item.setFlags(
-                                    (depot_item.flags() | QtCore.Qt.ItemFlag.ItemIsDragEnabled) & ~QtCore.Qt.ItemFlag.ItemIsDropEnabled
+                                    (depot_item.flags() | Qt.ItemFlag.ItemIsDragEnabled) & ~Qt.ItemFlag.ItemIsDropEnabled
                                 )
                                 # msg = "Right-click the selected file 'Revert' the file in Perforce. "
                                 msg = "Select the file for further action"
@@ -683,7 +688,7 @@ class TreeViewWidget(QtWidgets.QWidget):
 
                                 depot_item.setIcon(action_icon)
                                 depot_item.setData(key, QtCore.Qt.UserRole)
-                                depot_item.setTextAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+                                depot_item.setTextAlignment(Qt.AlignLeading | Qt.AlignLeft | Qt.AlignVCenter)
                                 depot_item.setData(action, QtCore.Qt.UserRole + 1)
                                 depot_item.setData(key, QtCore.Qt.UserRole + 2)
                                 depot_item.setData(sg_item, QtCore.Qt.UserRole + 3)
@@ -703,8 +708,8 @@ class TreeViewWidget(QtWidgets.QWidget):
 
     def _create_perforce_ui(self, data_dict, sorted=None):
         # publish list
-        publish_widget = QtWidgets.QWidget()
-        publish_layout = QtWidgets.QVBoxLayout()
+        publish_widget = QWidget()
+        publish_layout = QVBoxLayout()
 
         # Create a proxy model.
         proxy_model = QtGui.QSortFilterProxyModel(self)
@@ -715,13 +720,13 @@ class TreeViewWidget(QtWidgets.QWidget):
         proxy_model.setDynamicSortFilter(True)
 
         # Create a Tree View
-        view = QtGui.QTreeView(tab)
+        view = QTreeView(tab)
         publish_layout.addWidget(view)
 
         # Configure the view.
-        view.setEditTriggers(QtGui.QAbstractItemView.NoEditTriggers)
+        view.setEditTriggers(QAbstractItemView.NoEditTriggers)
         view.setProperty("showDropIndicator", False)
-        view.setIconSize(QtCore.QSize(20, 20))
+        view.setIconSize(QSize(20, 20))
         view.setStyleSheet("QTreeView::item { padding: 6px; }")
         view.setUniformRowHeights(True)
         view.setHeaderHidden(True)
@@ -734,28 +739,28 @@ class TreeViewWidget(QtWidgets.QWidget):
             if publish_item:
                 if publish_item[3] != current_publish:
                     sg_item = publish_item[0]
-                    info_layout = QtWidgets.QHBoxLayout()
+                    info_layout = QHBoxLayout()
                     info_layout.layout().setContentsMargins(0, 15, 0, 5)
 
-                    change_label = QtWidgets.QLabel()
+                    change_label = QLabel()
                     change_label.setMinimumWidth(120)
                     change_label.setMaximumWidth(120)
                     change_txt = self._get_change_list_info(sg_item)
                     change_label.setText(change_txt)
 
-                    publish_time_label = QtWidgets.QLabel()
+                    publish_time_label = QLabel()
                     publish_time_label.setMinimumWidth(200)
                     publish_time_label.setMaximumWidth(200)
                     publish_time_txt = self._get_publish_time_info(sg_item)
                     publish_time_label.setText(publish_time_txt)
 
-                    user_name_label = QtWidgets.QLabel()
+                    user_name_label = QLabel()
                     user_name_label.setMinimumWidth(150)
                     user_name_label.setMaximumWidth(150)
                     user_name_txt = self._get_user_name_info(sg_item)
                     user_name_label.setText(user_name_txt)
 
-                    description_label = QtWidgets.QLabel()
+                    description_label = QLabel()
                     description_label.setMinimumWidth(400)
                     user_name_label.setMaximumWidth(2000)
                     description_txt = self._get_description_info(sg_item)
@@ -798,7 +803,7 @@ class TreeViewWidget(QtWidgets.QWidget):
         for key in node_dictionary.keys():
             if key:
                 # logger.debug("<<<<<<<  key: {}".format(key))
-                publish_label = QtWidgets.QLabel()
+                publish_label = QLabel()
                 publish_label.setText(str(key))
                 for sg_item in node_dictionary[key]:
                     if sg_item:
@@ -810,18 +815,18 @@ class TreeViewWidget(QtWidgets.QWidget):
                         action = self._get_action(sg_item)
                         #action_icon = self.get_action_icon(action)
 
-                        publish_layout = QtWidgets.QHBoxLayout()
-                        publish_checkbox = QtWidgets.QCheckBox()
+                        publish_layout = QHBoxLayout()
+                        publish_checkbox = QCheckBox()
                         if is_published:
                             publish_checkbox.setChecked(True)
 
-                        action_line_edit = QtWidgets.QLineEdit()
+                        action_line_edit = QLineEdit()
                         action_line_edit.setMinimumWidth(80)
                         action_line_edit.setMaximumWidth(80)
                         action_line_edit.setText('{}'.format(action))
                         # action_line_edit.setEnabled(False)
 
-                        publish_path_line_edit = QtWidgets.QLineEdit()
+                        publish_path_line_edit = QLineEdit()
                         publish_path_line_edit.setMinimumWidth(750)
                         publish_path_line_edit.setText('{}'.format(depot_path))
                         # publish_path_line_edit.setEnabled(False)

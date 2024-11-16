@@ -1,7 +1,11 @@
 
-from sgtk.platform.qt import QtCore, QtGui
+from sgtk.platform.qt import QtCore
+for name, cls in QtCore.__dict__.items():
+    if isinstance(cls, type): globals()[name] = cls
 
-from tank.platform.qt5 import QtWidgets
+from sgtk.platform.qt import QtGui
+for name, cls in QtGui.__dict__.items():
+    if isinstance(cls, type): globals()[name] = cls
 
 datas = {
     "Category 1": [
@@ -13,20 +17,20 @@ datas = {
     ]
 }
 
-class GroupDelegate(QtWidgets.QStyledItemDelegate):
+class GroupDelegate(QStyledItemDelegate):
     def __init__(self, parent=None):
         super(GroupDelegate, self).__init__(parent)
-        #self._plus_icon = QtGui.QIcon("plus.png")
-        #self._minus_icon = QtGui.QIcon("minus.png")
+        #self._plus_icon = QIcon("plus.png")
+        #self._minus_icon = QIcon("minus.png")
 
     def initStyleOption(self, option, index):
         super(GroupDelegate, self).initStyleOption(option, index)
         if not index.parent().isValid():
-            is_open = bool(option.state & QtWidgets.QStyle.State_Open)
-            option.features |= QtWidgets.QStyleOptionViewItem.HasDecoration
+            is_open = bool(option.state & QStyle.State_Open)
+            option.features |= QStyleOptionViewItem.HasDecoration
             #option.icon = self._minus_icon if is_open else self._plus_icon
 
-class GroupView(QtWidgets.QTreeView):
+class GroupView(QTreeView):
     def __init__(self, model, parent=None):
         super(GroupView, self).__init__(parent)
         self.setIndentation(0)
@@ -35,32 +39,32 @@ class GroupView(QtWidgets.QTreeView):
         delegate = GroupDelegate(self)
         self.setItemDelegateForColumn(0, delegate)
         self.setModel(model)
-        self.header().setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents)
-        self.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.header().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.setSelectionBehavior(QAbstractItemView.SelectRows)
         #self.setStyleSheet("background-color: #0D1225;")
 
         # Enable sorting by column
         self.setSortingEnabled(True)
 
-    @QtCore.pyqtSlot(QtCore.QModelIndex)
+    @pyqtSlot(QModelIndex)
     def on_clicked(self, index):
         if not index.parent().isValid() and index.column() == 0:
             self.setExpanded(index, not self.isExpanded(index))
 
 
-class GroupModel(QtGui.QStandardItemModel):
+class GroupModel(QStandardItemModel):
     def __init__(self, parent=None):
         super(GroupModel, self).__init__(parent)
         self.setColumnCount(8)
         self.setHorizontalHeaderLabels(["", "Name", "Library", "Release Date", "Genre(s)", "Last Played", "Time Played", ""])
         for i in range(self.columnCount()):
             it = self.horizontalHeaderItem(i)
-            #it.setForeground(QtGui.QColor("#F2F2F2"))
+            #it.setForeground(QColor("#F2F2F2"))
 
     def add_group(self, group_name):
-        item_root = QtGui.QStandardItem()
+        item_root = QStandardItem()
         item_root.setEditable(False)
-        item = QtGui.QStandardItem(group_name)
+        item = QStandardItem(group_name)
         item.setEditable(False)
         ii = self.invisibleRootItem()
         i = ii.rowCount()
@@ -70,28 +74,28 @@ class GroupModel(QtGui.QStandardItemModel):
         for j in range(self.columnCount()):
             it = ii.child(i, j)
             if it is None:
-                it = QtGui.QStandardItem()
+                it = QStandardItem()
                 ii.setChild(i, j, it)
-            it.setBackground(QtGui.QColor("#002842"))
-            it.setForeground(QtGui.QColor("#F2F2F2"))
+            it.setBackground(QColor("#002842"))
+            it.setForeground(QColor("#F2F2F2"))
         return item_root
 
     def append_element_to_group(self, group_item, texts):
         j = group_item.rowCount()
-        item_icon = QtGui.QStandardItem()
+        item_icon = QStandardItem()
         item_icon.setEditable(False)
-        item_icon.setIcon(QtGui.QIcon("game.png"))
-        item_icon.setBackground(QtGui.QColor("#0D1225"))
+        item_icon.setIcon(QIcon("game.png"))
+        item_icon.setBackground(QColor("#0D1225"))
         group_item.setChild(j, 0, item_icon)
         for i, text in enumerate(texts):
-            item = QtGui.QStandardItem(text)
+            item = QStandardItem(text)
             item.setEditable(False)
-            item.setBackground(QtGui.QColor("#0D1225"))
-            item.setForeground(QtGui.QColor("#F2F2F2"))
+            item.setBackground(QColor("#0D1225"))
+            item.setForeground(QColor("#F2F2F2"))
             group_item.setChild(j, i+1, item)
 
 
-class MainWindow(QtWidgets.QMainWindow):
+class MainWindow(QMainWindow):
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
 
@@ -106,7 +110,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
 if __name__ == '__main__':
     import sys
-    app = QtWidgets.QApplication(sys.argv)
+    app = QApplication(sys.argv)
     w = MainWindow()
     w.resize(720, 240)
     w.show()

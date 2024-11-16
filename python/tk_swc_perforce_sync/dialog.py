@@ -12,10 +12,15 @@
 import sgtk
 from sgtk.util import login
 from sgtk import TankError
-from sgtk.platform.qt import QtCore, QtGui
 
+from sgtk.platform.qt import QtCore
+for name, cls in QtCore.__dict__.items():
+    if isinstance(cls, type): globals()[name] = cls
 
-from tank.platform.qt5 import QtWidgets
+from sgtk.platform.qt import QtGui
+for name, cls in QtGui.__dict__.items():
+    if isinstance(cls, type): globals()[name] = cls
+
 import threading
 from .threads import SyncThread, FileSyncThread
 import concurrent.futures
@@ -98,7 +103,7 @@ swc_fw = sgtk.platform.import_framework(
 ShotgunModelOverlayWidget = overlay_widget.ShotgunModelOverlayWidget
 
 
-class AppDialog(QtGui.QWidget):
+class AppDialog(QWidget):
     """
     Main dialog window for the App
     """
@@ -114,7 +119,7 @@ class AppDialog(QtGui.QWidget):
     # in either the main view or the details file_history view
     selection_changed = QtCore.Signal()
     update_pending_view_signal = QtCore.Signal()
-    # update_pending_view_signal = QtCore.pyqtSignal()
+    # update_pending_view_signal = pyqtQtCore.Signal()
 
     def __init__(self, action_manager, parent=None):
         super(AppDialog, self).__init__()  # Ensure proper parent initialization
@@ -125,7 +130,7 @@ class AppDialog(QtGui.QWidget):
                                 then the default will be used instead
         :param parent:          The parent QWidget for this control
         """
-       #QtGui.QWidget.__init__(self, parent)
+       #QWidget.__init__(self, parent)
         self._action_manager = action_manager
 
         # The loader app can be invoked from other applications with a custom
@@ -180,7 +185,7 @@ class AppDialog(QtGui.QWidget):
         # details pane
         self._details_pane_visible = False
 
-        self._file_details_action_menu = QtGui.QMenu()
+        self._file_details_action_menu = QMenu()
         self.ui.file_detail_actions_btn.setMenu(self._file_details_action_menu)
 
         self.ui.info.clicked.connect(self._toggle_details_pane)
@@ -221,7 +226,7 @@ class AppDialog(QtGui.QWidget):
         # continously sorting. And then tell it to use column 0
         # (we only have one column in our models) and descending order.
         self._publish_file_history_proxy.setDynamicSortFilter(True)
-        self._publish_file_history_proxy.sort(0, QtCore.Qt.DescendingOrder)
+        self._publish_file_history_proxy.sort(0, Qt.DescendingOrder)
 
         self.ui.file_history_view.setModel(self._publish_file_history_proxy)
         self._file_history_delegate = SgPublishHistoryDelegate(
@@ -238,22 +243,22 @@ class AppDialog(QtGui.QWidget):
             self._on_file_history_selection
         )
 
-        self._multiple_publishes_pixmap = QtGui.QPixmap(
+        self._multiple_publishes_pixmap = QPixmap(
             ":/res/multiple_publishes_512x400.png"
         )
-        self._no_selection_pixmap = QtGui.QPixmap(":/res/no_item_selected_512x400.png")
-        self._no_pubs_found_icon = QtGui.QPixmap(":/res/no_publishes_found.png")
+        self._no_selection_pixmap = QPixmap(":/res/no_item_selected_512x400.png")
+        self._no_pubs_found_icon = QPixmap(":/res/no_publishes_found.png")
 
         self.ui.file_detail_playback_btn.clicked.connect(self._on_detail_version_playback)
         self._current_version_detail_playback_url = None
 
         # set up right click menu for the main publish view
-        self._refresh_file_history_action = QtGui.QAction("Refresh", self.ui.file_history_view)
+        self._refresh_file_history_action = QAction("Refresh", self.ui.file_history_view)
         self._refresh_file_history_action.triggered.connect(
             self._publish_file_history_model.async_refresh
         )
         self.ui.file_history_view.addAction(self._refresh_file_history_action)
-        self.ui.file_history_view.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
+        self.ui.file_history_view.setContextMenuPolicy(Qt.ActionsContextMenu)
 
         # if an item in the list is double clicked the default action is run
         self.ui.file_history_view.doubleClicked.connect(self._on_file_history_double_clicked)
@@ -295,7 +300,7 @@ class AppDialog(QtGui.QWidget):
         # continously sorting. And then tell it to use column 0
         # (we only have one column in our models) and descending order.
         self._publish_entity_parents_proxy.setDynamicSortFilter(True)
-        self._publish_entity_parents_proxy.sort(0, QtCore.Qt.DescendingOrder)
+        self._publish_entity_parents_proxy.sort(0, Qt.DescendingOrder)
 
         #################################################
         # load and initialize cached publish type model
@@ -361,7 +366,7 @@ class AppDialog(QtGui.QWidget):
         # note! Because of some GC issues (maya 2012 Pyside), need to first establish
         # a direct reference to the selection model before we can set up any signal/slots
         # against it
-        self.ui.publish_view.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
+        self.ui.publish_view.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self._publish_view_selection_model = self.ui.publish_view.selectionModel()
         self._publish_view_selection_model.selectionChanged.connect(
             self._on_publish_selection
@@ -369,34 +374,34 @@ class AppDialog(QtGui.QWidget):
 
         # set up right click menu for the main publish view
 
-        self._add_action = QtGui.QAction("Add", self.ui.publish_view)
+        self._add_action = QAction("Add", self.ui.publish_view)
         self._add_action.triggered.connect(lambda: self._on_publish_model_action("add"))
-        self._edit_action = QtGui.QAction("Edit", self.ui.publish_view)
+        self._edit_action = QAction("Edit", self.ui.publish_view)
         self._edit_action.triggered.connect(lambda: self._on_publish_model_action("edit"))
-        self._delete_action = QtGui.QAction("Delete", self.ui.publish_view)
+        self._delete_action = QAction("Delete", self.ui.publish_view)
         self._delete_action.triggered.connect(lambda: self._on_publish_model_action("delete"))
         # Add changlist as submenus to the delete action
 
-        self._change_lists = QtGui.QAction("1001", self._delete_action)
+        self._change_lists = QAction("1001", self._delete_action)
         self._change_lists.triggered.connect(lambda: self._on_publish_model_action("1001"))
 
-        self._revert_action = QtGui.QAction("Revert", self.ui.publish_view)
+        self._revert_action = QAction("Revert", self.ui.publish_view)
         self._revert_action.triggered.connect(lambda: self._on_publish_model_action("revert"))
 
         # Correctly connect the triggered signal to the slot
-        self._preview_create_folders_action = QtGui.QAction("Preview Create Folders", self.ui.publish_view)
+        self._preview_create_folders_action = QAction("Preview Create Folders", self.ui.publish_view)
         self._preview_create_folders_action.triggered.connect(lambda: self._on_publish_folder_action("preview"))
 
-        self._create_folders_action = QtGui.QAction("Create Folders", self.ui.publish_view)
+        self._create_folders_action = QAction("Create Folders", self.ui.publish_view)
         self._create_folders_action.triggered.connect(lambda: self._on_publish_folder_action("create"))
 
-        self._unregister_folders_action = QtGui.QAction("Unregister Folders", self.ui.publish_view)
+        self._unregister_folders_action = QAction("Unregister Folders", self.ui.publish_view)
         self._unregister_folders_action.triggered.connect(lambda: self._on_publish_folder_action("unregister"))
 
-        self._refresh_action = QtGui.QAction("Refresh", self.ui.publish_view)
+        self._refresh_action = QAction("Refresh", self.ui.publish_view)
         self._refresh_action.triggered.connect(self._publish_model.async_refresh)
 
-        self.ui.publish_view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.ui.publish_view.setContextMenuPolicy(Qt.CustomContextMenu)
         self.ui.publish_view.customContextMenuRequested.connect(
             self._show_publish_actions
         )
@@ -443,7 +448,7 @@ class AppDialog(QtGui.QWidget):
         scale_val = self._settings_manager.retrieve("thumb_size_scale", 140)
         # position both slider and view
         self.ui.thumb_scale.setValue(scale_val)
-        self.ui.publish_view.setIconSize(QtCore.QSize(scale_val, scale_val))
+        self.ui.publish_view.setIconSize(QSize(scale_val, scale_val))
         # and track subsequent changes
         self.ui.thumb_scale.valueChanged.connect(self._on_thumb_size_slider_change)
 
@@ -490,15 +495,15 @@ class AppDialog(QtGui.QWidget):
 
         #################################################
         # set up cog button actions
-        self._help_action = QtGui.QAction("Show Help Screen", self)
+        self._help_action = QAction("Show Help Screen", self)
         self._help_action.triggered.connect(self.show_help_popup)
         self.ui.cog_button.addAction(self._help_action)
 
-        self._doc_action = QtGui.QAction("View Documentation", self)
+        self._doc_action = QAction("View Documentation", self)
         self._doc_action.triggered.connect(self._on_doc_action)
         self.ui.cog_button.addAction(self._doc_action)
 
-        self._reload_action = QtGui.QAction("Reload", self)
+        self._reload_action = QAction("Reload", self)
         self._reload_action.triggered.connect(self._on_reload_action)
         self.ui.cog_button.addAction(self._reload_action)
 
@@ -542,23 +547,23 @@ class AppDialog(QtGui.QWidget):
             os.path.join(os.path.dirname(__file__), "..", "..")
         )
         active_column_view_image_path = os.path.join(self.repo_root, "icons/mode_switch_column_active.png")
-        self.active_column_view_icon = QtGui.QIcon(QtGui.QPixmap(active_column_view_image_path))
+        self.active_column_view_icon = QIcon(QPixmap(active_column_view_image_path))
 
         inactive_column_view_image_path = os.path.join(self.repo_root, "icons/mode_switch_column_off.png")
-        self.inactive_column_view_icon = QtGui.QIcon(QtGui.QPixmap(inactive_column_view_image_path))
+        self.inactive_column_view_icon = QIcon(QPixmap(inactive_column_view_image_path))
 
         submitted_image_path = os.path.join(self.repo_root, "icons/mode_switch_submitted_active.png")
-        self.submitted_icon = QtGui.QIcon(QtGui.QPixmap(submitted_image_path))
+        self.submitted_icon = QIcon(QPixmap(submitted_image_path))
 
         inactive_submitted_image_path = os.path.join(self.repo_root, "submitted_off.png")
-        self.submitted_icon_inactive = QtGui.QIcon(QtGui.QPixmap(inactive_submitted_image_path))
+        self.submitted_icon_inactive = QIcon(QPixmap(inactive_submitted_image_path))
 
         pending_image_path = os.path.join(self.repo_root, "icons/mode_switch_pending_active.png")
-        self.pending_icon = QtGui.QIcon(QtGui.QPixmap(pending_image_path))
+        self.pending_icon = QIcon(QPixmap(pending_image_path))
 
         inactive_pending_image_path = os.path.join(self.repo_root, "icons/pending_off.png")
-        # self.inactive_pending_icon = QtGui.QIcon(QtGui.QPixmap(inactive_pending_image_path))
-        self.pending_icon_inactive = QtGui.QIcon(QtGui.QPixmap(inactive_pending_image_path))
+        # self.inactive_pending_icon = QIcon(QPixmap(inactive_pending_image_path))
+        self.pending_icon_inactive = QIcon(QPixmap(inactive_pending_image_path))
 
         self._root_path = self._app.sgtk.roots.get('primary', None)
         # logger.debug("root_path:{}".format(self._root_path))
@@ -632,7 +637,7 @@ class AppDialog(QtGui.QWidget):
             self._function_executed = False
 
             # Create a QTimer
-            self.timer = QtCore.QTimer(self)
+            self.timer = QTimer(self)
             self.timer.timeout.connect(self._run_function_once)
 
             # Delay the execution for 1 second (you can adjust the delay as needed)
@@ -776,7 +781,7 @@ class AppDialog(QtGui.QWidget):
         """
 
         # Build a menu with all the actions.
-        menu = QtGui.QMenu(self)
+        menu = QMenu(self)
         actions = self._action_manager.get_actions_for_publishes(
             self.selected_publishes, self._action_manager.UI_AREA_MAIN
         )
@@ -818,7 +823,7 @@ class AppDialog(QtGui.QWidget):
         is_folder = item.data(SgLatestPublishModel.IS_FOLDER_ROLE)
 
         # Build a menu with all the actions.
-        menu = QtGui.QMenu(self)
+        menu = QMenu(self)
 
         if is_folder:
             # Add folder-specific actions
@@ -895,11 +900,11 @@ class AppDialog(QtGui.QWidget):
         need to be called here.
         """
         # display exit splash screen
-        splash_pix = QtGui.QPixmap(":/res/exit_splash.png")
-        splash = QtGui.QSplashScreen(splash_pix, QtCore.Qt.WindowStaysOnTopHint)
+        splash_pix = QPixmap(":/res/exit_splash.png")
+        splash = QSplashScreen(splash_pix, Qt.WindowStaysOnTopHint)
         splash.setMask(splash_pix.mask())
         splash.show()
-        QtCore.QCoreApplication.processEvents()
+        QCoreApplication.processEvents()
 
         try:
             # clear the selection in the main views.
@@ -1112,8 +1117,8 @@ class AppDialog(QtGui.QWidget):
 
     def _create_perforce_ui(self, data_dict, sorted=None):
         # publish list
-        publish_widget = QtWidgets.QWidget()
-        publish_layout = QtWidgets.QVBoxLayout()
+        publish_widget = QWidget()
+        publish_layout = QVBoxLayout()
 
         publish_list = self._create_publish_layout(data_dict, sorted)
 
@@ -1122,28 +1127,28 @@ class AppDialog(QtGui.QWidget):
             if publish_item:
                 if publish_item[3] != current_publish:
                     sg_item = publish_item[0]
-                    info_layout = QtWidgets.QHBoxLayout()
+                    info_layout = QHBoxLayout()
                     info_layout.layout().setContentsMargins(0, 15, 0, 5)
 
-                    change_label = QtWidgets.QLabel()
+                    change_label = QLabel()
                     change_label.setMinimumWidth(120)
                     change_label.setMaximumWidth(120)
                     change_txt = self._get_change_list_info(sg_item)
                     change_label.setText(change_txt)
 
-                    publish_time_label = QtWidgets.QLabel()
+                    publish_time_label = QLabel()
                     publish_time_label.setMinimumWidth(200)
                     publish_time_label.setMaximumWidth(200)
                     publish_time_txt = self._get_publish_time_info(sg_item)
                     publish_time_label.setText(publish_time_txt)
 
-                    user_name_label = QtWidgets.QLabel()
+                    user_name_label = QLabel()
                     user_name_label.setMinimumWidth(150)
                     user_name_label.setMaximumWidth(150)
                     user_name_txt = self._get_user_name_info(sg_item)
                     user_name_label.setText(user_name_txt)
 
-                    description_label = QtWidgets.QLabel()
+                    description_label = QLabel()
                     description_label.setMinimumWidth(400)
                     description_label.setMaximumWidth(2000)
                     description_txt = self._get_description_info(sg_item)
@@ -1218,7 +1223,7 @@ class AppDialog(QtGui.QWidget):
         for key in node_dictionary.keys():
             if key:
                 # logger.debug("<<<<<<<  key: {}".format(key))
-                publish_label = QtWidgets.QLabel()
+                publish_label = QLabel()
                 publish_label.setText(str(key))
                 for sg_item in node_dictionary[key]:
                     if sg_item:
@@ -1229,18 +1234,18 @@ class AppDialog(QtGui.QWidget):
 
                         action = self._get_action(sg_item)
 
-                        publish_layout = QtWidgets.QHBoxLayout()
-                        publish_checkbox = QtWidgets.QCheckBox()
+                        publish_layout = QHBoxLayout()
+                        publish_checkbox = QCheckBox()
                         if is_published:
                             publish_checkbox.setChecked(True)
 
-                        action_line_edit = QtWidgets.QLineEdit()
+                        action_line_edit = QLineEdit()
                         action_line_edit.setMinimumWidth(80)
                         action_line_edit.setMaximumWidth(80)
                         action_line_edit.setText('{}'.format(action))
                         # action_line_edit.setEnabled(False)
 
-                        publish_path_line_edit = QtWidgets.QLineEdit()
+                        publish_path_line_edit = QLineEdit()
                         publish_path_line_edit.setMinimumWidth(750)
                         publish_path_line_edit.setText('{}'.format(depot_path))
                         # publish_path_line_edit.setEnabled(False)
@@ -1433,7 +1438,7 @@ class AppDialog(QtGui.QWidget):
         """
         if self.ui.search_publishes.isChecked():
             self.ui.search_publishes.setIcon(
-                QtGui.QIcon(QtGui.QPixmap(":/res/search_active.png"))
+                QIcon(QPixmap(":/res/search_active.png"))
             )
             self._search_widget.enable()
             # Chech if we are in Column view mode
@@ -1442,7 +1447,7 @@ class AppDialog(QtGui.QWidget):
                 logger.debug("Column view mode, search is active")
         else:
             self.ui.search_publishes.setIcon(
-                QtGui.QIcon(QtGui.QPixmap(":/res/search.png"))
+                QIcon(QPixmap(":/res/search.png"))
             )
             self._search_widget.disable()
             if self.main_view_mode == self.MAIN_VIEW_COLUMN:
@@ -1492,14 +1497,14 @@ class AppDialog(QtGui.QWidget):
             self._turn_all_modes_off()
             self.ui.publish_view.setVisible(True)
             self.ui.list_mode.setIcon(
-                QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_card_active.png"))
+                QIcon(QPixmap(":/res/mode_switch_card_active.png"))
             )
             self.ui.list_mode.setChecked(True)
             self.ui.thumbnail_mode.setIcon(
-                QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_thumb.png"))
+                QIcon(QPixmap(":/res/mode_switch_thumb.png"))
             )
 
-            self.ui.publish_view.setViewMode(QtGui.QListView.ListMode)
+            self.ui.publish_view.setViewMode(QListView.ListMode)
             self.ui.publish_view.setItemDelegate(self._publish_list_delegate)
             #self._show_thumb_scale(False)
             self.main_view_mode = self.MAIN_VIEW_LIST
@@ -1515,14 +1520,14 @@ class AppDialog(QtGui.QWidget):
             self.ui.publish_view.setVisible(True)
 
             self.ui.list_mode.setIcon(
-                QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_card.png"))
+                QIcon(QPixmap(":/res/mode_switch_card.png"))
             )
 
             self.ui.thumbnail_mode.setIcon(
-                QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_thumb_active.png"))
+                QIcon(QPixmap(":/res/mode_switch_thumb_active.png"))
             )
             self.ui.thumbnail_mode.setChecked(True)
-            self.ui.publish_view.setViewMode(QtGui.QListView.IconMode)
+            self.ui.publish_view.setViewMode(QListView.IconMode)
             self.ui.publish_view.setItemDelegate(self._publish_thumb_delegate)
             self._show_thumb_scale(True)
             self.main_view_mode = self.MAIN_VIEW_THUMB
@@ -1553,7 +1558,7 @@ class AppDialog(QtGui.QWidget):
             self.ui.submitted_scroll.setVisible(True)
 
             #self.ui.submitted_mode.setIcon(
-            #    QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_card_active.png"))
+            #    QIcon(QPixmap(":/res/mode_switch_card_active.png"))
             #)
             self.ui.submitted_mode.setIcon(self.submitted_icon)
             self.ui.submitted_mode.setChecked(True)
@@ -1584,14 +1589,14 @@ class AppDialog(QtGui.QWidget):
         self.ui.publish_view.setVisible(True)
 
         self.ui.list_mode.setIcon(
-            QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_card.png"))
+            QIcon(QPixmap(":/res/mode_switch_card.png"))
         )
 
         self.ui.thumbnail_mode.setIcon(
-            QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_thumb_active.png"))
+            QIcon(QPixmap(":/res/mode_switch_thumb_active.png"))
         )
         self.ui.thumbnail_mode.setChecked(True)
-        self.ui.publish_view.setViewMode(QtGui.QListView.IconMode)
+        self.ui.publish_view.setViewMode(QListView.IconMode)
         self.ui.publish_view.setItemDelegate(self._publish_thumb_delegate)
         self._show_thumb_scale(True)
         self.main_view_mode = self.MAIN_VIEW_THUMB
@@ -1624,7 +1629,7 @@ class AppDialog(QtGui.QWidget):
         self.ui.pending_scroll.setVisible(True)
         self.ui.pending_mode.setIcon(self.pending_icon)
         # self.ui.pending_mode.setIcon(
-        #    QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_card_active.png"))
+        #    QIcon(QPixmap(":/res/mode_switch_card_active.png"))
         # )
         self.ui.pending_mode.setChecked(True)
 
@@ -1659,15 +1664,15 @@ class AppDialog(QtGui.QWidget):
 
     def _create_pending_view_context_menu(self):
 
-        self._pending_view_publish_action = QtGui.QAction("Publish...", self._pending_view_widget)
+        self._pending_view_publish_action = QAction("Publish...", self._pending_view_widget)
         self._pending_view_publish_action.triggered.connect(lambda: self._on_pending_view_model_action("publish"))
-        self._pending_view_revert_action = QtGui.QAction("Revert", self._pending_view_widget)
+        self._pending_view_revert_action = QAction("Revert", self._pending_view_widget)
         self._pending_view_revert_action.triggered.connect(lambda: self._on_pending_view_model_action("revert"))
-        self._pending_view_move_action = QtGui.QAction("Move to Changelist", self._pending_view_widget)
+        self._pending_view_move_action = QAction("Move to Changelist", self._pending_view_widget)
         self._pending_view_move_action.triggered.connect(lambda: self._on_pending_view_model_action("move"))
 
 
-        self._pending_view_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self._pending_view_widget.setContextMenuPolicy(Qt.CustomContextMenu)
         self._pending_view_widget.customContextMenuRequested.connect(
             self._show_pending_view_actions
         )
@@ -1694,7 +1699,7 @@ class AppDialog(QtGui.QWidget):
         #    self._pending_view_widget.multi_selection()
 
         # Build a menu with all the actions.
-        menu = QtGui.QMenu(self)
+        menu = QMenu(self)
 
         # Add "Publish..." for parent rows, "Revert" for child rows
         if is_parent:
@@ -1710,7 +1715,7 @@ class AppDialog(QtGui.QWidget):
         global_pos = self._pending_view_widget.mapToGlobal(pos)
 
         # Execute the menu using a QEventLoop to block until an action is triggered
-        event_loop = QtCore.QEventLoop()
+        event_loop = QEventLoop()
         menu.aboutToHide.connect(event_loop.quit)
         menu.exec_(global_pos)
         event_loop.exec_()
@@ -1835,11 +1840,11 @@ class AppDialog(QtGui.QWidget):
                 files_str = "\n".join(selected_files_to_revert)
 
                 # Show confirmation dialog
-                reply = QtGui.QMessageBox.question(self, 'Confirmation',
+                reply = QMessageBox.question(self, 'Confirmation',
                                              f"Are you sure you want to revert the following files?\n\n{files_str}",
-                                             QtGui.QMessageBox.Yes | QtGui.QMessageBox.No, QtGui.QMessageBox.No)
+                                             QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
 
-                if reply == QtGui.QMessageBox.Yes:
+                if reply == QMessageBox.Yes:
                     for target_file in selected_files_to_revert:
                         try:
                             msg = f"Reverting file {target_file} ..."
@@ -1853,11 +1858,11 @@ class AppDialog(QtGui.QWidget):
                 files_str = "\n".join(selected_files_to_revert)
 
                 # Show confirmation dialog
-                reply = QtGui.QMessageBox.question(self, 'Confirmation',
+                reply = QMessageBox.question(self, 'Confirmation',
                                              f"Are you sure you want to delete the following files?\n\n{files_str}",
-                                             QtGui.QMessageBox.Yes | QtGui.QMessageBox.No, QtGui.QMessageBox.No)
+                                             QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
 
-                if reply == QtGui.QMessageBox.Yes:
+                if reply == QMessageBox.Yes:
                     self._delete_pending_data(selected_files_to_revert)
                     """
                     for change, target_file in selected_files_to_revert:
@@ -1897,12 +1902,12 @@ class AppDialog(QtGui.QWidget):
                 files_str = "\n".join(selected_files_to_move)
 
                 # Show confirmation dialog
-                reply = QtGui.QMessageBox.question(self, 'Confirmation',
+                reply = QMessageBox.question(self, 'Confirmation',
                                                    f"Do you wish to transfer the selected files to a new changelist?\n\n{files_str}",
-                                                   QtGui.QMessageBox.Yes | QtGui.QMessageBox.No,
-                                                   QtGui.QMessageBox.No)
+                                                   QMessageBox.Yes | QMessageBox.No,
+                                                   QMessageBox.No)
 
-                if reply == QtGui.QMessageBox.Yes:
+                if reply == QMessageBox.Yes:
                         try:
                             if selected_actions_to_move:
                                 self.perform_changelist_selection(selected_actions_to_move)
@@ -1915,7 +1920,7 @@ class AppDialog(QtGui.QWidget):
     def _after_publish_ui_close(self):
         logger.debug("Checking if the publisher UI is closed...")
         # Setup a QTimer to periodically check the condition
-        self.timer = QtCore.QTimer()
+        self.timer = QTimer()
         self.timer.timeout.connect(self.check_publisher_ui_closed)
         self.timer.start(1000)  # Check every 1000 milliseconds (1 second)
 
@@ -2112,7 +2117,7 @@ class AppDialog(QtGui.QWidget):
                 #logger.debug(">>> sg_list: {}".format(sg_list))
                 if sg_list:
 
-                    #item = [QtGui.QStandardItem(str(data)) for data in sg_list]
+                    #item = [QStandardItem(str(data)) for data in sg_list]
                     self._standard_item_dict[id] = sg_list
             #logger.debug(">>> self._column_view_dict: {}".format(self._column_view_dict))
             #logger.debug(">>> self._standard_item_dict: {}".format(self._standard_item_dict))
@@ -2427,12 +2432,12 @@ class AppDialog(QtGui.QWidget):
 
 
     def _reset_perforce_widget(self):
-        self.ui.column_view = QtWidgets.QTableView()
+        self.ui.column_view = QTableView()
     
     def _setup_column_view(self):
 
         # Create a table model and set headers
-        self.column_view_model = QtGui.QStandardItemModel(0, len(self._headers))
+        self.column_view_model = QStandardItemModel(0, len(self._headers))
         self.column_view_model.setHorizontalHeaderLabels(self._headers)
 
         # Create a proxy model for sorting and grouping
@@ -2443,7 +2448,7 @@ class AppDialog(QtGui.QWidget):
 
         header = self.ui.column_view.header()
         for col in range(len(self._headers)):
-            header.setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
+            header.setSectionResizeMode(col, QHeaderView.ResizeToContents)
 
         self.ui.column_view.clicked.connect(self.on_column_view_row_clicked)
 
@@ -2454,7 +2459,7 @@ class AppDialog(QtGui.QWidget):
 
     def _create_column_view_header_context_menu(self):
         header = self.ui.column_view.header()
-        header.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        header.setContextMenuPolicy(Qt.CustomContextMenu)
         header.customContextMenuRequested.connect(self._show_column_header_context_menu)
 
     def _show_column_header_context_menu(self, pos):
@@ -2462,52 +2467,52 @@ class AppDialog(QtGui.QWidget):
         col_idx = header.logicalIndexAt(pos)
         col_name = self.column_view_model.horizontalHeaderItem(col_idx).text()
 
-        menu = QtWidgets.QMenu(self.ui.column_view)
+        menu = QMenu(self.ui.column_view)
 
         # Add the "Group by folder" menu item
-        self._group_by_folder_action = QtWidgets.QAction("Group by folder", self.ui.column_view)
+        self._group_by_folder_action = QAction("Group by folder", self.ui.column_view)
         self._group_by_folder_action.triggered.connect(self._group_by_folder)
 
         # Add the "Group by action" menu item
-        self._group_by_action_action = QtWidgets.QAction("Group by action", self.ui.column_view)
+        self._group_by_action_action = QAction("Group by action", self.ui.column_view)
         self._group_by_action_action.triggered.connect(self._group_by_action)
 
         # Add grouping options for revision, file extension, type, task name, and task status
-        self._group_by_revision_action = QtWidgets.QAction("Group by Revision", self.ui.column_view)
+        self._group_by_revision_action = QAction("Group by Revision", self.ui.column_view)
         self._group_by_revision_action.triggered.connect(self._group_by_revision)
 
-        self._group_by_file_extension_action = QtWidgets.QAction("Group by File Extension", self.ui.column_view)
+        self._group_by_file_extension_action = QAction("Group by File Extension", self.ui.column_view)
         self._group_by_file_extension_action.triggered.connect(self._group_by_file_extension)
 
-        self._group_by_type_action = QtWidgets.QAction("Group by Type", self.ui.column_view)
+        self._group_by_type_action = QAction("Group by Type", self.ui.column_view)
         self._group_by_type_action.triggered.connect(self._group_by_type)
 
         # Add the "Group by user" menu item
-        self._group_by_user_action = QtWidgets.QAction("Group by user", self.ui.column_view)
+        self._group_by_user_action = QAction("Group by user", self.ui.column_view)
         self._group_by_user_action.triggered.connect(self._group_by_user)
 
-        self._group_by_task_name_action = QtWidgets.QAction("Group by Task Name", self.ui.column_view)
+        self._group_by_task_name_action = QAction("Group by Task Name", self.ui.column_view)
         self._group_by_task_name_action.triggered.connect(self._group_by_task_name)
 
-        self._group_by_task_status_action = QtWidgets.QAction("Group by Task Status", self.ui.column_view)
+        self._group_by_task_status_action = QAction("Group by Task Status", self.ui.column_view)
         self._group_by_task_status_action.triggered.connect(self._group_by_task_status)
 
-        self._group_by_step_action = QtWidgets.QAction("Group by Task Step", self.ui.column_view)
+        self._group_by_step_action = QAction("Group by Task Step", self.ui.column_view)
         self._group_by_step_action.triggered.connect(self._group_by_step)
 
-        self._group_by_date_modified_action = QtWidgets.QAction("Group by Date Modified", self.ui.column_view)
+        self._group_by_date_modified_action = QAction("Group by Date Modified", self.ui.column_view)
         self._group_by_date_modified_action.triggered.connect(self._group_by_date_modified)
 
         # Add a general Ungroup option
-        self._no_groups_action = QtWidgets.QAction("Ungroup", self.ui.column_view)
+        self._no_groups_action = QAction("Ungroup", self.ui.column_view)
         self._no_groups_action.triggered.connect(self._no_groups)
 
         # Add "Expand All" action
-        self._expand_all_action = QtWidgets.QAction("Expand All", self.ui.column_view)
+        self._expand_all_action = QAction("Expand All", self.ui.column_view)
         self._expand_all_action.triggered.connect(self._expand_all)
 
         # Add "Collapse All" action
-        self._collapse_all_action = QtWidgets.QAction("Collapse All", self.ui.column_view)
+        self._collapse_all_action = QAction("Collapse All", self.ui.column_view)
         self._collapse_all_action.triggered.connect(self._collapse_all)
 
         # Map each column to its relevant action(s)
@@ -2546,7 +2551,7 @@ class AppDialog(QtGui.QWidget):
         global_pos = header.mapToGlobal(pos)
 
         # Execute the menu using a QEventLoop to block until an action is triggered
-        event_loop = QtCore.QEventLoop()
+        event_loop = QEventLoop()
         menu.aboutToHide.connect(event_loop.quit)
         menu.exec_(global_pos)
         event_loop.exec_()
@@ -2568,7 +2573,7 @@ class AppDialog(QtGui.QWidget):
         # Add items to the model
         for category, sg_data in group_dict.items():
             # logger.debug(">>> category: {}, sg_data: {}".format(category, sg_data))
-            category_item = QtGui.QStandardItem(category)
+            category_item = QStandardItem(category)
             self.column_view_model.appendRow(category_item)
             for sg_list in sg_data:
                 # logger.debug(">>> sg_list: {}".format(sg_list))
@@ -2594,10 +2599,10 @@ class AppDialog(QtGui.QWidget):
                     tooltip = self._get_tooltip(sg_list, sg_item)
                 item_list = []
                 for col, value in enumerate(sg_list):
-                    item = QtGui.QStandardItem(str(value))
+                    item = QStandardItem(str(value))
                     item.setToolTip(tooltip)
                     if col == 5:
-                        item.setData(value, QtCore.Qt.DisplayRole)
+                        item.setData(value, Qt.DisplayRole)
                     if col == 2:
                         action = sg_list[2]
                         # action_icon, icon_path = get_action_icon(action)
@@ -2727,20 +2732,20 @@ class AppDialog(QtGui.QWidget):
         self._create_groups(self._date_modified_dict)
 
     def _create_column_view_context_menu(self):
-        self._column_add_action = QtGui.QAction("Add", self.ui.column_view)
+        self._column_add_action = QAction("Add", self.ui.column_view)
         self._column_add_action.triggered.connect(lambda: self._on_column_model_action("add"))
-        self._column_edit_action = QtGui.QAction("Edit", self.ui.column_view)
+        self._column_edit_action = QAction("Edit", self.ui.column_view)
         self._column_edit_action.triggered.connect(lambda: self._on_column_model_action("edit"))
-        self._column_delete_action = QtGui.QAction("Delete", self.ui.column_view)
+        self._column_delete_action = QAction("Delete", self.ui.column_view)
         self._column_delete_action.triggered.connect(lambda: self._on_column_model_action("delete"))
 
-        self._column_revert_action = QtGui.QAction("Revert", self.ui.column_view)
+        self._column_revert_action = QAction("Revert", self.ui.column_view)
         self._column_revert_action.triggered.connect(lambda: self._on_column_model_action("revert"))
 
-        #self._column_refresh_action = QtGui.QAction("Refresh", self.ui.column_view)
+        #self._column_refresh_action = QAction("Refresh", self.ui.column_view)
         #self._column_refresh_action.triggered.connect(self._publish_model.async_refresh)
 
-        self.ui.column_view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.ui.column_view.setContextMenuPolicy(Qt.CustomContextMenu)
         self.ui.column_view.customContextMenuRequested.connect(
             self._show_column_actions
         )
@@ -2752,7 +2757,7 @@ class AppDialog(QtGui.QWidget):
         """
 
         # Build a menu with all the actions.
-        menu = QtGui.QMenu(self)
+        menu = QMenu(self)
         actions = self._action_manager.get_actions_for_publishes(
             self.selected_publishes, self._action_manager.UI_AREA_MAIN
         )
@@ -2773,7 +2778,7 @@ class AppDialog(QtGui.QWidget):
         global_pos = self.ui.column_view.mapToGlobal(pos)
 
         # Execute the menu using a QEventLoop to block until an action is triggered
-        event_loop = QtCore.QEventLoop()
+        event_loop = QEventLoop()
         menu.aboutToHide.connect(event_loop.quit)
         menu.exec_(global_pos)
         event_loop.exec_()
@@ -2896,10 +2901,10 @@ class AppDialog(QtGui.QWidget):
     def _insert_perforce_row(self, row, data, sg_item):
         tooltip = self._get_tooltip(data, sg_item)
         for col, value in enumerate(data):
-            item = QtGui.QStandardItem(str(value))
+            item = QStandardItem(str(value))
             item.setToolTip(tooltip)
             if col == 5:
-                item.setData(value, QtCore.Qt.DisplayRole)
+                item.setData(value, Qt.DisplayRole)
             if col == 2:
                 action = data[2]
                 # action_icon, icon_path = get_action_icon(action)
@@ -3272,7 +3277,7 @@ class AppDialog(QtGui.QWidget):
                     with open(local_image_path, "wb") as local_image_file:
                         local_image_file.write(image_data)
 
-                self.ui.file_details_image.setPixmap(QtGui.QPixmap(local_image_path))
+                self.ui.file_details_image.setPixmap(QPixmap(local_image_path))
                 """
 
                 if self._publish_icons and id in self._publish_icons:
@@ -3452,20 +3457,20 @@ class AppDialog(QtGui.QWidget):
         self.ui.pending_mode.setChecked(False)
 
         self.ui.list_mode.setIcon(
-            QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_card.png"))
+            QIcon(QPixmap(":/res/mode_switch_card.png"))
         )
         self.ui.thumbnail_mode.setIcon(
-            QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_thumb.png"))
+            QIcon(QPixmap(":/res/mode_switch_thumb.png"))
         )
         self.ui.column_mode.setIcon(
-            QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_column.png"))
+            QIcon(QPixmap(":/res/mode_switch_column.png"))
         )
         """
         self.ui.submitted_mode.setIcon(
-            QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_thumb.png"))
+            QIcon(QPixmap(":/res/mode_switch_thumb.png"))
         )
         self.ui.pending_mode.setIcon(
-            QtGui.QIcon(QtGui.QPixmap(":/res/mode_switch_card.png"))
+            QIcon(QPixmap(":/res/mode_switch_card.png"))
         )
         """
 
@@ -3475,13 +3480,13 @@ class AppDialog(QtGui.QWidget):
         )
 
         inactive_column_view_image_path = os.path.join(repo_root, "icons/mode_switch_column_off.png")
-        inactive_column_view_icon = QtGui.QIcon(QtGui.QPixmap(inactive_column_view_image_path))
+        inactive_column_view_icon = QIcon(QPixmap(inactive_column_view_image_path))
 
         inactive_submitted_image_path = os.path.join(repo_root, "icons/submitted_off.png")
-        submitted_icon_inactive = QtGui.QIcon(QtGui.QPixmap(inactive_submitted_image_path))
+        submitted_icon_inactive = QIcon(QPixmap(inactive_submitted_image_path))
 
         inactive_pending_image_path = os.path.join(repo_root, "icons/pending_off.png")
-        pending_icon_inactive = QtGui.QIcon(QtGui.QPixmap(inactive_pending_image_path))
+        pending_icon_inactive = QIcon(QPixmap(inactive_pending_image_path))
 
         self.ui.column_mode.setIcon(inactive_column_view_icon)
         self.ui.submitted_mode.setIcon(submitted_icon_inactive)
@@ -3552,14 +3557,14 @@ class AppDialog(QtGui.QWidget):
                 if "image" in field and entity_data[field] is not None:
                     image_url = entity_data.get(field)
                     logger.debug("Image url: %s" % image_url)
-                    thumb_pixmap = QtGui.QPixmap.fromImage(image_url)
+                    thumb_pixmap = QPixmap.fromImage(image_url)
                     self.ui.entity_details_image.setPixmap(thumb_pixmap)
                     #self._request_thumbnail_download(self, item, field, image_url, entity_type, entity_id)
                     """
                     image_path = os.path.join(self._temp_dir, "asset_image.jpg")
                     logger.debug("Downloading image %s to %s" % (image_url, image_path))
                     self._app.shotgun.download_attachment(image_url, image_path)
-                    thumb_pixmap = QtGui.QPixmap(image_path)
+                    thumb_pixmap = QPixmap(image_path)
                     self.ui.entity_details_image.setPixmap(thumb_pixmap)
                     """
 
@@ -3625,7 +3630,7 @@ class AppDialog(QtGui.QWidget):
             for linked thumb fields or if you want to download thumbnails for external model data
             that doesn't come from Shotgun.
 
-        :param item: :class:`~PySide.QtGui.QStandardItem` which belongs to this model
+        :param item: :class:`~PySide.QStandardItem` which belongs to this model
         :param field: Shotgun field where the thumbnail is stored. This is typically ``image`` but
                       can also for example be ``sg_sequence.Sequence.image``.
         :param url: thumbnail url
@@ -4364,8 +4369,8 @@ class AppDialog(QtGui.QWidget):
         # the code that sets up the version button also populates
         # a member variable which olds the current media center url.
         if self._current_version_detail_playback_url:
-            QtGui.QDesktopServices.openUrl(
-                QtCore.QUrl(self._current_version_detail_playback_url)
+            QDesktopServices.openUrl(
+                QUrl(self._current_version_detail_playback_url)
             )
 
     ########################################################################################
@@ -4544,10 +4549,10 @@ class AppDialog(QtGui.QWidget):
                 # and display help
                 app = sgtk.platform.current_bundle()
                 help_pix = [
-                    QtGui.QPixmap(":/res/subitems_help_1.png"),
-                    QtGui.QPixmap(":/res/subitems_help_2.png"),
-                    QtGui.QPixmap(":/res/subitems_help_3.png"),
-                    QtGui.QPixmap(":/res/help_4.png"),
+                    QPixmap(":/res/subitems_help_1.png"),
+                    QPixmap(":/res/subitems_help_2.png"),
+                    QPixmap(":/res/subitems_help_3.png"),
+                    QPixmap(":/res/help_4.png"),
                 ]
                 help_screen.show_help_screen(self.window(), app, help_pix)
 
@@ -4560,7 +4565,7 @@ class AppDialog(QtGui.QWidget):
         """
         When scale slider is manipulated
         """
-        self.ui.publish_view.setIconSize(QtCore.QSize(value, value))
+        self.ui.publish_view.setIconSize(QSize(value, value))
         self._settings_manager.store("thumb_size_scale", value)
 
     def _on_publish_selection(self, selected, deselected):
@@ -4708,7 +4713,7 @@ class AppDialog(QtGui.QWidget):
         description = submitter_widget.changelist_description.toPlainText()
         selected_files = []
         for row in range(submitter_widget.files_table_widget.rowCount()):
-            if submitter_widget.files_table_widget.item(row, 0).checkState() == QtCore.Qt.Checked:
+            if submitter_widget.files_table_widget.item(row, 0).checkState() == Qt.Checked:
                 file_info = {
                     "file": submitter_widget.files_table_widget.item(row, 1).text(),
                     "folder": submitter_widget.files_table_widget.item(row, 2).text(),
@@ -4719,11 +4724,11 @@ class AppDialog(QtGui.QWidget):
                 selected_files.append(file_info)
 
         if not description:
-            QtGui.QMessageBox.warning(submitter_widget, "Warning", "Changelist description cannot be empty.")
+            QMessageBox.warning(submitter_widget, "Warning", "Changelist description cannot be empty.")
             return
 
         if not selected_files:
-            QtGui.QMessageBox.warning(submitter_widget, "Warning", "No files selected for submission.")
+            QMessageBox.warning(submitter_widget, "Warning", "No files selected for submission.")
             return
 
         # Here you would add the logic to submit the changelist with the selected files and description
@@ -4788,11 +4793,11 @@ class AppDialog(QtGui.QWidget):
             files_str = "\n".join(selected_files_to_delete)
 
             # Show confirmation dialog
-            reply = QtGui.QMessageBox.question(self, 'Confirmation',
+            reply = QMessageBox.question(self, 'Confirmation',
                                          f"Are you sure you want to delete the following files in Perforce?\n\n{files_str}",
-                                         QtGui.QMessageBox.Yes | QtGui.QMessageBox.No, QtGui.QMessageBox.No)
+                                         QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
 
-            if reply == QtGui.QMessageBox.Yes:
+            if reply == QMessageBox.Yes:
                 msg = "\n <span style='color:#2C93E2'>Submitting pending files for deletion in Perforce...</span> \n"
                 self._add_log(msg, 2)
                 if selected_files_to_delete:
@@ -5641,7 +5646,7 @@ class AppDialog(QtGui.QWidget):
             progress_sum = ((i + 1) / total) * 100
             self.progress_bar(progress_sum)
             #time.sleep(1)
-        QtCore.QCoreApplication.processEvents()
+        QCoreApplication.processEvents()
 
     def _do_sync_files_threads(self, files_to_sync):
 
@@ -5687,7 +5692,7 @@ class AppDialog(QtGui.QWidget):
             progress_sum = ((i + 1) / total) * 100
             self._add_progress_bar(progress_sum)
             #time.sleep(1)
-        QtCore.QCoreApplication.processEvents()
+        QCoreApplication.processEvents()
     """
 
     def _do_sync_files_ThreadPoolExecutor(self, files_to_sync):
@@ -5735,8 +5740,8 @@ class AppDialog(QtGui.QWidget):
         # Sync files
         total = len(files_to_sync)
         if total > 0:
-            self.thread_pool = QtCore.QThreadPool()
-            #self.thread_pool = QtCore.QThreadPool.globalInstance()
+            self.thread_pool = QThreadPool()
+            #self.thread_pool = QThreadPool.globalInstance()
             self.thread_pool.setMaxThreadCount(6)  # Set the maximum number of concurrent threads
             for i, file_name in enumerate(files_to_sync):
                 msg = "({}/{})  Syncing file: {}...".format(i + 1, total, file_name)
@@ -5746,7 +5751,7 @@ class AppDialog(QtGui.QWidget):
                 self.thread_pool.start(runnable)
                 progress_sum = ((i + 1) / total) * 100
                 self._update_progress(progress_sum)
-                QtCore.QCoreApplication.processEvents()
+                QCoreApplication.processEvents()
             self.thread_pool.waitForDone()
 
 
@@ -5793,7 +5798,7 @@ class AppDialog(QtGui.QWidget):
                 #thread.start()
                 #thread.run()
                 self._update_progress(progress_sum)
-                QtCore.QCoreApplication.processEvents()
+                QCoreApplication.processEvents()
 
             # Start all threads
             for thread in threads:
@@ -5861,7 +5866,7 @@ class AppDialog(QtGui.QWidget):
             progress_sum = ((i + 1) / total) * 100
             # Simulate progress
             self._update_progress(progress_sum)
-            QtCore.QCoreApplication.processEvents()
+            QCoreApplication.processEvents()
             time.sleep(0.15)
             #time.sleep(0.1)
 
@@ -5873,7 +5878,7 @@ class AppDialog(QtGui.QWidget):
         while sync_thread.is_alive():
             #threading.enumerate()
             #logger.debug(">>>>>>>>> len(threading.enumerate()): {}".format(len(threading.enumerate())))
-            QtCore.QCoreApplication.processEvents()
+            QCoreApplication.processEvents()
 
         # wait for all threads to complete
         #sync_thread.join()
@@ -5928,7 +5933,7 @@ class AppDialog(QtGui.QWidget):
         while thread.is_alive():
             progress = int((completed_tasks / total_tasks) * 100)  # Calculate the progress based on completed tasks
             self.progress_bar.setValue(progress)
-            QtCore.QCoreApplication.processEvents()
+            QCoreApplication.processEvents()
 
     def run_sync_semaphore(self, files_to_sync, semaphore, completed_tasks):
         for file in files_to_sync:
@@ -5982,7 +5987,7 @@ class AppDialog(QtGui.QWidget):
             self.ui.progress.setVisible(True)
         else:
             self.ui.progress.setVisible(False)
-        QtCore.QCoreApplication.processEvents()
+        QCoreApplication.processEvents()
 
     def send_error_message(self, text):
         """
@@ -6003,7 +6008,7 @@ class AppDialog(QtGui.QWidget):
         #if flag < 4:
         #    logger.debug(msg)
         self.ui.log_window.verticalScrollBar().setValue(self.ui.log_window.verticalScrollBar().maximum())
-        QtCore.QCoreApplication.processEvents()
+        QCoreApplication.processEvents()
 
     def _to_sync (self, have_rev, head_rev):
         """
@@ -6062,7 +6067,7 @@ class AppDialog(QtGui.QWidget):
         # hooks will be run right after this method returns, which wouldn't
         # leave space for the event loop to update the UI.
         self.window().repaint()
-        QtGui.QApplication.processEvents()
+        QApplication.processEvents()
 
     def show_help_popup(self):
         """
@@ -6070,10 +6075,10 @@ class AppDialog(QtGui.QWidget):
         """
         app = sgtk.platform.current_bundle()
         help_pix = [
-            QtGui.QPixmap(":/res/help_1.png"),
-            QtGui.QPixmap(":/res/help_2.png"),
-            QtGui.QPixmap(":/res/help_3.png"),
-            QtGui.QPixmap(":/res/help_4.png"),
+            QPixmap(":/res/help_1.png"),
+            QPixmap(":/res/help_2.png"),
+            QPixmap(":/res/help_3.png"),
+            QPixmap(":/res/help_4.png"),
         ]
         help_screen.show_help_screen(self.window(), app, help_pix)
 
@@ -6083,7 +6088,7 @@ class AppDialog(QtGui.QWidget):
         """
         app = sgtk.platform.current_bundle()
         app.log_debug("Opening documentation url %s..." % app.documentation_url)
-        QtGui.QDesktopServices.openUrl(QtCore.QUrl(app.documentation_url))
+        QDesktopServices.openUrl(QUrl(app.documentation_url))
 
     def _on_reload_action(self):
         """
@@ -6203,12 +6208,12 @@ class AppDialog(QtGui.QWidget):
                 # from deep model index into proxy model index style indicies
                 proxy_index = view.model().mapFromSource(item.index())
                 # and now perform view operations
-                view.scrollTo(proxy_index, QtGui.QAbstractItemView.PositionAtCenter)
+                view.scrollTo(proxy_index, QAbstractItemView.PositionAtCenter)
                 selection_model.select(
-                    proxy_index, QtGui.QItemSelectionModel.ClearAndSelect
+                    proxy_index, QItemSelectionModel.ClearAndSelect
                 )
                 selection_model.setCurrentIndex(
-                    proxy_index, QtGui.QItemSelectionModel.ClearAndSelect
+                    proxy_index, QItemSelectionModel.ClearAndSelect
                 )
             #if self.main_view_mode == self.MAIN_VIEW_COLUMN:
             #    self._populate_column_view_widget()
@@ -6294,20 +6299,20 @@ class AppDialog(QtGui.QWidget):
                 (model, proxy_model) = self._setup_query_model(app, setting_dict)
 
             # Add a new tab and its layout to the main tab bar.
-            tab = QtGui.QWidget()
-            layout = QtGui.QVBoxLayout(tab)
+            tab = QWidget()
+            layout = QVBoxLayout(tab)
             layout.setSpacing(0)
             layout.setContentsMargins(0, 0, 0, 0)
             self.ui.entity_preset_tabs.addTab(tab, preset_name)
 
             # Add a tree view in the tab layout.
-            view = QtGui.QTreeView(tab)
+            view = QTreeView(tab)
             layout.addWidget(view)
 
             # Configure the view.
-            view.setEditTriggers(QtGui.QAbstractItemView.NoEditTriggers)
+            view.setEditTriggers(QAbstractItemView.NoEditTriggers)
             view.setProperty("showDropIndicator", False)
-            view.setIconSize(QtCore.QSize(20, 20))
+            view.setIconSize(QSize(20, 20))
             view.setStyleSheet("QTreeView::item { padding: 6px; }")
             view.setUniformRowHeights(True)
             view.setHeaderHidden(True)
@@ -6329,11 +6334,11 @@ class AppDialog(QtGui.QWidget):
                 # )
 
                 # Add a layout to host search.
-                search_layout = QtGui.QHBoxLayout()
+                search_layout = QHBoxLayout()
                 layout.addLayout(search_layout)
 
                 # Add the search text field.
-                # search = QtGui.QLineEdit(tab)
+                # search = QLineEdit(tab)
                 search = MyLineEdit(tab)
                 search.setStyleSheet(
                     "QLineEdit{ border-width: 1px; "
@@ -6362,7 +6367,7 @@ class AppDialog(QtGui.QWidget):
 
                 # Add a Search button.
                 logger.debug("Searching for items in the tree above, query text is {}".format(search.text()))
-                search_button = QtGui.QPushButton("Search", tab)
+                search_button = QPushButton("Search", tab)
                 search_button.setToolTip("Click to search for items displayed in the tree above.")
 
                 search_layout.addWidget(search_button)
@@ -6370,12 +6375,12 @@ class AppDialog(QtGui.QWidget):
 
 
                 # Add a cancel search button, disabled by default.
-                clear_search = QtGui.QToolButton(tab)
-                icon = QtGui.QIcon()
+                clear_search = QToolButton(tab)
+                icon = QIcon()
                 icon.addPixmap(
-                    QtGui.QPixmap(":/res/clear_search.png"),
-                    QtGui.QIcon.Normal,
-                    QtGui.QIcon.Off,
+                    QPixmap(":/res/clear_search.png"),
+                    QIcon.Normal,
+                    QIcon.Off,
                 )
                 clear_search.setIcon(icon)
                 clear_search.setAutoRaise(True)
@@ -6438,20 +6443,20 @@ class AppDialog(QtGui.QWidget):
             def action_hovered(action):
                 tip = action.toolTip()
                 if tip == action.text():
-                    QtGui.QToolTip.hideText()
+                    QToolTip.hideText()
                 else:
-                    QtGui.QToolTip.showText(QtGui.QCursor.pos(), tip)
+                    QToolTip.showText(QCursor.pos(), tip)
 
             # Set up a view right click menu.
             if type_hierarchy:
 
-                action_ca = QtGui.QAction("Collapse All Folders", view)
+                action_ca = QAction("Collapse All Folders", view)
                 action_ca.hovered.connect(lambda: action_hovered(action_ca))
                 action_ca.triggered.connect(view.collapseAll)
                 view.addAction(action_ca)
                 self._dynamic_widgets.append(action_ca)
 
-                action_reset = QtGui.QAction("Reset", view)
+                action_reset = QAction("Reset", view)
                 action_reset.setToolTip(
                     "<nobr>Reset the tree to its PTR hierarchy root collapsed state.</nobr><br><br>"
                     "Any existing data contained in the tree will be cleared, "
@@ -6466,19 +6471,19 @@ class AppDialog(QtGui.QWidget):
 
             else:
 
-                action_ea = QtGui.QAction("Expand All Folders", view)
+                action_ea = QAction("Expand All Folders", view)
                 action_ea.hovered.connect(lambda: action_hovered(action_ea))
                 action_ea.triggered.connect(view.expandAll)
                 view.addAction(action_ea)
                 self._dynamic_widgets.append(action_ea)
 
-                action_ca = QtGui.QAction("Collapse All Folders", view)
+                action_ca = QAction("Collapse All Folders", view)
                 action_ca.hovered.connect(lambda: action_hovered(action_ca))
                 action_ca.triggered.connect(view.collapseAll)
                 view.addAction(action_ca)
                 self._dynamic_widgets.append(action_ca)
 
-                action_refresh = QtGui.QAction("Refresh", view)
+                action_refresh = QAction("Refresh", view)
                 action_refresh.setToolTip(
                     "<nobr>Refresh the tree data to ensure it is up to date with Flow Production Tracking.</nobr><br><br>"
                     "Since this action is done in the background, the tree update "
@@ -6493,7 +6498,7 @@ class AppDialog(QtGui.QWidget):
                 view.addAction(action_refresh)
                 self._dynamic_widgets.append(action_refresh)
 
-            view.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
+            view.setContextMenuPolicy(Qt.ActionsContextMenu)
 
             # Set up an on-select callback.
             selection_model = view.selectionModel()
@@ -6521,7 +6526,7 @@ class AppDialog(QtGui.QWidget):
         self._on_home_clicked()
 
     def trigger_search(self, view, proxy_model, search):
-        QtWidgets.QApplication.processEvents()  # Process all pending GUI events
+        QApplication.processEvents()  # Process all pending GUI events
         text = search.get_current_text()  # Retrieve the text
         logger.debug("Text at time of search: {}".format(text))
         self._on_search_text_changed(text, view, proxy_model)
@@ -8213,7 +8218,7 @@ class EntityPreset(object):
         self.entity_type = entity_type
         self.publish_filters = publish_filters
 
-class UIWaitThread(QtCore.QThread):
+class UIWaitThread(QThread):
     def __init__(self, check_ui_closed_callback, parent=None):
         super(UIWaitThread, self).__init__(parent)
         self.check_ui_closed_callback = check_ui_closed_callback
@@ -8227,7 +8232,7 @@ class UIWaitThread(QtCore.QThread):
         logger.debug("UI is closed, Updating pending view")
         self.parent().update_pending_view_signal.emit()
 
-class UIWaitThreadOLD(QtCore.QThread):
+class UIWaitThreadOLD(QThread):
     def __init__(self, check_ui_closed_callback, parent=None):
         super(UIWaitThread, self).__init__(parent)
         self.check_ui_closed_callback = check_ui_closed_callback
@@ -8243,7 +8248,7 @@ class UIWaitThreadOLD(QtCore.QThread):
         self.parent().update_pending_view_signal.emit()
 
 
-class MyLineEdit(QtWidgets.QLineEdit):
+class MyLineEdit(QLineEdit):
     customTextChanged = QtCore.Signal(str)
 
     def __init__(self, *args, **kwargs):
@@ -8266,7 +8271,7 @@ class ShotGridLogHandlerOriginal(logging.Handler):
         super().__init__()
         self.log_window = log_window
         self.log_queue = []
-        self.timer = QtCore.QTimer()
+        self.timer = QTimer()
         self.timer.timeout.connect(self.flush)
         self.timer.start(100)  # Update log window every 100ms
 
@@ -8288,7 +8293,7 @@ class ShotGridLogHandlerOriginal(logging.Handler):
             self.log_window.append(''.join(self.log_queue))
             self.log_queue = []
             self.log_window.verticalScrollBar().setValue(self.log_window.verticalScrollBar().maximum())
-            QtCore.QCoreApplication.processEvents()
+            QCoreApplication.processEvents()
 
 
     def get_color(self, levelno):
@@ -8308,7 +8313,7 @@ class ShotGridLogHandler(logging.Handler):
         super().__init__()
         self.log_window = log_window
         self.log_queue = []
-        self.timer = QtCore.QTimer()
+        self.timer = QTimer()
         self.timer.timeout.connect(self.flush)
         self.timer.start(100)  # Update log window every 100ms
 
@@ -8329,7 +8334,7 @@ class ShotGridLogHandler(logging.Handler):
             self.log_window.append(''.join(self.log_queue))
             self.log_queue = []
             self.log_window.verticalScrollBar().setValue(self.log_window.verticalScrollBar().maximum())
-            QtCore.QCoreApplication.processEvents()
+            QCoreApplication.processEvents()
 
     def get_color(self, levelno):
         if levelno == logging.DEBUG:

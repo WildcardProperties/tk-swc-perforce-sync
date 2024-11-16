@@ -1,6 +1,11 @@
 import os
-from sgtk.platform.qt import QtCore, QtGui
-from tank.platform.qt5 import QtWidgets
+from sgtk.platform.qt import QtCore
+for name, cls in QtCore.__dict__.items():
+    if isinstance(cls, type): globals()[name] = cls
+
+from sgtk.platform.qt import QtGui
+for name, cls in QtGui.__dict__.items():
+    if isinstance(cls, type): globals()[name] = cls
 from .publish_item import PublishItem
 
 import datetime
@@ -13,7 +18,7 @@ import sgtk
 from sgtk.util import login
 logger = sgtk.platform.get_logger(__name__)
 
-class PublishFilesUI(QtWidgets.QDialog):
+class PublishFilesUI(QDialog):
     """
     Publish Files UI
     """
@@ -40,35 +45,35 @@ class PublishFilesUI(QtWidgets.QDialog):
         self.sg_entity = sg_entity
 
         # Main layout
-        self.main_layout = QtWidgets.QVBoxLayout()
+        self.main_layout = QVBoxLayout()
 
         # Select all layout
-        self.select_all_layout = QtWidgets.QHBoxLayout()
-        self.deselect_all_button = QtWidgets.QPushButton('Deselect All')
-        self.select_all_button = QtWidgets.QPushButton('Select All')
+        self.select_all_layout = QHBoxLayout()
+        self.deselect_all_button = QPushButton('Deselect All')
+        self.select_all_button = QPushButton('Select All')
         self.select_all_layout.addWidget(self.deselect_all_button)
         self.select_all_layout.addWidget(self.select_all_button)
 
         # Button layout
-        self.button_layout = QtWidgets.QHBoxLayout()
+        self.button_layout = QHBoxLayout()
         self.button_layout.layout().setContentsMargins(0, 15, 0, 2)
-        self.cancel_button = QtWidgets.QPushButton('Close')
-        self.add_publish_files_button = QtWidgets.QPushButton('Publish Files')
+        self.cancel_button = QPushButton('Close')
+        self.add_publish_files_button = QPushButton('Publish Files')
 
         self.button_layout.addWidget(self.cancel_button)
         self.button_layout.addWidget(self.add_publish_files_button)
 
         # log layout
-        self.log_layout = QtWidgets.QHBoxLayout()
-        self.log_window = QtWidgets.QTextBrowser()
+        self.log_layout = QHBoxLayout()
+        self.log_window = QTextBrowser()
         self.log_window.verticalScrollBar().setValue(self.log_window.verticalScrollBar().maximum())
         self.log_window.setMinimumHeight(100)
         self.log_window.setMaximumHeight(150)
         self.log_layout.addWidget(self.log_window)
 
         # publish list
-        publish_widget = QtWidgets.QWidget()
-        publish_layout = QtWidgets.QVBoxLayout()
+        publish_widget = QWidget()
+        publish_layout = QVBoxLayout()
         publish_list = self.create_publish_layout()
 
         current_publish = ''
@@ -76,28 +81,28 @@ class PublishFilesUI(QtWidgets.QDialog):
             if publish_item:
                 if publish_item[3] != current_publish:
                     sg_item = publish_item[0]
-                    info_layout = QtWidgets.QHBoxLayout()
+                    info_layout = QHBoxLayout()
                     info_layout.layout().setContentsMargins(0, 15, 0, 5)
 
-                    change_label = QtWidgets.QLabel()
+                    change_label = QLabel()
                     change_label.setMinimumWidth(120)
                     change_label.setMaximumWidth(120)
                     change_txt = self.get_change_list_info(sg_item)
                     change_label.setText(change_txt)
 
-                    publish_time_label = QtWidgets.QLabel()
+                    publish_time_label = QLabel()
                     publish_time_label.setMinimumWidth(200)
                     publish_time_label.setMaximumWidth(200)
                     publish_time_txt = self.get_publish_time_info(sg_item)
                     publish_time_label.setText(publish_time_txt)
 
-                    user_name_label = QtWidgets.QLabel()
+                    user_name_label = QLabel()
                     user_name_label.setMinimumWidth(150)
                     user_name_label.setMaximumWidth(150)
                     user_name_txt = self.get_user_name_info(sg_item)
                     user_name_label.setText(user_name_txt)
 
-                    description_label = QtWidgets.QLabel()
+                    description_label = QLabel()
                     description_label.setMinimumWidth(400)
                     description_txt = self.get_description_info(sg_item)
                     description_label.setText(description_txt)
@@ -118,9 +123,9 @@ class PublishFilesUI(QtWidgets.QDialog):
         publish_widget.setLayout(publish_layout)
 
         # Scroll Area
-        self.scroll = QtWidgets.QScrollArea()
-        self.scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
-        self.scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.scroll = QScrollArea()
+        self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.scroll.setWidgetResizable(False)
         self.scroll.setWidget(publish_widget)
 
@@ -256,7 +261,7 @@ class PublishFilesUI(QtWidgets.QDialog):
         for key in node_dictionary.keys():
             if key:
                 logger.debug("<<<<<<<  key: {}".format(key))
-                publish_label = QtWidgets.QLabel()
+                publish_label = QLabel()
                 publish_label.setText(str(key))
                 for sg_item in node_dictionary[key]:
                     if sg_item:
@@ -265,16 +270,16 @@ class PublishFilesUI(QtWidgets.QDialog):
                         # depot_file_name = self.get_depot_file_name(depot_path, sg_item)
                         action = self.get_action(sg_item)
 
-                        publish_layout = QtWidgets.QHBoxLayout()
-                        publish_checkbox = QtWidgets.QCheckBox()
+                        publish_layout = QHBoxLayout()
+                        publish_checkbox = QCheckBox()
 
-                        action_line_edit = QtWidgets.QLineEdit()
+                        action_line_edit = QLineEdit()
                         action_line_edit.setMinimumWidth(80)
                         action_line_edit.setMaximumWidth(80)
                         action_line_edit.setText('{}'.format(action))
                         # action_line_edit.setEnabled(False)
 
-                        publish_path_line_edit = QtWidgets.QLineEdit()
+                        publish_path_line_edit = QLineEdit()
                         publish_path_line_edit.setMinimumWidth(750)
                         publish_path_line_edit.setText('{}'.format(depot_path))
                         # publish_path_line_edit.setEnabled(False)
@@ -380,7 +385,7 @@ class PublishFilesUI(QtWidgets.QDialog):
         #if flag < 4:
         #    logger.debug(msg)
         self.log_window.verticalScrollBar().setValue(self.log_window.verticalScrollBar().maximum())
-        QtCore.QCoreApplication.processEvents()
+        QCoreApplication.processEvents()
 
     def select_all_outputs(self, output_list):
         """

@@ -1,12 +1,17 @@
 import sys
-from sgtk.platform.qt import QtCore, QtGui
-from tank.platform.qt5 import QtWidgets
+from sgtk.platform.qt import QtCore
+for name, cls in QtCore.__dict__.items():
+    if isinstance(cls, type): globals()[name] = cls
+
+from sgtk.platform.qt import QtGui
+for name, cls in QtGui.__dict__.items():
+    if isinstance(cls, type): globals()[name] = cls
 
 import sgtk
 
 logger = sgtk.platform.get_logger(__name__)
 
-class PublishedFileSPerforce(QtWidgets.QTreeView):
+class PublishedFileSPerforce(QTreeView):
     def __init__(self, parent=None, sg_data=None, fstat_dict=None, p4=None):
         super().__init__(parent)
 
@@ -19,15 +24,15 @@ class PublishedFileSPerforce(QtWidgets.QTreeView):
 
         self.setWindowTitle("Published Files")
         self.setGeometry(100, 100, 1200, 1000)
-        #self.setMinimumSize(QtCore.QSize(10000, 600))
-        #self.setMaximumSize(QtCore.QSize(10000, 1500))
+        #self.setMinimumSize(QSize(10000, 600))
+        #self.setMaximumSize(QSize(10000, 1500))
 
-        self.central_widget = QtWidgets.QWidget(self)
+        self.central_widget = QWidget(self)
         #self.setCentralWidget(self.central_widget)
 
-        self.layout = QtWidgets.QVBoxLayout(self.central_widget)
+        self.layout = QVBoxLayout(self.central_widget)
 
-        self.table_view = QtWidgets.QTableView(self)
+        self.table_view = QTableView(self)
         self.layout.addWidget(self.table_view)
 
         self._extension_types = {
@@ -76,7 +81,7 @@ class PublishedFileSPerforce(QtWidgets.QTreeView):
                    "Destination Path", "Description", "Entity Sub-Folder"]
 
         # Create a table model and set headers
-        self.model = QtGui.QStandardItemModel(0, len(headers))
+        self.model = QStandardItemModel(0, len(headers))
         self.model.setHorizontalHeaderLabels(headers)
 
         # Create a proxy model for sorting and grouping
@@ -90,11 +95,11 @@ class PublishedFileSPerforce(QtWidgets.QTreeView):
         self.table_view.horizontalHeader().setSortIndicatorShown(True)
 
         # Sort by the first column initially
-        self.table_view.sortByColumn(0, QtCore.Qt.AscendingOrder)
+        self.table_view.sortByColumn(0, Qt.AscendingOrder)
 
         # Grouping by "Entity Sub-Folder"
         self.table_view.setSortingEnabled(True)
-        self.table_view.sortByColumn(7, QtCore.Qt.AscendingOrder)
+        self.table_view.sortByColumn(7, Qt.AscendingOrder)
         #self.table_view.setGroupByColumn(7)
 
         # Fetch PublishedFiles data from Shotgun
@@ -157,13 +162,13 @@ class PublishedFileSPerforce(QtWidgets.QTreeView):
 
     def insert_row(self, row, data):
         for col, value in enumerate(data):
-            item = QtGui.QStandardItem(str(value))
+            item = QStandardItem(str(value))
             self.model.setItem(row, col, item)
 
 #Todo: do we need this?
 def main():
-    app = QtWidgets.QApplication(sys.argv)
-    app.setWindowIcon(QtGui.QIcon("icon.png"))
+    app = QApplication(sys.argv)
+    app.setWindowIcon(QIcon("icon.png"))
     window = PublishedFileSPerforce()
     window.show()
     sys.exit(app.exec_())

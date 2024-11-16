@@ -1,33 +1,33 @@
 from PyQt5 import QtWidgets, QtCore
 
-class YourMainWindow(QtWidgets.QMainWindow):
+class YourMainWindow(QMainWindow):
     def __init__(self, parent=None):
         super(YourMainWindow, self).__init__(parent)
 
         # Main splitter to organize layout horizontally
-        self.splitter = QtWidgets.QSplitter(self)
+        self.splitter = QSplitter(self)
         self.setCentralWidget(self.splitter)
 
         # Simple widget for file details
-        self.file_details = QtWidgets.QWidget(self.splitter)
-        self.file_details_layout = QtWidgets.QVBoxLayout(self.file_details)
-        self.file_details_layout.addWidget(QtWidgets.QLabel("File Details Area"))
+        self.file_details = QWidget(self.splitter)
+        self.file_details_layout = QVBoxLayout(self.file_details)
+        self.file_details_layout.addWidget(QLabel("File Details Area"))
 
         # QDockWidget to host the panel
-        self.panel_dock_widget = QtWidgets.QDockWidget("Panel Details", self)
+        self.panel_dock_widget = QDockWidget("Panel Details", self)
         self.panel_dock_widget.setObjectName("detailsDockWidget")
-        self.panel_dock_widget.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
+        self.panel_dock_widget.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
 
         # QWidget to serve as the dock widget's main widget
-        self.panel_widget = QtWidgets.QWidget()
+        self.panel_widget = QWidget()
         self.panel_dock_widget.setWidget(self.panel_widget)
-        self.panel_layout = QtWidgets.QVBoxLayout(self.panel_widget)
+        self.panel_layout = QVBoxLayout(self.panel_widget)
 
         # Add the QDockWidget to the main window
-        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.panel_dock_widget)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.panel_dock_widget)
 
         # Tab widget to manage different views, though might not be needed with docking
-        self.details_tab = QtWidgets.QTabWidget(self.splitter)
+        self.details_tab = QTabWidget(self.splitter)
         self.details_tab.addTab(self.file_details, "Files")
 
         # Signal connection for tab change might be redundant with dock but kept for any additional tabs
@@ -49,7 +49,7 @@ class YourMainWindow(QtWidgets.QMainWindow):
     def get_shotgun_panel_widget(self):
         # Simulated function to get the tk-multi-shotgunpanel widget
         # Replace this with the actual call to your Shotgun application
-        return QtWidgets.QLabel("Shotgun Panel Widget")
+        return QLabel("Shotgun Panel Widget")
 
     def clear_layout(self, layout):
         # Function to clear all widgets from a layout
@@ -65,7 +65,7 @@ class YourMainWindow(QtWidgets.QMainWindow):
 # Setup and run the application
 if __name__ == "__main__":
     import sys
-    app = QtWidgets.QApplication(sys.argv)
+    app = QApplication(sys.argv)
     window = YourMainWindow()
     window.show()
     sys.exit(app.exec_())

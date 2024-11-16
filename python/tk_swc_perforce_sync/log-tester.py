@@ -5,16 +5,16 @@ sys.path.append("C:/Program Files/Shotgun/Resources/Desktop/Python/bundle_cache/
 import sgtk
 
 
-class LogWindow(QtWidgets.QWidget):
+class LogWindow(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.log_window = QtWidgets.QTextBrowser()
+        self.log_window = QTextBrowser()
         self.log_window.verticalScrollBar().setValue(self.log_window.verticalScrollBar().maximum())
         self.log_window.setMinimumHeight(187)
         self.log_window.setMaximumHeight(187)
         self.log_window.setMinimumWidth(630)
-        self.horizontalLayout_8 = QtWidgets.QHBoxLayout(self)
+        self.horizontalLayout_8 = QHBoxLayout(self)
         self.horizontalLayout_8.addWidget(self.log_window)
 
     def _add_log(self, msg, flag):
@@ -26,7 +26,7 @@ class LogWindow(QtWidgets.QWidget):
         if flag < 4:
             print(msg)  # Use logger.debug(msg) if a logger is configured
         self.log_window.verticalScrollBar().setValue(self.log_window.verticalScrollBar().maximum())
-        QtCore.QCoreApplication.processEvents()
+        QCoreApplication.processEvents()
 
     def add_shotgrid_log(self, log_msg, flag):
         self._add_log(log_msg, flag)
@@ -43,7 +43,7 @@ class ShotGridLogHandler(logging.Handler):
 
 
 def main():
-    app = QtWidgets.QApplication(sys.argv)
+    app = QApplication(sys.argv)
     main_window = LogWindow()
     main_window.show()
 

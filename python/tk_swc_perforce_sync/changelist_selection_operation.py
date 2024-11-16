@@ -4,8 +4,13 @@
 import os
 
 # Qt
-from sgtk.platform.qt import QtCore, QtGui
-from tank.platform.qt5 import QtWidgets
+from sgtk.platform.qt import QtCore
+for name, cls in QtCore.__dict__.items():
+    if isinstance(cls, type): globals()[name] = cls
+
+from sgtk.platform.qt import QtGui
+for name, cls in QtGui.__dict__.items():
+    if isinstance(cls, type): globals()[name] = cls
 
 from .changelists_selection_widget import ChangelistSelectionWidget
 from .perform_actions import PerformActions
@@ -21,7 +26,7 @@ swc_fw = sgtk.platform.import_framework(
     "tk-framework-swc", "Context_Utils"
 )
 
-class ChangelistSelection(QtWidgets.QDialog):
+class ChangelistSelection(QDialog):
     """
     Shot Loader using Shot Select Widget
     """
@@ -56,7 +61,7 @@ class ChangelistSelection(QtWidgets.QDialog):
         # self.populate_changelists_description()
 
         # Main Layout
-        self.main_layout = QtWidgets.QVBoxLayout()
+        self.main_layout = QVBoxLayout()
 
         self.main_layout.addWidget(self.changelists_widget)
         self.setLayout(self.main_layout)
@@ -204,7 +209,7 @@ def run(p4=None, selected_actions=None, parent=None):
     Main function for the application
     """
     global loader
-    app = QtWidgets.QApplication.instance()
+    app = QApplication.instance()
 
     
     # if loader is None:
