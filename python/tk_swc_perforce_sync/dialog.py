@@ -7936,7 +7936,7 @@ class AppDialog(QWidget):
         self.ui.entity_breadcrumbs.setText("<big>%s</big>" % breadcrumbs)
 
     ################################################################################################
-    def _convert_local_to_depot(self, local_directory):
+    def _convert_local_to_depot_original(self, local_directory):
 
         local_directory = os.path.abspath(local_directory)
         where_output = self._p4.run_where(local_directory)
@@ -7948,6 +7948,70 @@ class AppDialog(QWidget):
                 break
 
         return depot_directory
+
+
+    def _convert_local_to_depot(self, local_path):
+        """
+        Converts a local file path to a Perforce depot path.
+
+        Args:
+            local_path (str): The local file path.
+
+        Returns:
+            str: The corresponding depot path.
+        """
+        # Remove the drive letter (e.g., B:) and leading backslash
+        depot_path = local_path[2:].lstrip("\\")
+        # Replace backslashes with forward slashes
+        depot_path = depot_path.replace("\\", "/")
+        # Add the depot prefix (e.g., "//")
+        depot_path = f"//{depot_path}"
+        return depot_path
+
+    def _convert_local_to_depot_2(self, local_directory):
+        """
+        Converts a local file/directory path to its Perforce depot path.
+
+        Args:
+            local_directory (str): The local path to be converted.
+
+        Returns:
+            str: The depot path corresponding to the local path, or None if not found.
+        """
+        # Ensure the input path is absolute
+        local_directory = os.path.abspath(local_directory)
+
+        try:
+            # Run the Perforce `where` command
+            where_output = self._p4.run_where(local_directory)
+        except Exception as e:
+            # Log the exception if the command fails
+            logger.error(f"Failed to run `p4 where` for {local_directory}: {e}")
+            return None
+
+        # Validate the output of `run_where`
+        if not where_output or not isinstance(where_output, list):
+            logger.error(f"`p4 where` returned invalid data for {local_directory}: {where_output}")
+            return None
+
+        # Attempt to find the depot path
+        depot_directory = None
+        for mapping in where_output:
+            if isinstance(mapping, dict):
+                depot_directory = mapping.get('depotFile')
+                if depot_directory:
+                    break
+            else:
+                logger.warning(f"Unexpected mapping format for {local_directory}: {mapping}")
+
+        if depot_directory:
+            # Return the found depot path
+            logger.debug(f"Depot path for {local_directory} is {depot_directory}")
+            return depot_directory
+        else:
+            # Log a warning if no mapping was found
+            logger.warning(f"No depot mapping found for {local_directory}")
+            return None
 
     def _get_perforce_data(self):
         """
@@ -7974,7 +8038,10 @@ class AppDialog(QWidget):
         for key in self._item_path_dict:
             if key:
                 #logger.debug(">>>>>>>>>>  key is: {}".format(key))
-                key = self._convert_local_to_depot(key).rstrip('/')
+                key = self._convert_local_to_depot(key)
+                #logger.debug(">>>>>>>>>> Converted key is: {}".format(key))
+                key = key.rstrip('/')
+                #logger.debug(">>>>>>>>>> modifed key is: {}".format(key))
                 fstat_list = self._p4.run_fstat('-Of', key + '/...')
                 self._get_submitted_changelists(key)
                 # logger.debug(">>>>>>>>>>  self._submitted_changes is: {}".format(self._submitted_changes))
@@ -8110,6 +8177,7 @@ class AppDialog(QWidget):
         depot_path = local_path.replace("\\", "/")
         depot_path = "/{}".format(depot_path)
         return depot_path
+
 
     def _find_task_context(self, path):
         # Try to get the context more specifically from the path on disk
