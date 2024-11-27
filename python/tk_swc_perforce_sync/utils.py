@@ -422,7 +422,7 @@ def check_validity_by_published_file(sg_item):
     if not sg_item:
         return None, None
 
-    logger.debug(">>>>> Checking validity by published file: sg_item: {}".format(sg_item))
+    #logger.debug(">>>>> Checking validity by published file: sg_item: {}".format(sg_item))
 
     if "path" in sg_item:
         local_path = sg_item["path"].get("local_path", None)
@@ -436,11 +436,11 @@ def check_validity_by_published_file(sg_item):
                 # return None, None
 
             sg = sgtk.platform.current_bundle()
-            logger.debug(">>>>> local_path: {}".format(local_path))
+            #logger.debug(">>>>> local_path: {}".format(local_path))
             current_relative_path = fix_query_path(local_path)
-            logger.debug(">>>>>>>>>>>>>> current_relative_path: {}".format(current_relative_path))
+            #logger.debug(">>>>>>>>>>>>>> current_relative_path: {}".format(current_relative_path))
             file_name = os.path.basename(local_path)
-            logger.debug(">>>>> file_name: {}".format(file_name))
+            #logger.debug(">>>>> file_name: {}".format(file_name))
             local_path = local_path.replace("\\", "/")
 
             # Search by file name
@@ -453,9 +453,9 @@ def check_validity_by_published_file(sg_item):
                                               order=[{'field_name': 'version_number', 'direction': 'desc'}])
 
             for published_file in published_files:
-                logger.debug(">>>>> published_file: ")
-                for k, v in published_file.items():
-                    logger.debug(">>>>> {} : {}".format(k, v))
+                #logger.debug(">>>>> published_file: ")
+                #for k, v in published_file.items():
+                #    logger.debug(">>>>> {} : {}".format(k, v))
                 if "path" in published_file and "local_path" in published_file["path"]:
                     query_local_path = published_file["path"]["local_path"].replace("\\", "/")
                     if query_local_path.endswith(current_relative_path):

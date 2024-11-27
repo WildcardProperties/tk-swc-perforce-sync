@@ -1741,8 +1741,8 @@ class AppDialog(QWidget):
             sg_item["path"] = {}
             sg_item["path"]["local_path"] = filepath
             entity, published_file = self._get_entity_from_sg_item(sg_item)
-            logger.debug("_validate_changelist_files: entity: {}".format(entity))
-            logger.debug("_validate_changelist_files: published_file: {}".format(published_file))
+            #logger.debug("_validate_changelist_files: entity: {}".format(entity))
+            #logger.debug("_validate_changelist_files: published_file: {}".format(published_file))
             if not entity:
                 error_list.append(filepath)
                 logger.debug("_validate_changelist_files: error_list: {}".format(error_list))
@@ -1774,15 +1774,17 @@ class AppDialog(QWidget):
             if change:
                 files_in_changelist = self._list_files_in_changelist(change)
                 logger.debug("Files in changelist {}: {}".format(change, files_in_changelist))
-                result, error_list = self._validate_changelist_files(files_in_changelist)
+                # Validate changelist files using threading
+                result, error_list = self._validate_changelist_files_with_threads(files_in_changelist)
+
                 if not result:
-                    msg = "\n <span style='color:#CC3333'>The following files in the changelist {} are not linked to any Shotgrid entity:</span> \n".format(change)
-                    self._add_log(msg, 2)
-                    for filepath in error_list:
-                        msg = "\n <span style='color:#CC3333'>{}</span> \n".format(filepath)
+                        msg = "\n <span style='color:#CC3333'>The following files in the changelist {} are not linked to any Shotgrid entity:</span> \n".format(change)
                         self._add_log(msg, 2)
-                    # Exit without publishing
-                    return
+                        for filepath in error_list:
+                            msg = "\n <span style='color:#CC3333'>{}</span> \n".format(filepath)
+                            self._add_log(msg, 2)
+                        # Exit without publishing
+                        return
 
             try:
                 try:
@@ -1793,7 +1795,10 @@ class AppDialog(QWidget):
                 logger.debug("change is: {}".format(change))
                 engine = sgtk.platform.current_engine()
                 if engine:
+                    logger.debug("Running the publish command...")
                     app_command = engine.commands.get("Publish...")
+                    # logger.debug("Completed running the publish command")
+
                     if app_command:
                         # now run the command, which in this case will launch the Publish app,
                         # passing in the desired changelist parameter.
@@ -1801,7 +1806,7 @@ class AppDialog(QWidget):
                         app_command["callback"](change)
 
                         # Start the after_publish_ui_close method in a new thread
-                        threading.Thread(target=self._after_publish_ui_close).start()
+                        # threading.Thread(target=self._after_publish_ui_close).start()
 
                         # After the UI closes, call _populate_pending_widget
                         # wait_thread = threading.Thread(target=self._after_publish_ui_close)
@@ -1813,6 +1818,7 @@ class AppDialog(QWidget):
 
                         #wait_thread = UIWaitThread(self._check_ui_closed, self)
                         # wait_thread.start()
+
 
             except Exception as e:
                 logger.debug("Error loading publisher: {}".format(e))
@@ -1916,6 +1922,48 @@ class AppDialog(QWidget):
 
         if selected_files_to_revert or selected_files_to_delete or selected_files_to_move:
             self._populate_pending_widget()
+
+    import threading
+    import os
+
+    def _validate_changelist_files_with_threads(self, files_in_changelist):
+        """
+        Validate changelist files using threading for faster execution, adapting to the machine's capabilities.
+        """
+        # Use the number of available CPU cores for thread count or default to 1 if detection fails
+        num_threads = max(1, os.cpu_count() or 1)
+        files_per_thread = len(files_in_changelist) // num_threads
+        error_list = []
+        results = []
+
+        def validate_files_sublist(files_sublist):
+            """
+            Thread-safe validation of a sublist of files.
+            """
+            result, errors = self._validate_changelist_files(files_sublist)
+            results.append(result)
+            error_list.extend(errors)
+
+        threads = []
+        for i in range(num_threads):
+            start_index = i * files_per_thread
+            end_index = start_index + files_per_thread
+            if i == num_threads - 1:  # Ensure the last thread handles remaining files
+                end_index = len(files_in_changelist)
+            files_sublist = files_in_changelist[start_index:end_index]
+
+            # Create and start a thread for the sublist
+            thread = threading.Thread(target=validate_files_sublist, args=(files_sublist,))
+            threads.append(thread)
+            thread.start()
+
+        # Wait for all threads to complete
+        for thread in threads:
+            thread.join()
+
+        # Consolidate results
+        overall_result = all(results)
+        return overall_result, error_list
 
     def _after_publish_ui_close(self):
         logger.debug("Checking if the publisher UI is closed...")
@@ -4842,53 +4890,6 @@ class AppDialog(QWidget):
             self._submit_other_pending_data(selected_tuples_to_submit)
             self._publish_pending_data_using_command_line(selected_tuples_to_submit)
 
-    def _publish_pending_data_using_command_line_original(self, selected_tuples_to_publish):
-        """
-        Publish Depot Data
-        """
-        # logger.debug(">>>>>>> _publish_pending_data_using_command_line: selected_tuples_to_publish:{}".format(selected_tuples_to_publish))
-        if selected_tuples_to_publish:
-            msg = "\n <span style='color:#2C93E2'>Publishing pending files in shotgrid</span> \n"
-            self._add_log(msg, 2)
-            files_count = len(selected_tuples_to_publish)
-            i = 0
-            for change, target_file, action, sg_item in selected_tuples_to_publish:
-                description = sg_item.get("description", None)
-                entity, new_sg_item = self._get_entity_from_sg_item(sg_item)
-                #logger.debug(">>>>>>>>>>> entity:{}".format(entity))
-                if entity:
-                    if new_sg_item:
-                        sg_item.update(new_sg_item)
-                        sg_item["description"] = description
-                    else:
-                        sg_item["entity"] = entity
-                    if 'path' in sg_item:
-                        rev = sg_item.get("version_number") or sg_item.get("headRev") or 1
-
-                        file_to_publish = sg_item['path'].get('local_path', None)
-                        msg = "({}/{})  Publishing file: {}#{}".format(i + 1, files_count, file_to_publish, rev)
-                        self._add_log(msg, 4)
-                        #logger.debug(">>>>>>>>>>> file_to_publish:{}".format(file_to_publish))
-                        #logger.debug(">>>>>>>>>>> sg_item:{}".format(sg_item))
-                        publisher = PublishItem(sg_item)
-                        publish_result = publisher.commandline_publishing()
-                        # publish_result = publisher.gui_publishing()
-                        if publish_result:
-                            logger.debug("New data is: {}".format(publish_result))
-                        i += 1
-                else:
-                    msg = "Unable to find the entity associated with the file: {}".format(target_file)
-                    msg = "\n <span style='color:#CC3333'>{}:</span> \n".format(msg)
-                    self._add_log(msg, 4)
-
-            msg = "\n <span style='color:#2C93E2'>Publishing files is complete</span> \n"
-            self._add_log(msg, 2)
-
-        else:
-            msg = "\n <span style='color:#2C93E2'>No need to publish any file</span> \n"
-            self._add_log(msg, 2)
-
-    import threading
 
     def _publish_file_thread(self, change, target_file, action, sg_item, log_callback, get_entity_callback):
         """
