@@ -1647,7 +1647,27 @@ class AppDialog(QWidget):
         self._pending_view_widget = self.pending_tree_view.get_treeview_widget()
 
         # Pending Scroll Area
-        self.ui.pending_scroll.setWidget(self._pending_view_widget)
+        #self.ui.pending_scroll.setWidget(self._pending_view_widget)
+        # Create a container widget for the TreeView
+        container_widget = QWidget()
+        container_layout = QVBoxLayout(container_widget)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.setSpacing(0)
+
+        # Add the TreeView widget to the container layout
+        self._pending_view_widget = self.pending_tree_view.get_treeview_widget()
+        self.pending_tree_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        container_layout.addWidget(self._pending_view_widget)
+
+        # Add a stretch to ensure proper resizing
+        container_layout.addStretch()
+
+        # Attach the container to the scroll area
+        self.ui.pending_scroll.setWidget(container_widget)
+        self.ui.pending_scroll.setWidgetResizable(True)
+        self.ui.pending_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.ui.pending_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+
         self._pending_view_model = self.pending_tree_view.proxymodel
         self._create_pending_view_context_menu()
 
@@ -1793,6 +1813,33 @@ class AppDialog(QWidget):
                 except:
                     pass
                 logger.debug("change is: {}".format(change))
+                """
+                engine = sgtk.platform.current_engine()
+                if engine:
+                    logger.debug("Running the publish command...")
+                    logger.debug("Current engine: {}".format(engine))
+
+                    # Get all available commands in the engine
+                    logger.debug("Available commands: {}".format(engine.commands.keys()))
+
+                    app_command = engine.commands.get("Publish...")
+
+                    if app_command:
+                        logger.debug("Found 'Publish...' command.")
+                        logger.debug("Command details: {}".format(app_command))
+
+                        # Log the callback function before calling it
+                        callback_func = app_command.get("callback")
+                        logger.debug("Callback function: {}".format(callback_func))
+
+                        if callback_func:
+                            logger.debug(">>>>> Pass in the desired changelist parameter: {}".format(change))
+                            callback_func(change)
+                        else:
+                            logger.warning("No callback function found in 'Publish...' command.")
+                    else:
+                        logger.warning("'Publish...' command not found in engine.commands.")
+                """
                 engine = sgtk.platform.current_engine()
                 if engine:
                     logger.debug("Running the publish command...")
@@ -1803,6 +1850,7 @@ class AppDialog(QWidget):
                         # now run the command, which in this case will launch the Publish app,
                         # passing in the desired changelist parameter.
                         # app_command["callback"](change)
+                        logger.debug(">>>>> Pass in the desired changelist parameter: {}".format(change))
                         app_command["callback"](change)
 
                         # Start the after_publish_ui_close method in a new thread
@@ -1818,6 +1866,7 @@ class AppDialog(QWidget):
 
                         #wait_thread = UIWaitThread(self._check_ui_closed, self)
                         # wait_thread.start()
+
 
 
             except Exception as e:
@@ -2031,7 +2080,7 @@ class AppDialog(QWidget):
                     else:
                         # Handle lines without delimiter or skip
                         # For example, you might want to log a warning or error
-                        logger.debug("Line without delimiter: {}".format(line))
+                        #logger.debug("Line without delimiter: {}".format(line))
                         return False
         except Exception as e:
             logger.debug("Error reading publisher is closed file status {}".format(e))

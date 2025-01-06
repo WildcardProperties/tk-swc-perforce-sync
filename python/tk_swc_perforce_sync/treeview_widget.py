@@ -9,6 +9,7 @@ from collections import OrderedDict
 import datetime
 from .date_time import create_publish_timestamp
 import os
+import threading
 import sgtk
 from sgtk.util import login
 
@@ -31,8 +32,10 @@ class SWCTreeView(QTreeView):
 
         #self.setMinimumSize(QSize(1200, 500))
 
-        self.setMinimumSize(QSize(10000, 600))
-        self.setMaximumSize(QSize(10000, 1500))
+        #self.setMinimumSize(QSize(10000, 600))
+        #self.setMaximumSize(QSize(10000, 1500))
+        self.setMinimumSize(QSize(10000, 3000))
+        self.setMaximumSize(QSize(10000, 5000))
         self.setEditTriggers(QAbstractItemView.NoEditTriggers)
 
         # self.setProperty("showDropIndicator", False)
@@ -117,7 +120,7 @@ class SWCTreeView(QTreeView):
     def multi_selection(self):
         self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
 
-    def dropEvent(self, event):
+    def dropEventOriginal(self, event):
         if event.mimeData().hasUrls():  # Handle external file drops
             logger.debug("External file drop ...")
             urls = event.mimeData().urls()
@@ -206,6 +209,112 @@ class SWCTreeView(QTreeView):
                 super().dropEvent(event)
             else:
                 # Call the base dropEvent implementation
+                super().dropEvent(event)
+
+    def dropEvent(self, event):
+        if event.mimeData().hasUrls():  # Handle external file/folder drops
+            logger.debug("External file/folder drop detected.")
+            urls = event.mimeData().urls()
+
+            # Determine the target changelist
+            target_index = self.indexAt(event.pos())
+            target_changelist = target_index.data(QtCore.Qt.UserRole)
+            if target_changelist is None:
+                target_changelist = "default"  # Use "default" if no specific changelist is targeted
+            logger.debug("Target changelist: {}".format(target_changelist))
+
+            # Define a function to process each file
+            def process_file(local_path):
+                try:
+                    fstat_info = self.p4.run_fstat(local_path)
+                    logger.debug("fstat_info: {}".format(fstat_info))
+                    if fstat_info:
+                        fstat_info = fstat_info[0]
+                        sg_item = self.create_sg_item_from_fstat(fstat_info)
+                        action = fstat_info.get("headAction") or fstat_info.get("action") or None
+                        if action:
+                            logger.debug("Original action for file: {} is: {}".format(local_path, action))
+                            if action == "add":
+                                action = "edit"
+                                logger.debug("Modified action for file: {} is: {}".format(local_path, action))
+                            selected_actions.append((sg_item, action))
+                        else:
+                            logger.debug("No action found for file: {}".format(local_path))
+                    else:
+                        logger.debug("No fstat info found for file: {}".format(local_path))
+                        sg_item = self.create_sg_item_from_local_path(local_path)
+                        action = "edit"
+                        selected_actions.append((sg_item, action))
+                except Exception as e:
+                    logger.error("Error processing file {}: {}".format(local_path, e))
+
+            # Helper function to recursively gather files in a folder
+            def gather_files(folder_path):
+                import os
+                file_paths = []
+                for root, _, files in os.walk(folder_path):
+                    for file in files:
+                        file_paths.append(os.path.join(root, file))
+                return file_paths
+
+            # Process each URL in a separate thread
+            threads = []
+            selected_actions = []
+
+            for url in urls:
+                if url.isLocalFile():
+                    local_path = url.toLocalFile().replace("\\", "/")
+                    if os.path.isdir(local_path):
+                        # If it's a folder, gather all files in the folder
+                        file_paths = gather_files(local_path)
+                        for file_path in file_paths:
+                            thread = threading.Thread(target=process_file, args=(file_path,))
+                            thread.start()
+                            threads.append(thread)
+                    else:
+                        # If it's a file, process it directly
+                        thread = threading.Thread(target=process_file, args=(local_path,))
+                        thread.start()
+                        threads.append(thread)
+
+            # Wait for all threads to finish
+            for thread in threads:
+                thread.join()
+
+            logger.debug("Selected actions: {}".format(selected_actions))
+
+            # Add files to the changelist
+            try:
+                self.perform_changelist_selection(selected_actions)
+            except Exception as e:
+                logger.error("Error adding files to changelist: {}".format(e))
+
+            event.acceptProposedAction()
+        else:
+            # Drop event handling for internal items
+            if event.source() == self:
+                target_index = self.indexAt(event.pos())
+                target_changelist = target_index.data(QtCore.Qt.UserRole)
+                target_changelist = str(target_changelist)
+
+                for source_index in self.selectedIndexes():
+                    source_data = source_index.data(Qt.DisplayRole)
+                    source_changelist = source_index.data(QtCore.Qt.UserRole)
+                    source_changelist = str(source_changelist)
+
+                    if source_data:
+                        dragged_file = source_data.split("#")[0].strip()
+                        logger.debug(
+                            "Adding dragged file: {} to changelist: {}".format(dragged_file, target_changelist))
+
+                        try:
+                            reopen_res = self.p4.run_reopen("-c", target_changelist, dragged_file)
+                            logger.debug("Result of reopen: {}".format(reopen_res))
+                        except Exception as e:
+                            logger.error("Error during reopen: {}".format(e))
+
+                super().dropEvent(event)
+            else:
                 super().dropEvent(event)
 
     def dragEnterEvent(self, event):
