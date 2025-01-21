@@ -1760,7 +1760,7 @@ class AppDialog(QWidget):
             sg_item = {}
             sg_item["path"] = {}
             sg_item["path"]["local_path"] = filepath
-            entity, published_file = self._get_entity_from_sg_item(sg_item)
+            entity, published_file = self.get_entity_from_sg_item(sg_item)
             #logger.debug("_validate_changelist_files: entity: {}".format(entity))
             #logger.debug("_validate_changelist_files: published_file: {}".format(published_file))
             if not entity:
@@ -4734,7 +4734,7 @@ class AppDialog(QWidget):
         #self._clear_pending_view_widget()
         self.change_sg_item = self._get_submit_changelist_widget_data()
         if self.change_sg_item and self._submit_widget_dict:
-            self.submitter_widget = SubmitChangelistWidget(parent=self, myp4=self._p4, chane_item=self.change_sg_item, file_dict=self._submit_widget_dict)
+            self.submitter_widget = SubmitChangelistWidget(parent=self, myp4=self._p4, change_item=self.change_sg_item, file_dict=self._submit_widget_dict)
             #logger.debug(">>>>>>>>>>> Submit Widget Dict:{}".format(self._submit_widget_dict))
 
             self.submitter_widget.show()
@@ -4975,6 +4975,8 @@ class AppDialog(QWidget):
         """
         Publish Depot Data using threading for speedup.
         """
+        logger.debug(">>>>>>>>>>>  _publish_pending_data_using_command_line")
+        logger.debug(">>>>>>>>>>>  selected_tuples_to_publish:{}".format(selected_tuples_to_publish))
         if selected_tuples_to_publish:
             msg = "\n <span style='color:#2C93E2'>Publishing pending files in Shotgrid</span> \n"
             self._add_log(msg, 2)
@@ -4986,7 +4988,7 @@ class AppDialog(QWidget):
             for change, target_file, action, sg_item in selected_tuples_to_publish:
                 thread = threading.Thread(target=self._publish_file_thread,
                                           args=(change, target_file, action, sg_item, self._add_log,
-                                                self._get_entity_from_sg_item))
+                                                self.get_entity_from_sg_item))
                 threads.append(thread)
                 thread.start()
 
@@ -5000,7 +5002,7 @@ class AppDialog(QWidget):
             msg = "\n <span style='color:#2C93E2'>No need to publish any file</span> \n"
             self._add_log(msg, 2)
 
-    def _get_entity_from_sg_item(self, sg_item):
+    def get_entity_from_sg_item(self, sg_item):
         # Check if the filepath leads to a valid shotgrid entity
         entity, published_file = check_validity_by_published_file(sg_item)
         if not entity:

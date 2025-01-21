@@ -11,8 +11,6 @@ from tank_vendor import shotgun_api3
 import sgtk
 logger = sgtk.platform.get_logger(__name__)
 
-import threading
-
 class SubmitChangelistWidget(QDialog):
     """
     Widget to submit and edit a changelist
@@ -23,7 +21,7 @@ class SubmitChangelistWidget(QDialog):
 
         # Setup the UI
         self.setObjectName('submit_changelist_widget')
-        self.setMinimumSize(1400, 865)
+        self.setMinimumSize(1000, 618)
         self.setWindowTitle('Submit Changelist')
         self.parent = parent
         self.p4 = myp4
@@ -110,31 +108,18 @@ class SubmitChangelistWidget(QDialog):
 
         # Buttons
         self.select_all_button = QPushButton('Select All')
-        #self.select_all_button.setFixedWidth(100)
-        #self.select_all_button.setFixedHeight(22.5)
         self.select_all_button.clicked.connect(self.select_all)
 
         self.select_none_button = QPushButton('Select None')
-        #self.select_none_button.setFixedWidth(100)
-        #self.select_none_button.setFixedHeight(22.5)
         self.select_none_button.clicked.connect(self.select_none)
 
         self.submit_button = QPushButton('Submit')
-        self.submit_button.setToolTip('Submit the selected files in the changelist')
-        #self.submit_button.setFixedWidth(100)
-        #self.submit_button.setFixedHeight(22.5)
         self.submit_button.clicked.connect(self.submit_changelist)
 
         self.save_button = QPushButton('Save')
-        self.save_button.setToolTip('Save the changelist description')
-        #self.save_button.setFixedWidth(100)
-        #self.save_button.setFixedHeight(22.5)
         self.save_button.clicked.connect(self.save_changelist)
 
         self.cancel_button = QPushButton('Cancel')
-        self.cancel_button.setToolTip('Cancel the operation')
-        #self.cancel_button.setFixedWidth(100)
-        #self.cancel_button.setFixedHeight(22.5)
         self.cancel_button.clicked.connect(self.cancel_action)
 
         # Button Layout
@@ -155,60 +140,65 @@ class SubmitChangelistWidget(QDialog):
 
     def populate_file_table(self):
         """
-        Populate the table widget with the files to submit.
+        Populate the table widget with the files to submit and update changelist details.
         """
-        #self.files_table_widget.setRowCount(0)  # Clear existing rows
-
-
         description = self.change_sg_item.get("description", "")
         user = self.change_sg_item.get("p4_user", "")
         head_time = self.change_sg_item.get("headTime", "")
-        change_time = self.change_sg_item.get("time", "")
-        # logger.debug(f"head_time:{head_time}, change_time:{change_time}")
         date_time = self._fix_timestamp(head_time)
-        # logger.debug(f"date_time:{date_time}")
         change = self.change_sg_item.get("change", "")
         workspace = self.change_sg_item.get("client", "")
+
+        # Set changelist details
         self.changelist_description.setText(description)
         self.user_value.setText(user)
-
         self.changelist_value.setText(str(change))
         self.date_value.setText(date_time)
         self.workspace_value.setText(workspace)
 
-        description_length = 0
-        has_files = False
-        if description:
-            description_length = len(description)
-        if self.submit_widget_dict:
-            has_files = len(self.submit_widget_dict.values()) > 0
+        # Initialize or update context in change_sg_item
+        if "context" not in self.change_sg_item or not self.change_sg_item["context"]:
+            logger.debug(f"populate_file_table: Context not found in change_sg_item: {self.change_sg_item}")
+            entity, published_file = self.parent.get_entity_from_sg_item(self.change_sg_item)
+            logger.debug(f"populate_file_table: Entity: {entity}")
+            if entity:
+                self.change_sg_item["entity"] = entity
+                entity_id = entity.get("id", None)
+                entity_type = entity.get("type", None)
 
-        self.submit_button.setEnabled(description_length >= 5 and has_files)
-        self.save_button.setEnabled(description_length >= 5)
+                if entity_type and entity_id:
+                    # Retrieve context and cache it if not already cached
 
+                    context_str = self.context_cache.get((entity_type, entity_id))
+                    if not context_str:
+                        try:
+                            tk = sgtk.sgtk_from_entity(entity_type, entity_id)
+                            context = tk.context_from_entity(entity_type, entity_id)
+                            context_str = str(context)
+                            self.context_cache[(entity_type, entity_id)] = context_str
+                        except Exception as e:
+                            logger.debug(f"Failed to retrieve context for {entity_type} {entity_id}: {e}")
+                            context_str = None
+
+                    # Store context in change_sg_item
+                    self.change_sg_item["context"] = context_str
+                else:
+                    self.change_sg_item["context"] = None
+            else:
+                self.change_sg_item["context"] = None
+
+        # Populate the table
         row_position = 0
-
-        # Create and start a thread for entity processing
-        entity_thread = threading.Thread(target=self.process_entities, args=(self.submit_widget_dict, self.get_entity))
-        entity_thread.start()
-        entity_thread.join()  # Wait for the thread to finish before populating the table
-
         for key, file_info in self.submit_widget_dict.items():
-            # logger.debug(">>>>>>>>>>> file_info:{}".format(file_info))
-
-            sg_item = file_info.get("sg_item", None)
-            # logger.debug(">>>>>>>>>>> sg_item begore additions:{}".format(sg_item))
-            if sg_item:
-                entity = sg_item.get("entity", None)
-
             self.files_table_widget.insertRow(row_position)
 
-            # Create checkbox item
+            # Checkbox column
             checkbox_item = QTableWidgetItem()
             checkbox_item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
             checkbox_item.setCheckState(Qt.Checked)
             self.files_table_widget.setItem(row_position, 0, checkbox_item)
 
+            # File and metadata columns
             self.files_table_widget.setItem(row_position, 1, QTableWidgetItem(file_info["file"]))
             self.files_table_widget.setItem(row_position, 2, QTableWidgetItem(file_info["folder"]))
             self.files_table_widget.setItem(row_position, 3, QTableWidgetItem(file_info["resolve_status"]))
@@ -218,15 +208,17 @@ class SubmitChangelistWidget(QDialog):
             # Changelist column
             self.files_table_widget.setItem(row_position, 6, QTableWidgetItem(str(change)))
 
+            # Entity Name, Entity ID, and Context columns
+            entity = self.change_sg_item.get("entity", {})
             if entity:
-                entity_name = entity.get("name", None)
                 entity_id = entity.get("id", None)
+                entity_name = entity.get("code", None)
 
-                self.files_table_widget.setItem(row_position, 7, QTableWidgetItem(str(entity_name or "None")))
-                self.files_table_widget.setItem(row_position, 8, QTableWidgetItem(str(entity_id or "None")))
+                self.files_table_widget.setItem(row_position, 7, QTableWidgetItem(str(entity_name or "")))
+                self.files_table_widget.setItem(row_position, 8, QTableWidgetItem(str(entity_id or "")))
 
                 # Context column
-                context_str = sg_item.get("context")
+                context_str = self.change_sg_item.get("context")
                 self.files_table_widget.setItem(row_position, 9,
                                                 QTableWidgetItem(context_str if context_str else "None"))
             else:
@@ -241,58 +233,11 @@ class SubmitChangelistWidget(QDialog):
                         item = QTableWidgetItem("")
                         self.files_table_widget.setItem(row_position, col, item)
                     item.setFlags(Qt.NoItemFlags)  # Disable interaction for the item
-            # logger.debug(">>>>>>>>>>> sg_item after additions:{}".format(self.submit_widget_dict[key]))
+
             row_position += 1
 
         # Update the button states based on the initial description and file selection
         #self.update_buttons_state()
-
-    def process_entities(self, submit_widget_dict, get_entity_callback):
-        """
-        Process entities in a separate thread.
-
-        For each file in the submit_widget_dict, retrieves the associated entity using the provided callback.
-        Updates the "sg_item" in the submit_widget_dict with the processed entity information.
-
-        :param submit_widget_dict: Dictionary of files with associated ShotGrid items.
-        :param get_entity_callback: Callback function to retrieve entity data for an sg_item.
-        """
-        for key, file_info in submit_widget_dict.items():
-            sg_item = file_info.get("sg_item", None)
-            if sg_item:
-                # Retrieve and update the sg_item with entity information
-                processed_sg_item = get_entity_callback(sg_item)
-                file_info["sg_item"] = processed_sg_item
-
-    def get_entity(self, sg_item):
-        """
-        Get the entity name and id from the Shotgun item.
-
-        :param sg_item: Standard Shotgun entity dictionary with keys type, id and name.
-        :return: Tuple with entity name and id.
-        """
-
-        if sg_item:
-            entity, published_file = self.parent.get_entity_from_sg_item(sg_item)
-            if entity:
-                sg_item["entity"] = entity
-                entity_id = entity.get("id", None)
-                entity_type = entity.get("type", None)
-                if entity_type and entity_id:
-                    context_str = self.context_cache.get((entity_type, entity_id))
-                    if not context_str:
-                        try:
-                            tk = sgtk.sgtk_from_entity(entity_type, entity_id)
-                            context = tk.context_from_entity(entity_type, entity_id)
-                            context_str = str(context)
-                            self.context_cache[(entity_type, entity_id)] = context_str
-                            sg_item["context"] = context_str
-                        except Exception as e:
-                            logger.debug(f"Failed to retrieve context for {entity_type} {entity_id}: {e}")
-                            context_str = None
-                    # Store context in change_sg_item
-                    sg_item["context"] = context_str
-        return sg_item
 
     def _fix_timestamp(self, unix_timestamp):
         """
