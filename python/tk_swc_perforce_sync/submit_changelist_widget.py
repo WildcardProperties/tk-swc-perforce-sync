@@ -89,7 +89,7 @@ class SubmitChangelistWidget(QDialog):
         self.files_table_widget = QTableWidget(0, 10)  # Adjusted for 10 columns
         self.files_table_widget.setHorizontalHeaderLabels(
             ['', 'File', 'In Folder', 'Resolve Status', 'Type', 'Pending Action', 'Changelist', 'Entity Name',
-             'Entity ID', 'Context']
+             'Entity ID', 'Context', 'Comment']
         )
 
         # Adjust column resizing to fit content and stretch
@@ -103,7 +103,8 @@ class SubmitChangelistWidget(QDialog):
         header.setSectionResizeMode(6, QHeaderView.ResizeToContents)  # Changelist column
         header.setSectionResizeMode(7, QHeaderView.ResizeToContents)  # Entity Name column
         header.setSectionResizeMode(8, QHeaderView.ResizeToContents)  # Entity ID column
-        header.setSectionResizeMode(9, QHeaderView.Stretch)  # Context column
+        header.setSectionResizeMode(9, QHeaderView.ResizeToContents)  # Context column
+        header.setSectionResizeMode(10, QHeaderView.Stretch)  # Comment column
 
         self.main_layout.addWidget(self.files_label)
         self.main_layout.addWidget(self.files_table_widget)
@@ -195,9 +196,9 @@ class SubmitChangelistWidget(QDialog):
 
         for key, file_info in self.submit_widget_dict.items():
             # logger.debug(">>>>>>>>>>> file_info:{}".format(file_info))
-
+            entity = None
             sg_item = file_info.get("sg_item", None)
-            # logger.debug(">>>>>>>>>>> sg_item begore additions:{}".format(sg_item))
+            logger.debug(">>>>>>>>>>> sg_item before additions:{}".format(sg_item))
             if sg_item:
                 entity = sg_item.get("entity", None)
 
@@ -218,7 +219,8 @@ class SubmitChangelistWidget(QDialog):
             # Changelist column
             self.files_table_widget.setItem(row_position, 6, QTableWidgetItem(str(change)))
 
-            if entity:
+            if entity and isinstance(entity, dict):
+                logger.debug(">>>>>>>>>>> entity:{}".format(entity))
                 entity_name = entity.get("name", None)
                 entity_id = entity.get("id", None)
 
@@ -229,18 +231,27 @@ class SubmitChangelistWidget(QDialog):
                 context_str = sg_item.get("context")
                 self.files_table_widget.setItem(row_position, 9,
                                                 QTableWidgetItem(context_str if context_str else "None"))
+                comment_item = QTableWidgetItem("Entity is recognizable")
+                comment_item.setToolTip("Entity is recognizable")
+                self.files_table_widget.setItem(row_position, 10, comment_item)
             else:
                 self.files_table_widget.setItem(row_position, 7, QTableWidgetItem("None"))
                 self.files_table_widget.setItem(row_position, 8, QTableWidgetItem("None"))
                 self.files_table_widget.setItem(row_position, 9, QTableWidgetItem("None"))
 
-                # Deactivate the row
-                for col in range(10):  # Total number of columns
+                comment_item = QTableWidgetItem("Entity is not recognized")
+                comment_item.setToolTip("Entity is not recognized")
+                self.files_table_widget.setItem(row_position, 10, comment_item)
+
+                for col in range(11):  # Total number of columns
                     item = self.files_table_widget.item(row_position, col)
                     if item is None:
                         item = QTableWidgetItem("")
                         self.files_table_widget.setItem(row_position, col, item)
+                    item.setForeground(QtGui.QBrush(QtGui.QColor(255, 0, 0)))  # Red color
                     item.setFlags(Qt.NoItemFlags)  # Disable interaction for the item
+
+
             # logger.debug(">>>>>>>>>>> sg_item after additions:{}".format(self.submit_widget_dict[key]))
             row_position += 1
 
@@ -313,7 +324,7 @@ class SubmitChangelistWidget(QDialog):
             sg_timestamp = ""
         return sg_timestamp
 
-    def update_buttons_state(self):
+    def update_buttons_state_original(self):
         """
         Enable or disable the submit and save buttons based on the description length and file selection.
         """
@@ -323,6 +334,19 @@ class SubmitChangelistWidget(QDialog):
 
         self.submit_button.setEnabled(description_length >= 5 and has_files)
         self.save_button.setEnabled(description_length >= 5)
+
+    def update_buttons_state(self):
+        """
+        Enable or disable the submit button based on conditions.
+        """
+        description_length = len(self.changelist_description.toPlainText()) if hasattr(self,
+                                                                                       'changelist_description') else 0
+        has_files = any(
+            self.files_table_widget.item(row, 0).checkState() == Qt.Checked and
+            self.files_table_widget.item(row, 10).text() != "Entity is not recognized"
+            for row in range(self.files_table_widget.rowCount())
+        )
+        self.submit_button.setEnabled(description_length >= 5 and has_files)
 
     def select_all(self):
         """
@@ -376,15 +400,22 @@ class SubmitChangelistWidget(QDialog):
                 key = (file_name, folder)
                 if key in self.submit_widget_dict:
                     full_file_info = self.submit_widget_dict[key]
-                    if "sg_item" in full_file_info:
-                        full_file_info["sg_item"]["description"] = description
-                    #full_file_info["description"] = description
                     if full_file_info:
-                        action = full_file_info.get("pending_action", None)
-                        if action == "delete":
-                            file_info_deleted.append(full_file_info)
+                        full_file_info["sg_item"]["description"] = description
+                    if "sg_item" in full_file_info:
+                        sg_item = full_file_info["sg_item"]
+                        entity = sg_item.get("entity", None)
+
+                    #full_file_info["description"] = description
+                        if entity:
+
+                            action = full_file_info.get("pending_action", None)
+                            if action == "delete":
+                                file_info_deleted.append(full_file_info)
+                            else:
+                                file_info_other.append(full_file_info)
                         else:
-                            file_info_other.append(full_file_info)
+                            logger.warning(f"Entity not found for {key}, skipping file")
                 else:
                     logger.warning(f"File info not found for {key}")
 
