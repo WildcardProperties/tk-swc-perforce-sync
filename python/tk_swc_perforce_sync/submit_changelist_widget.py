@@ -96,10 +96,10 @@ class SubmitChangelistWidget(QDialog):
         header = self.files_table_widget.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)  # Checkbox column
         header.setSectionResizeMode(1, QHeaderView.ResizeToContents)  # File column
-        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)  # In Folder column
+        header.setSectionResizeMode(2, QHeaderView.Stretch)  # In Folder column
         header.setSectionResizeMode(3, QHeaderView.ResizeToContents)  # Resolve Status column
         header.setSectionResizeMode(4, QHeaderView.ResizeToContents)  # Type column
-        header.setSectionResizeMode(5, QHeaderView.Stretch)  # Pending Action column
+        header.setSectionResizeMode(5, QHeaderView.ResizeToContents)  # Pending Action column
         header.setSectionResizeMode(6, QHeaderView.ResizeToContents)  # Changelist column
         header.setSectionResizeMode(7, QHeaderView.ResizeToContents)  # Entity Name column
         header.setSectionResizeMode(8, QHeaderView.ResizeToContents)  # Entity ID column
